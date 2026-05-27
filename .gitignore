@@ -9,4 +9,5 @@ build
 coverage
 .turbo
 .pnpm-store
+*.tsbuildinfo
 prisma/migrations/dev.db*

@@ -4,6 +4,12 @@
 // Endpoints that should NOT appear in public docs simply do not call
 // registerEndpoint() — making the "intentionally incomplete docs"
 // gap structural rather than manually maintained.
+//
+// The registry is anchored to globalThis (same pattern as the Prisma
+// client in @bvbe/db) so that Next.js route-segment bundles and HMR
+// reloads in dev share a single Map instance. Without this, each
+// compiled route segment could end up with its own copy and the doc
+// would surface only whichever segment was last loaded.
 
 type Method = "get" | "post" | "put" | "patch" | "delete";
 
@@ -14,7 +20,14 @@ export type EndpointSpec = {
   responses: Record<string, { description: string }>;
 };
 
-const registry = new Map<string, EndpointSpec>();
+declare global {
+  // eslint-disable-next-line no-var
+  var __bvbeOpenApiRegistry: Map<string, EndpointSpec> | undefined;
+}
+
+const registry: Map<string, EndpointSpec> =
+  globalThis.__bvbeOpenApiRegistry ??
+  (globalThis.__bvbeOpenApiRegistry = new Map<string, EndpointSpec>());
 
 function key(spec: EndpointSpec): string {
   return `${spec.method.toUpperCase()} ${spec.path}`;
@@ -27,8 +40,8 @@ export function registerEndpoint(spec: EndpointSpec): void {
 export function buildOpenApiDocument(): unknown {
   const paths: Record<string, Record<string, unknown>> = {};
   for (const spec of registry.values()) {
-    paths[spec.path] ??= {};
-    paths[spec.path][spec.method] = {
+    const pathEntry = (paths[spec.path] ??= {});
+    pathEntry[spec.method] = {
       summary: spec.summary,
       responses: spec.responses,
     };
@@ -45,4 +58,3 @@ export function buildOpenApiDocument(): unknown {
     paths,
   };
 }
-

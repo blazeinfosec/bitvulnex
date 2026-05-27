@@ -1,4 +1,4 @@
-# BVBE local lab — six services.
+# BVBE local lab — seven services.
 #
 # DO NOT DEPLOY. Local docker-compose only. `docker compose down -v`
 # fully destroys all state. No volumes survive a reset.
@@ -33,13 +33,41 @@ services:
       HINT_MODE: ${HINT_MODE:-false}
       SCOREBOARD_ENABLED: ${SCOREBOARD_ENABLED:-false}
       CTF_SALT: ${CTF_SALT:?CTF_SALT must be set. Copy .env.example to .env.}
+    volumes:
+      # Bind mounts so `next dev` Fast Refresh sees host edits.
+      # The anonymous-volume entries for node_modules / .next prevent
+      # the host OS file layer from contending with the container's.
+      - ./apps/web:/repo/apps/web
+      - ./packages:/repo/packages
+      - ./CHANGELOG.md:/repo/CHANGELOG.md:ro
+      - /repo/apps/web/node_modules
+      - /repo/apps/web/.next
     depends_on:
       db:
         condition: service_healthy
       redis:
         condition: service_healthy
+      db-migrate:
+        condition: service_completed_successfully
       bitcoin-mock:
         condition: service_started
+    networks:
+      - bvbe-net
+
+  # One-shot service: applies Prisma migrations and seeds the admin
+  # row, then exits. `web` waits on `service_completed_successfully`
+  # so exit criterion #6 ("admin row exists after `make up`") is
+  # satisfied by `make up` alone.
+  db-migrate:
+    build:
+      context: .
+      dockerfile: apps/db-migrate/Dockerfile
+    environment:
+      DATABASE_URL: postgresql://bvbe:bvbe@db:5432/bvbe?schema=public
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: "no"
     networks:
       - bvbe-net
 
@@ -52,11 +80,17 @@ services:
       DATABASE_URL: postgresql://bvbe:bvbe@db:5432/bvbe?schema=public
       REDIS_URL: redis://redis:6379
       BITCOIN_MOCK_URL: http://bitcoin-mock:18443
+    volumes:
+      - ./apps/worker:/repo/apps/worker
+      - ./packages:/repo/packages
+      - /repo/apps/worker/node_modules
     depends_on:
       db:
         condition: service_healthy
       redis:
         condition: service_healthy
+      db-migrate:
+        condition: service_completed_successfully
     networks:
       - bvbe-net
 
@@ -67,6 +101,10 @@ services:
     environment:
       NODE_ENV: development
       PORT: "18443"
+    volumes:
+      - ./apps/bitcoin-mock:/repo/apps/bitcoin-mock
+      - ./packages/bitcoin-rpc-types:/repo/packages/bitcoin-rpc-types
+      - /repo/apps/bitcoin-mock/node_modules
     # No host port mapping — internal network only.
     networks:
       - bvbe-net
