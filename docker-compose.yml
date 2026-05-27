@@ -1,0 +1,106 @@
+# BVBE local lab — six services.
+#
+# DO NOT DEPLOY. Local docker-compose only. `docker compose down -v`
+# fully destroys all state. No volumes survive a reset.
+
+services:
+  nginx:
+    image: nginx:1.25-alpine
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - web
+    networks:
+      - bvbe-net
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    environment:
+      NODE_ENV: development
+      PORT: "3000"
+      DATABASE_URL: postgresql://bvbe:bvbe@db:5432/bvbe?schema=public
+      REDIS_URL: redis://redis:6379
+      # Phase 0: strict, no fallback. The deliberate weak-key fallback
+      # path that becomes V-9 is reserved for Phase 1. If JWT_SECRET is
+      # unset, the web container must fail-fast at env() parsing.
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET must be set (>=32 chars). Copy .env.example to .env.}
+      BITCOIN_MOCK_URL: http://bitcoin-mock:18443
+      CTF_MODE: ${CTF_MODE:-false}
+      HINT_MODE: ${HINT_MODE:-false}
+      SCOREBOARD_ENABLED: ${SCOREBOARD_ENABLED:-false}
+      CTF_SALT: ${CTF_SALT:?CTF_SALT must be set. Copy .env.example to .env.}
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      bitcoin-mock:
+        condition: service_started
+    networks:
+      - bvbe-net
+
+  worker:
+    build:
+      context: .
+      dockerfile: apps/worker/Dockerfile
+    environment:
+      NODE_ENV: development
+      DATABASE_URL: postgresql://bvbe:bvbe@db:5432/bvbe?schema=public
+      REDIS_URL: redis://redis:6379
+      BITCOIN_MOCK_URL: http://bitcoin-mock:18443
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - bvbe-net
+
+  bitcoin-mock:
+    build:
+      context: .
+      dockerfile: apps/bitcoin-mock/Dockerfile
+    environment:
+      NODE_ENV: development
+      PORT: "18443"
+    # No host port mapping — internal network only.
+    networks:
+      - bvbe-net
+
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: bvbe
+      POSTGRES_PASSWORD: bvbe
+      POSTGRES_DB: bvbe
+    volumes:
+      - bvbe-db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U bvbe -d bvbe"]
+      interval: 2s
+      timeout: 2s
+      retries: 20
+    networks:
+      - bvbe-net
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 2s
+      timeout: 2s
+      retries: 20
+    networks:
+      - bvbe-net
+
+volumes:
+  bvbe-db:
+
+networks:
+  bvbe-net:
+    driver: bridge

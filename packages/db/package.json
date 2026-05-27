@@ -1,0 +1,23 @@
+{
+  "name": "@bvbe/db",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "scripts": {
+    "build": "prisma generate",
+    "lint": "tsc -p tsconfig.json --noEmit",
+    "seed": "prisma migrate deploy && tsx prisma/seed.ts",
+    "migrate": "prisma migrate dev",
+    "generate": "prisma generate",
+    "studio": "prisma studio"
+  },
+  "dependencies": {
+    "@prisma/client": "^5.20.0"
+  },
+  "devDependencies": {
+    "prisma": "^5.20.0",
+    "tsx": "^4.19.1"
+  }
+}

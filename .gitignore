@@ -1,0 +1,12 @@
+node_modules
+.next
+dist
+build
+.DS_Store
+.env
+.env.local
+*.log
+coverage
+.turbo
+.pnpm-store
+prisma/migrations/dev.db*

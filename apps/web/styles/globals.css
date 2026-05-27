@@ -1,0 +1,24 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+}
+
+html, body {
+  height: 100%;
+}
+
+body {
+  @apply bg-white text-navy-900 antialiased;
+  font-feature-settings: "ss01", "cv11", "tnum";
+}
+
+a {
+  @apply text-accent hover:underline;
+}
+
+.font-tabular {
+  font-variant-numeric: tabular-nums;
+}
