@@ -6,6 +6,19 @@ import { buildOpenApiDocument, registerEndpoint } from "@/lib/openapi-registry";
 // phases ship new routes; intentionally-undocumented endpoints simply
 // do not appear in this import list.
 import "@/app/api/health/route";
+import "@/app/api/v2/auth/signup/route";
+import "@/app/api/v2/auth/login/route";
+import "@/app/api/v2/auth/login/totp/route";
+import "@/app/api/v2/auth/refresh/route";
+import "@/app/api/v2/auth/logout/route";
+import "@/app/api/v2/auth/password-reset/request/route";
+import "@/app/api/v2/auth/password-reset/confirm/route";
+import "@/app/api/v2/auth/2fa/enable/route";
+import "@/app/api/v2/auth/2fa/verify/route";
+import "@/app/api/v2/auth/2fa/disable/route";
+import "@/app/api/v2/me/route";
+import "@/app/api/v2/me/api-keys/route";
+import "@/app/api/v2/me/api-keys/[id]/route";
 
 registerEndpoint({
   method: "get",

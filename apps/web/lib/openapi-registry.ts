@@ -25,21 +25,21 @@ declare global {
   var __bvbeOpenApiRegistry: Map<string, EndpointSpec> | undefined;
 }
 
-const registry: Map<string, EndpointSpec> =
-  globalThis.__bvbeOpenApiRegistry ??
-  (globalThis.__bvbeOpenApiRegistry = new Map<string, EndpointSpec>());
+function registry(): Map<string, EndpointSpec> {
+  return (globalThis.__bvbeOpenApiRegistry ??= new Map<string, EndpointSpec>());
+}
 
 function key(spec: EndpointSpec): string {
   return `${spec.method.toUpperCase()} ${spec.path}`;
 }
 
 export function registerEndpoint(spec: EndpointSpec): void {
-  registry.set(key(spec), spec);
+  registry().set(key(spec), spec);
 }
 
 export function buildOpenApiDocument(): unknown {
   const paths: Record<string, Record<string, unknown>> = {};
-  for (const spec of registry.values()) {
+  for (const spec of registry().values()) {
     const pathEntry = (paths[spec.path] ??= {});
     pathEntry[spec.method] = {
       summary: spec.summary,

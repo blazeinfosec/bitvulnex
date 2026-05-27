@@ -1,4 +1,4 @@
-import { PrismaClient } from "@prisma/client";
+import { PrismaClient, type Role } from "@prisma/client";
 import { scrypt, randomBytes } from "node:crypto";
 import { promisify } from "node:util";
 
@@ -11,25 +11,137 @@ async function hashPassword(password: string): Promise<string> {
   return `scrypt$${salt.toString("hex")}$${derived.toString("hex")}`;
 }
 
-async function main() {
-  // Phase 0 seeds exactly one row: the admin account that exists so
-  // Phase 1's signup flow has a counterparty. No realistic users yet.
-  // The realistic ~50-user seed lands in Phase 1.
-  const adminEmail = "admin@bvbe.local";
-  const placeholderPassword = "change-me-after-first-login";
+const FIRST = [
+  "Ada", "Linus", "Grace", "Donald", "Margaret", "Edsger", "Barbara", "Tim",
+  "Brian", "Ken", "Brendan", "Anita", "Radia", "Vint", "Hedy", "Alan",
+  "Claude", "Niklaus", "Bjarne", "James", "Dennis", "Guido", "Yukihiro",
+  "Audrey", "Frances", "Karen", "Adele", "Jeanette", "Joan", "Sophie",
+];
+const LAST = [
+  "Lovelace", "Torvalds", "Hopper", "Knuth", "Hamilton", "Dijkstra", "Liskov",
+  "Berners-Lee", "Kernighan", "Thompson", "Eich", "Borg", "Perlman", "Cerf",
+  "Lamarr", "Turing", "Shannon", "Wirth", "Stroustrup", "Gosling", "Ritchie",
+  "Rossum", "Matsumoto", "Tang", "Allen", "Sparck-Jones", "Goldberg",
+  "Wing", "Clarke", "Wilkes",
+];
 
-  await prisma.user.upsert({
-    where: { email: adminEmail },
-    update: {},
-    create: {
-      email: adminEmail,
-      passwordHash: await hashPassword(placeholderPassword),
+type SeedUser = {
+  email: string;
+  displayName: string;
+  password: string;
+  role: Role;
+  kycTier: number;
+  emailVerified: boolean;
+};
+
+function det(i: number, n: number): number {
+  // Deterministic pseudo-random for stable seeds across re-runs.
+  return ((i + 1) * 2654435761) >>> 0 ? ((i + 1) * 2654435761) % n : 0;
+}
+
+function buildUsers(): SeedUser[] {
+  const users: SeedUser[] = [
+    {
+      email: "admin@bvbe.local",
+      displayName: "Admin",
+      password: "change-me-after-first-login",
       role: "admin",
       kycTier: 3,
+      emailVerified: true,
     },
-  });
+    {
+      email: "treasury@bvbe.local",
+      displayName: "Treasury Ops",
+      password: "change-me-after-first-login",
+      role: "treasury",
+      kycTier: 3,
+      emailVerified: true,
+    },
+    {
+      email: "support1@bvbe.local",
+      displayName: "Support Agent A",
+      password: "change-me-after-first-login",
+      role: "support",
+      kycTier: 3,
+      emailVerified: true,
+    },
+    {
+      email: "support2@bvbe.local",
+      displayName: "Support Agent B",
+      password: "change-me-after-first-login",
+      role: "support",
+      kycTier: 3,
+      emailVerified: true,
+    },
+    {
+      email: "compliance@bvbe.local",
+      displayName: "Compliance Officer",
+      password: "change-me-after-first-login",
+      role: "compliance",
+      kycTier: 3,
+      emailVerified: true,
+    },
+    {
+      email: "whale1@example.test",
+      displayName: "High Roller Holdings",
+      password: "Sup3rLong-Whale-Pass-001",
+      role: "user",
+      kycTier: 3,
+      emailVerified: true,
+    },
+    {
+      email: "whale2@example.test",
+      displayName: "Cetacean Capital",
+      password: "Sup3rLong-Whale-Pass-002",
+      role: "user",
+      kycTier: 3,
+      emailVerified: true,
+    },
+  ];
 
-  console.log(`seeded: ${adminEmail} (admin)`);
+  const tiers: Array<{ tier: number; verified: boolean; count: number }> = [
+    { tier: 0, verified: false, count: 10 },
+    { tier: 1, verified: true, count: 15 },
+    { tier: 2, verified: true, count: 12 },
+    { tier: 3, verified: true, count: 6 },
+  ];
+
+  let i = 0;
+  for (const t of tiers) {
+    for (let k = 0; k < t.count; k++) {
+      const first = FIRST[det(i * 7, FIRST.length)] as string;
+      const last = LAST[det(i * 11 + 3, LAST.length)] as string;
+      users.push({
+        email: `${first.toLowerCase()}.${last.toLowerCase()}.${i}@example.test`,
+        displayName: `${first} ${last}`,
+        password: "lab-password-${i}",
+        role: "user",
+        kycTier: t.tier,
+        emailVerified: t.verified,
+      });
+      i++;
+    }
+  }
+  return users;
+}
+
+async function main() {
+  const users = buildUsers();
+  for (const u of users) {
+    await prisma.user.upsert({
+      where: { email: u.email },
+      update: {},
+      create: {
+        email: u.email,
+        passwordHash: await hashPassword(u.password),
+        displayName: u.displayName,
+        role: u.role,
+        kycTier: u.kycTier,
+        emailVerified: u.emailVerified,
+      },
+    });
+  }
+  console.log(`seeded ${users.length} users`);
 }
 
 main()

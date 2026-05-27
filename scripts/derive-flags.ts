@@ -5,7 +5,13 @@
 import { createHash } from "node:crypto";
 
 const VULN_IDS: string[] = [
-  // Populated by later phases. See VULNS.md.
+  "V-8",
+  "V-9",
+  "V-10",
+  "V-19",
+  "V-20",
+  "V-21",
+  "V-35",
 ];
 
 function flagFor(vulnId: string, salt: string): string {

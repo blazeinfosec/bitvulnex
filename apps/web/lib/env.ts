@@ -6,7 +6,10 @@ const schema = z.object({
   REDIS_URL: z.string().url(),
   JWT_SECRET: z
     .string()
-    .min(32, "JWT_SECRET must be >=32 chars (phase 0 strict)"),
+    .min(32, "JWT_SECRET must be >=32 chars"),
+  // Legacy v1 mobile-app HMAC secret. Defaulted so the legacy verifier
+  // still works in dev when the variable isn't set explicitly.
+  JWT_SECRET_LEGACY: z.string().default("changeme"),
   BITCOIN_MOCK_URL: z.string().url(),
   CTF_MODE: z
     .enum(["true", "false"])

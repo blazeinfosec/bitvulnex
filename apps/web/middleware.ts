@@ -1,0 +1,64 @@
+import { NextResponse, type NextRequest } from "next/server";
+import { jwtVerify } from "jose";
+
+const ADMIN_API_PREFIX = "/api/v2/admin";
+const ACCOUNT_API_PREFIX = "/api/v2/me";
+
+function secretBytes(): Uint8Array {
+  const s = process.env.JWT_SECRET ?? "";
+  return new TextEncoder().encode(s);
+}
+
+async function claimsFromHeader(
+  header: string | null,
+): Promise<{ sub: string; role: string } | null> {
+  if (!header) return null;
+  const m = header.match(/^Bearer\s+(.+)$/i);
+  if (!m) return null;
+  try {
+    const { payload } = await jwtVerify(m[1] as string, secretBytes(), {
+      issuer: "bvbe",
+      audience: "bvbe-web",
+      algorithms: ["HS256"],
+    });
+    return { sub: String(payload.sub), role: String(payload.role) };
+  } catch {
+    return null;
+  }
+}
+
+export async function middleware(req: NextRequest) {
+  // Internal Next.js subrequest hop — let it through so health
+  // probes and on-demand revalidation don't have to mint a token.
+  if (req.headers.get("x-middleware-subrequest")) {
+    return NextResponse.next();
+  }
+
+  const path = req.nextUrl.pathname;
+  const claims = await claimsFromHeader(req.headers.get("authorization"));
+
+  if (path.startsWith(ADMIN_API_PREFIX)) {
+    if (!claims) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+    if (claims.role !== "admin" && claims.role !== "treasury") {
+      return NextResponse.json({ error: "forbidden" }, { status: 403 });
+    }
+    const headers = new Headers(req.headers);
+    headers.set("x-bvbe-user-id", claims.sub);
+    headers.set("x-bvbe-role", claims.role);
+    return NextResponse.next({ request: { headers } });
+  }
+
+  if (path.startsWith(ACCOUNT_API_PREFIX)) {
+    if (!claims) return NextResponse.json({ error: "unauthorized" }, { status: 401 });
+    const headers = new Headers(req.headers);
+    headers.set("x-bvbe-user-id", claims.sub);
+    headers.set("x-bvbe-role", claims.role);
+    return NextResponse.next({ request: { headers } });
+  }
+
+  return NextResponse.next();
+}
+
+export const config = {
+  matcher: ["/api/v2/admin/:path*", "/api/v2/me/:path*"],
+};

@@ -1,10 +1,12 @@
 import { SignJWT, jwtVerify, type JWTPayload } from "jose";
+import { randomBytes, createHash } from "node:crypto";
 import type { UserClaims } from "./types.js";
 
 const ISSUER = "bvbe";
 const AUDIENCE = "bvbe-web";
 const ALG = "HS256" as const;
 const ACCESS_TTL = "15m";
+const REFRESH_TTL_DAYS = 30;
 
 function secretBytes(secret: string): Uint8Array {
   if (secret.length < 32) {
@@ -44,4 +46,23 @@ export async function verifyAccessToken(
     role: payload.role as UserClaims["role"],
     kycTier: payload.kycTier as UserClaims["kycTier"],
   };
+}
+
+export type IssuedRefreshToken = {
+  token: string;
+  tokenHash: string;
+  expiresAt: Date;
+};
+
+export function issueRefreshToken(): IssuedRefreshToken {
+  const token = randomBytes(32).toString("base64url");
+  const tokenHash = createHash("sha256").update(token).digest("hex");
+  const expiresAt = new Date(
+    Date.now() + REFRESH_TTL_DAYS * 24 * 60 * 60 * 1000,
+  );
+  return { token, tokenHash, expiresAt };
+}
+
+export function hashRefreshToken(token: string): string {
+  return createHash("sha256").update(token).digest("hex");
 }

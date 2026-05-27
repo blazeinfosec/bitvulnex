@@ -1,8 +1,7 @@
 // Prisma schema for BVBE.
 //
-// Phase 0 baseline. Only the User model exists, with a single seeded
-// admin row so Phase 1's signup flow has a counterparty. Subsequent
-// phases extend this schema additively via migrations.
+// Phase 1 extends the User model and adds RefreshToken,
+// PasswordResetToken, ApiKey. Subsequent phases extend additively.
 
 generator client {
   provider      = "prisma-client-js"
@@ -23,13 +22,64 @@ enum Role {
 }
 
 model User {
-  id           String   @id @default(cuid())
-  email        String   @unique
-  passwordHash String
-  role         Role     @default(user)
-  kycTier      Int      @default(0)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id            String    @id @default(cuid())
+  email         String    @unique
+  passwordHash  String
+  displayName   String?
+  role          Role      @default(user)
+  kycTier       Int       @default(0)
+  emailVerified Boolean   @default(false)
+  totpSecret    String?
+  totpEnabled   Boolean   @default(false)
+  failedLogins  Int       @default(0)
+  lockedUntil   DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  refreshTokens      RefreshToken[]
+  passwordResets     PasswordResetToken[]
+  apiKeys            ApiKey[]
 
   @@map("users")
+}
+
+model RefreshToken {
+  id        String   @id @default(cuid())
+  userId    String
+  tokenHash String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("refresh_tokens")
+}
+
+model PasswordResetToken {
+  id        String   @id @default(cuid())
+  userId    String
+  token     String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("password_reset_tokens")
+}
+
+model ApiKey {
+  id         String    @id @default(cuid())
+  userId     String
+  name       String
+  keyHash    String    @unique
+  scopes     String[]
+  createdAt  DateTime  @default(now())
+  lastUsedAt DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("api_keys")
 }
