@@ -28,6 +28,11 @@ export function NavBar() {
           </span>
         </Link>
         <nav className="flex items-center gap-1">
+          {isAuthed ? (
+            <Button variant="ghost" size="sm" asChild>
+              <Link href="/account/trading/BTC-USDT">Trade</Link>
+            </Button>
+          ) : null}
           <Button variant="ghost" size="sm" asChild>
             <Link href="/lending">Lending</Link>
           </Button>
@@ -54,12 +59,16 @@ export function NavBar() {
           <Button variant="ghost" size="sm" asChild>
             <Link href="/docs">API Docs</Link>
           </Button>
-          <Button variant="secondary" size="sm" asChild>
-            <Link href="/login">Sign in</Link>
-          </Button>
-          <Button variant="primary" size="sm" asChild>
-            <Link href="/signup">Create account</Link>
-          </Button>
+          {!isAuthed ? (
+            <>
+              <Button variant="secondary" size="sm" asChild>
+                <Link href="/login">Sign in</Link>
+              </Button>
+              <Button variant="primary" size="sm" asChild>
+                <Link href="/signup">Create account</Link>
+              </Button>
+            </>
+          ) : null}
         </nav>
       </Container>
     </header>

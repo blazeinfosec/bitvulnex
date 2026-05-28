@@ -19,7 +19,8 @@ export async function GET(
 
   const { id } = await ctx.params;
   const orderId = Number(id);
-  if (!Number.isInteger(orderId)) return jsonError(400, "bad id");
+  if (!Number.isSafeInteger(orderId) || orderId <= 0)
+    return jsonError(400, "bad id");
 
   const order = await prisma.order.findUnique({ where: { id: orderId } });
   if (!order) return jsonError(404, "not found");
@@ -42,7 +43,8 @@ export async function DELETE(
 
   const { id } = await ctx.params;
   const orderId = Number(id);
-  if (!Number.isInteger(orderId)) return jsonError(400, "bad id");
+  if (!Number.isSafeInteger(orderId) || orderId <= 0)
+    return jsonError(400, "bad id");
 
   const order = await prisma.order.findUnique({ where: { id: orderId } });
   if (!order) return jsonError(404, "not found");

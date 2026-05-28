@@ -67,26 +67,56 @@ export function LoginForm() {
       </CardHeader>
       <CardContent>
         {stage === "password" ? (
-          <form onSubmit={submitPassword} className="space-y-3">
-            <input
-              type="email"
-              required
-              autoComplete="email"
-              placeholder="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="w-full border border-navy-200 rounded-md h-10 px-3"
-            />
-            <input
-              type="password"
-              required
-              autoComplete="current-password"
-              placeholder="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full border border-navy-200 rounded-md h-10 px-3"
-            />
-            {error && <p className="text-sm text-danger">{error}</p>}
+          <form
+            onSubmit={submitPassword}
+            className="space-y-3"
+            aria-describedby={error ? "login-error" : undefined}
+          >
+            <div>
+              <label
+                htmlFor="login-email"
+                className="block text-sm text-navy-700 mb-1"
+              >
+                Email
+              </label>
+              <input
+                id="login-email"
+                name="email"
+                type="email"
+                required
+                autoComplete="email"
+                placeholder="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                aria-describedby={error ? "login-error" : undefined}
+                className="w-full border border-navy-200 rounded-md h-10 px-3"
+              />
+            </div>
+            <div>
+              <label
+                htmlFor="login-password"
+                className="block text-sm text-navy-700 mb-1"
+              >
+                Password
+              </label>
+              <input
+                id="login-password"
+                name="password"
+                type="password"
+                required
+                autoComplete="current-password"
+                placeholder="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                aria-describedby={error ? "login-error" : undefined}
+                className="w-full border border-navy-200 rounded-md h-10 px-3"
+              />
+            </div>
+            {error && (
+              <p id="login-error" role="alert" className="text-sm text-danger">
+                {error}
+              </p>
+            )}
             <div className="flex items-center justify-between">
               <Button type="submit">Sign in</Button>
               <Link href="/forgot" className="text-sm">
@@ -102,10 +132,16 @@ export function LoginForm() {
             <p className="text-sm text-navy-700">
               Enter the 6-digit code from your authenticator app.
             </p>
+            <label htmlFor="login-totp" className="sr-only">
+              Authenticator code
+            </label>
             <input
+              id="login-totp"
+              name="code"
               inputMode="numeric"
               pattern="\d{6}"
               required
+              aria-label="Authenticator code"
               placeholder="123456"
               value={code}
               onChange={(e) => setCode(e.target.value)}

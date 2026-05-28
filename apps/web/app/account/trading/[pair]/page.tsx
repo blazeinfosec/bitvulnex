@@ -29,7 +29,10 @@ type OrderRow = {
 export default function TradingPage() {
   const router = useRouter();
   const params = useParams<{ pair: string }>();
-  const pair = decodeURIComponent(params.pair);
+  // Accept hyphenated slugs in the URL (`BTC-USDT`) as well as URL-encoded
+  // slashes (`BTC%2FUSDT`). The API contract requires `BASE/QUOTE`.
+  const rawSlug = decodeURIComponent(params.pair);
+  const pair = rawSlug.includes("/") ? rawSlug : rawSlug.replace("-", "/");
 
   const [book, setBook] = useState<Book | null>(null);
   const [price, setPrice] = useState<Price | null>(null);

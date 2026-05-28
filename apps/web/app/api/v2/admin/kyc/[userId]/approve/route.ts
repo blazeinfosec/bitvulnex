@@ -17,6 +17,11 @@ export async function POST(
   const parsed = await readJson(req, schema);
   if (parsed.error) return parsed.error;
 
+  const user = await prisma.user.findUnique({ where: { id: userId } });
+  if (!user) return jsonError(404, "user not found");
+  const profile = await prisma.kycProfile.findUnique({ where: { userId } });
+  if (!profile) return jsonError(404, "kyc submission not found");
+
   await prisma.$transaction([
     prisma.user.update({
       where: { id: userId },

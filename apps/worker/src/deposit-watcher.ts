@@ -132,9 +132,11 @@ async function reconcile(
         userId: ba.userId,
         asset: ba.asset,
         amount: D(tx.amountBtc.toFixed(8)),
+        available: D(tx.amountBtc.toFixed(8)),
       },
       update: {
         amount: { increment: D(tx.amountBtc.toFixed(8)) },
+        available: { increment: D(tx.amountBtc.toFixed(8)) },
       },
     }),
   ]);

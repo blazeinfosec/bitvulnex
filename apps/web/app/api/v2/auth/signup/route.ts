@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { prisma } from "@bvbe/db";
+import { Prisma, prisma } from "@bvbe/db";
 import {
   hashPassword,
   issueAccessToken,
@@ -24,7 +24,14 @@ registerEndpoint({
 export const dynamic = "force-dynamic";
 
 const schema = z.object({
-  email: z.string().email(),
+  // RFC 5321 §4.5.3.1: total address max 254, local-part max 64.
+  email: z
+    .string()
+    .email()
+    .max(254)
+    .refine((v) => (v.split("@")[0]?.length ?? 0) <= 64, {
+      message: "email local-part exceeds 64 chars",
+    }),
   password: z.string().min(8).max(128),
   displayName: z.string().min(1).max(64),
 });
@@ -37,13 +44,27 @@ export async function POST(req: Request) {
   const existing = await prisma.user.findUnique({ where: { email } });
   if (existing) return jsonError(409, "email already in use");
 
-  const user = await prisma.user.create({
-    data: {
-      email,
-      passwordHash: await hashPassword(password),
-      displayName,
-    },
-  });
+  let user;
+  try {
+    user = await prisma.user.create({
+      data: {
+        email,
+        passwordHash: await hashPassword(password),
+        displayName,
+      },
+    });
+  } catch (err) {
+    // Race window between findUnique above and create: a concurrent
+    // signup with the same email (or double-clicked submit) will hit
+    // the unique-index violation. Map to 409 instead of bubbling 500.
+    if (
+      err instanceof Prisma.PrismaClientKnownRequestError &&
+      err.code === "P2002"
+    ) {
+      return jsonError(409, "email already in use");
+    }
+    throw err;
+  }
 
   const claims = {
     sub: user.id,
