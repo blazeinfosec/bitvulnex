@@ -6,6 +6,21 @@ planted vulnerabilities — references to "fixed" issues that hint at
 adjacent unfixed ones, TODOs left in the code, etc. They are part of
 the lab.
 
+## 2026-06-01 — Phase 5: margin trading
+
+- New: leveraged long/short positions on BTC/USDT, ETH/USDT.
+  Leverage tiers 2× / 3× / 5× / 10× gated by KYC tier.
+- New: liquidation engine. The worker polls the public price
+  feed every 2s and flags positions whose maintenance margin
+  is breached.
+- New: **anyone can register as a keeper** and claim a flagged
+  liquidation for a 50bps rebate from the closed position's
+  collateral.
+- Internal: liquidation oracle reads via the cached public
+  price endpoint. Trades on the order book move the oracle.
+- New UI: /account/margin (positions) and /account/keeper
+  (claim queue).
+
 ## 2026-05-31 — Phase 4: spot trading & order book
 
 - New: BTC/USDT and ETH/USDT pairs. Limit and market orders.

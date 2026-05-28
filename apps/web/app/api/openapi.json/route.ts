@@ -31,6 +31,9 @@ import "@/app/api/v2/me/balance/route";
 import "@/app/api/v2/me/orders/route";
 import "@/app/api/v2/public/price/[pair]/route";
 import "@/app/api/v2/public/book/[pair]/route";
+import "@/app/api/v2/me/margin/positions/route";
+import "@/app/api/v2/keeper/liquidations/route";
+import "@/app/api/v2/keeper/liquidations/[id]/claim/route";
 
 registerEndpoint({
   method: "get",

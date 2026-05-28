@@ -65,6 +65,17 @@ enum OrderStatus {
   cancelled
 }
 
+enum PositionSide {
+  long
+  short
+}
+
+enum PositionStatus {
+  open
+  liquidated
+  closed
+}
+
 model User {
   id            String    @id @default(cuid())
   email         String    @unique
@@ -91,6 +102,8 @@ model User {
   orders             Order[]
   tradesAsTaker      Trade[]    @relation("trade_taker")
   tradesAsMaker      Trade[]    @relation("trade_maker")
+  marginPositions    MarginPosition[]
+  liquidationsClaimed Liquidation[] @relation("liquidation_keeper")
 
   @@map("users")
 }
@@ -131,13 +144,15 @@ model Deposit {
 }
 
 model Balance {
-  id        String   @id @default(cuid())
-  userId    String
-  asset     String
-  amount    Decimal  @default(0) @db.Decimal(38, 8)
-  available Decimal  @default(0) @db.Decimal(38, 8)
-  locked    Decimal  @default(0) @db.Decimal(38, 8)
-  updatedAt DateTime @updatedAt
+  id              String   @id @default(cuid())
+  userId          String
+  asset           String
+  amount          Decimal  @default(0) @db.Decimal(38, 8)
+  available       Decimal  @default(0) @db.Decimal(38, 8)
+  locked          Decimal  @default(0) @db.Decimal(38, 8)
+  marginAvailable Decimal  @default(0) @db.Decimal(38, 8)
+  marginBorrowed  Decimal  @default(0) @db.Decimal(38, 8)
+  updatedAt       DateTime @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -285,4 +300,45 @@ model ApiKey {
 
   @@index([userId])
   @@map("api_keys")
+}
+
+model MarginPosition {
+  id               Int            @id @default(autoincrement())
+  userId           String
+  pair             String
+  side             PositionSide
+  size             Decimal        @db.Decimal(38, 8)
+  entryPrice       Decimal        @db.Decimal(38, 8)
+  leverage         Int
+  collateralAsset  String
+  collateral       Decimal        @db.Decimal(38, 8)
+  liquidationPrice Decimal        @db.Decimal(38, 8)
+  status           PositionStatus @default(open)
+  openedAt         DateTime       @default(now())
+  closedAt         DateTime?
+  closedPrice      Decimal?       @db.Decimal(38, 8)
+  realizedPnl      Decimal?       @db.Decimal(38, 8)
+
+  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  liquidation Liquidation?
+
+  @@index([userId])
+  @@index([pair, status])
+  @@map("margin_positions")
+}
+
+model Liquidation {
+  id              Int       @id @default(autoincrement())
+  positionId      Int       @unique
+  triggerPrice    Decimal   @db.Decimal(38, 8)
+  keeperUserId    String?
+  keeperRebate    Decimal   @db.Decimal(38, 8)
+  flaggedAt       DateTime  @default(now())
+  claimedAt       DateTime?
+
+  position MarginPosition @relation(fields: [positionId], references: [id], onDelete: Cascade)
+  keeper   User?          @relation("liquidation_keeper", fields: [keeperUserId], references: [id], onDelete: SetNull)
+
+  @@index([keeperUserId])
+  @@map("liquidations")
 }

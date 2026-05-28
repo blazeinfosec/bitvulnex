@@ -109,6 +109,7 @@ services:
       DATABASE_URL: postgresql://bvbe:bvbe@db:5432/bvbe?schema=public
       REDIS_URL: redis://redis:6379
       BITCOIN_MOCK_URL: http://bitcoin-mock:18443
+      WEB_INTERNAL_URL: http://web:3000
     volumes:
       - ./apps/worker:/repo/apps/worker
       - ./packages:/repo/packages

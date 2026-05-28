@@ -1,16 +1,18 @@
-// BullMQ worker — Phase 4 adopts the upsertJobScheduler API and
-// passes a shared IORedis instance to all BullMQ constructors.
+// BullMQ worker — Phase 5 adds the liquidation-poll queue alongside
+// Phase 3's deposit-poll.
 
 import { Redis } from "ioredis";
 import { Queue, Worker, QueueEvents } from "bullmq";
 import { pollOnce, type RpcClient, type WatchTx } from "./deposit-watcher.js";
+import {
+  pollLiquidations,
+  type PriceClient,
+} from "./liquidation-watcher.js";
 
 const redisUrl = process.env.REDIS_URL ?? "redis://redis:6379";
 const mockUrl = process.env.BITCOIN_MOCK_URL ?? "http://bitcoin-mock:18443";
+const webUrl = process.env.WEB_INTERNAL_URL ?? "http://web:3000";
 
-// Single shared connection. ioredis fully parses the URL (including
-// password, db number, rediss://) so we don't hand-roll a partial
-// parser. Phase-3 L7 Q-3.8 fix-up.
 const connection = new Redis(redisUrl, { maxRetriesPerRequest: null });
 
 const rpc: RpcClient = {
@@ -22,39 +24,75 @@ const rpc: RpcClient = {
   },
 };
 
-const QUEUE_NAME = "deposit-poll";
+const pricer: PriceClient = {
+  async getPrice(pair: string) {
+    const res = await fetch(
+      `${webUrl}/api/v2/public/price/${encodeURIComponent(pair)}`,
+    );
+    if (!res.ok) return { last: null };
+    const body = (await res.json()) as { last: string | null };
+    return { last: body.last };
+  },
+};
+
+const DEPOSIT_QUEUE = "deposit-poll";
+const LIQUIDATION_QUEUE = "liquidation-poll";
 
 async function main() {
-  const queue = new Queue(QUEUE_NAME, { connection });
-  const events = new QueueEvents(QUEUE_NAME, { connection });
-  events.on("failed", ({ jobId, failedReason }) => {
-    console.error(`[worker] job ${jobId} failed:`, failedReason);
-  });
+  const depositQueue = new Queue(DEPOSIT_QUEUE, { connection });
+  const liquidationQueue = new Queue(LIQUIDATION_QUEUE, { connection });
+  const depositEvents = new QueueEvents(DEPOSIT_QUEUE, { connection });
+  const liquidationEvents = new QueueEvents(LIQUIDATION_QUEUE, { connection });
 
-  // BullMQ v5: use upsertJobScheduler (the queue.add+repeat form is
-  // deprecated). The scheduler key is deterministic; repeated calls
-  // across worker restarts are idempotent. Phase-3 L7 Q-3.7 fix-up.
-  await queue.upsertJobScheduler(
+  await depositQueue.upsertJobScheduler(
     "deposit-poll-scheduler",
     { every: 5_000 },
     { name: "poll", data: {}, opts: { removeOnComplete: true, removeOnFail: 50 } },
   );
+  await liquidationQueue.upsertJobScheduler(
+    "liquidation-poll-scheduler",
+    { every: 2_000 },
+    { name: "poll", data: {}, opts: { removeOnComplete: true, removeOnFail: 50 } },
+  );
 
-  const worker = new Worker(
-    QUEUE_NAME,
+  const depositWorker = new Worker(
+    DEPOSIT_QUEUE,
     async () => {
       await pollOnce(rpc);
     },
     { connection, concurrency: 1 },
   );
-  worker.on("ready", () => console.log("[worker] deposit-poll worker ready"));
-  worker.on("error", (err) => console.error("[worker] worker error:", err));
+  depositWorker.on("ready", () =>
+    console.log("[worker] deposit-poll ready"),
+  );
+  depositWorker.on("error", (err) =>
+    console.error("[worker] deposit error:", err),
+  );
+
+  const liquidationWorker = new Worker(
+    LIQUIDATION_QUEUE,
+    async () => {
+      await pollLiquidations(pricer);
+    },
+    { connection, concurrency: 1 },
+  );
+  liquidationWorker.on("ready", () =>
+    console.log("[worker] liquidation-poll ready"),
+  );
+  liquidationWorker.on("error", (err) =>
+    console.error("[worker] liquidation error:", err),
+  );
 
   const shutdown = async (sig: string) => {
     console.log(`[worker] received ${sig}, shutting down...`);
-    await worker.close();
-    await queue.close();
-    await events.close();
+    await Promise.all([
+      depositWorker.close(),
+      liquidationWorker.close(),
+      depositQueue.close(),
+      liquidationQueue.close(),
+      depositEvents.close(),
+      liquidationEvents.close(),
+    ]);
     await connection.quit();
     process.exit(0);
   };
