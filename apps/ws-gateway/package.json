@@ -1,18 +1,20 @@
 {
-  "name": "@bvbe/worker",
+  "name": "@bvbe/ws-gateway",
   "version": "0.0.0",
   "private": true,
   "type": "module",
   "scripts": {
     "build": "tsc -p tsconfig.json",
-    "start": "node dist/index.js",
+    "start": "node dist/server.js",
     "lint": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@bvbe/db": "workspace:*",
     "@bvbe/shared": "workspace:*",
-    "bullmq": "^5.21.0",
     "ioredis": "^5.4.1",
-    "tsx": "^4.19.1"
+    "tsx": "^4.19.1",
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "@types/ws": "^8.5.13"
   }
 }

@@ -210,9 +210,82 @@ Each entry:
 
 ---
 
+## Phase 4 — Spot trading & order book
+
+### V-4: IDOR on order GET / DELETE
+
+- **Category:** OWASP / Access control / IDOR
+- **Phase introduced:** 4
+- **Location:** `apps/web/app/api/v2/me/orders/[id]/route.ts` (GET + DELETE; `findUnique({where:{id}})` without verifying `order.userId === claims.sub`)
+- **Exploitation path:** Authenticate as any tier-1+ user. Order IDs are sequential ints. `GET /api/v2/me/orders/42` returns order #42 regardless of owner. `DELETE /api/v2/me/orders/42` cancels any user's order and refunds *their* locked balance — free cancel-as-griefing. Combined with V-25 self-trade, attacker can clear a victim's resting orders before sweeping the book.
+- **Intended discovery difficulty:** easy
+- **Realistic root cause:** Engineer extracted generic `findUnique` pattern and forgot the ownership filter.
+- **Remediation:** `prisma.order.findFirst({ where: { id, userId: claims.sub } })`.
+- **Chain membership:** standalone (force multiplier on V-25 / V-43).
+
+### V-22: Mass assignment via Next.js Server Action
+
+- **Category:** OWASP / Mass assignment
+- **Phase introduced:** 4
+- **Location:** `apps/web/app/account/orders/edit-order.ts` (`editOrder` — spreads every `FormData` entry into `prisma.order.update`)
+- **Exploitation path:** Action accepts any `FormData` key. POST extra fields like `feeTier=prime`, `status=filled`, `amount=99999999`. The Prisma update applies them. No ownership check either — attacker can edit any order. Discoverable via the page's hidden form ID + the Next.js server-action wire format.
+- **Intended discovery difficulty:** medium
+- **Realistic root cause:** Engineer copy-pasted "spread the form into the update" pattern from a prototype. Server-Action wire format hides the mass-assign at the call-site.
+- **Remediation:** Whitelist fields explicitly; verify `order.userId === claims.sub`.
+- **Chain membership:** standalone (fee-tier escalation amplifies V-43).
+
+### V-23: CSWSH on order-book WebSocket gateway
+
+- **Category:** WebSocket / CSWSH
+- **Phase introduced:** 4
+- **Location:** `apps/ws-gateway/src/server.ts` (upgrade handler; `handleMessage` subscribe branch)
+- **Exploitation path:** Three siblings, one site:
+  1. **No Origin check** — attacker page at `attacker.example` opens `new WebSocket("ws://exchange.local/ws?token=...")`; the upgrade accepts because Origin isn't validated.
+  2. **Token in query string** — leaks via Referer, nginx access logs, browser history.
+  3. **No per-channel ACL** — `subscribe` accepts any channel name; client can subscribe to `private:<other-user-id>` and receive that user's order/balance updates live.
+- **Intended discovery difficulty:** medium
+- **Realistic root cause:** Generic `ws` library tutorial code without Origin check; subscribe-by-channel-name without per-channel ACL.
+- **Remediation:** Origin allow-list at upgrade; session-bound subscriptions (`private:<userId>` requires `claims.sub === userId`); move token out of URL (sec-websocket-protocol header).
+- **Chain membership:** standalone (also a primitive for CHAIN C-flavor mass-takeover surveillance).
+
+### V-25: Self-trade not blocked
+
+- **Category:** Business logic / Market manipulation
+- **Phase introduced:** 4
+- **Location:** `apps/web/lib/engine/match.ts` (`matchAgainstBook` — no `resting.userId === taker.userId` filter)
+- **Exploitation path:** Place a sell limit at $X. Immediately place a matching buy from the same account. Engine matches, writes a Trade, the price feed (`/api/v2/public/price/*`) reports $X as last. Repeat to drive the public price feed arbitrarily. Phase 5 margin engine reads this as oracle → CHAIN C cascading liquidations.
+- **Intended discovery difficulty:** medium
+- **Realistic root cause:** Engine MVP didn't filter self-matches; team punted ("compliance will catch it"); compliance never built it.
+- **Remediation:** Reject `maker.userId === taker.userId` matches; flag self-trades and exclude from public price + fee volume.
+- **Chain membership:** CHAIN C — oracle manipulation → margin liquidations (Phase 5).
+
+### V-32: Stop-loss / OCO cancellation race
+
+- **Category:** Business logic / Race condition
+- **Phase introduced:** 4
+- **Location:** `apps/web/app/api/v2/me/orders/[id]/route.ts` (DELETE handler) + `apps/web/lib/engine/place.ts` (matching tx)
+- **Exploitation path:** Place an OCO pair. Trigger the stop-loss; mid-match, hammer `DELETE /api/v2/me/orders/<takeProfit>` via HTTP/2 multiplexing. The cancel reads `status:"open"` and refunds the locked balance; the match writes the trade and decrements locked. Both succeed under READ COMMITTED — user receives the take-profit fill AND a refund of the same locked balance. Repeats inflate balance.
+- **Intended discovery difficulty:** hard
+- **Realistic root cause:** Default Prisma `$transaction` isolation (READ COMMITTED); no `SELECT FOR UPDATE`; no per-pair serialization.
+- **Remediation:** SERIALIZABLE isolation OR `SELECT FOR UPDATE` on the Order row at the start of both transactions; or single in-process queue per pair.
+- **Chain membership:** standalone.
+
+### V-43: Fee-tier volume counts cancelled maker-side fills
+
+- **Category:** Business logic
+- **Phase introduced:** 4
+- **Location:** `apps/web/lib/engine/fees.ts` (`feeTierForUser` — `where` filters `takerOrder.status` but not `makerOrder.status`)
+- **Exploitation path:** Combined with V-25: place maker sell, fill from a second account (or self-trade), cancel the maker. The trade row survives and counts toward 30-day volume. A few hundred wash trades → `prime` tier (≥ $1M volume) → 0bps maker / 5bps taker fees.
+- **Intended discovery difficulty:** medium
+- **Realistic root cause:** Engineer filtered the side that "obviously" shouldn't count (taker), missed the maker.
+- **Remediation:** Filter both sides; exclude self-trades from volume.
+- **Chain membership:** standalone (amplified by V-25).
+
+---
+
 ## Killer chains — current state
 
 - **CHAIN A — Drain the hot wallet:** components landed = V-19 (forge admin JWT). Remaining: leaked secret + treasury endpoint + PSBT signing flaw (Phase 7-9).
 - **CHAIN B — Become admin and persist:** components landed = V-35 (middleware bypass) + V-41 (admin JWT theft via polyglot). Remaining: smuggling at nginx (Phase 9).
-- **CHAIN C — Mass user takeover:** no components yet (price feed + self-trade Phase 4).
+- **CHAIN C — Mass user takeover:** components landed = V-25 (self-trade → oracle manipulation) + nginx `proxy_cache` infrastructure for `/api/v2/public/*` (the cache-poisoning surface activates in Phase 9). Phase 5 lands the margin liquidation engine that consumes the manipulated oracle.
 - **CHAIN D — Exfiltrate full user DB + KYC:** components landed = V-40 (SSRF → mock IMDS → IAM creds). Remaining: mock S3 bucket + DB backup access (Phase 9).

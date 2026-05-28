@@ -46,6 +46,25 @@ enum DepositStatus {
   dropped
 }
 
+enum OrderSide {
+  buy
+  sell
+}
+
+enum OrderType {
+  limit
+  market
+  stop_limit
+  oco
+}
+
+enum OrderStatus {
+  open
+  partial
+  filled
+  cancelled
+}
+
 model User {
   id            String    @id @default(cuid())
   email         String    @unique
@@ -69,6 +88,9 @@ model User {
   btcAddresses       BitcoinAddress[]
   deposits           Deposit[]
   balances           Balance[]
+  orders             Order[]
+  tradesAsTaker      Trade[]    @relation("trade_taker")
+  tradesAsMaker      Trade[]    @relation("trade_maker")
 
   @@map("users")
 }
@@ -113,6 +135,8 @@ model Balance {
   userId    String
   asset     String
   amount    Decimal  @default(0) @db.Decimal(38, 8)
+  available Decimal  @default(0) @db.Decimal(38, 8)
+  locked    Decimal  @default(0) @db.Decimal(38, 8)
   updatedAt DateTime @updatedAt
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -120,6 +144,67 @@ model Balance {
   @@unique([userId, asset])
   @@index([userId])
   @@map("balances")
+}
+
+model TradingPair {
+  id           String  @id @default(cuid())
+  base         String
+  quote        String
+  active       Boolean @default(true)
+  minOrderSize Decimal @db.Decimal(38, 8)
+  priceTick    Decimal @db.Decimal(38, 8)
+
+  @@unique([base, quote])
+  @@map("trading_pairs")
+}
+
+model Order {
+  id          Int          @id @default(autoincrement())
+  userId      String
+  pair        String
+  side        OrderSide
+  type        OrderType
+  price       Decimal?     @db.Decimal(38, 8)
+  amount      Decimal      @db.Decimal(38, 8)
+  filled      Decimal      @default(0) @db.Decimal(38, 8)
+  status      OrderStatus  @default(open)
+  stopTrigger Decimal?     @db.Decimal(38, 8)
+  ocoPairId   Int?
+  feeTier     String       @default("base")
+  createdAt   DateTime     @default(now())
+  cancelledAt DateTime?
+
+  user             User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  takerTrades      Trade[] @relation("trade_taker_order")
+  makerTrades      Trade[] @relation("trade_maker_order")
+
+  @@index([userId])
+  @@index([pair, status])
+  @@map("orders")
+}
+
+model Trade {
+  id            Int      @id @default(autoincrement())
+  pair          String
+  takerOrderId  Int
+  makerOrderId  Int
+  takerUserId   String
+  makerUserId   String
+  price         Decimal  @db.Decimal(38, 8)
+  amount        Decimal  @db.Decimal(38, 8)
+  takerFeeBps   Int
+  makerFeeBps   Int
+  executedAt    DateTime @default(now())
+
+  takerOrder Order @relation("trade_taker_order", fields: [takerOrderId], references: [id], onDelete: Restrict)
+  makerOrder Order @relation("trade_maker_order", fields: [makerOrderId], references: [id], onDelete: Restrict)
+  takerUser  User  @relation("trade_taker", fields: [takerUserId], references: [id], onDelete: Cascade)
+  makerUser  User  @relation("trade_maker", fields: [makerUserId], references: [id], onDelete: Cascade)
+
+  @@index([pair, executedAt])
+  @@index([takerUserId])
+  @@index([makerUserId])
+  @@map("trades")
 }
 
 model KycProfile {

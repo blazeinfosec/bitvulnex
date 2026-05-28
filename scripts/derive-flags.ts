@@ -5,6 +5,7 @@
 import { createHash } from "node:crypto";
 
 const VULN_IDS: string[] = [
+  "V-4",
   "V-8",
   "V-9",
   "V-10",
@@ -13,12 +14,17 @@ const VULN_IDS: string[] = [
   "V-19",
   "V-20",
   "V-21",
+  "V-22",
+  "V-23",
   "V-24",
+  "V-25",
   "V-27",
+  "V-32",
   "V-35",
   "V-40",
   "V-41",
   "V-42",
+  "V-43",
 ];
 
 function flagFor(vulnId: string, salt: string): string {

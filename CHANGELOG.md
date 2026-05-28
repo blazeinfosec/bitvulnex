@@ -6,6 +6,20 @@ planted vulnerabilities — references to "fixed" issues that hint at
 adjacent unfixed ones, TODOs left in the code, etc. They are part of
 the lab.
 
+## 2026-05-31 — Phase 4: spot trading & order book
+
+- New: BTC/USDT and ETH/USDT pairs. Limit and market orders.
+- New: live order book at `wss://exchange.local/ws`. Subscribe
+  to channels by name (`book:BTC/USDT`, `trades:BTC/USDT`,
+  `private:<userId>`).
+- New: advanced order types (stop-loss, OCO) for tier-2+ users.
+- New: fee tiers (base / vip / prime) recalculated on each trade
+  from your last 30 days of volume.
+- New: `/api/v2/public/price/{pair}` and `/api/v2/public/book/{pair}`
+  cached at the edge for 5 seconds.
+- Internal: matching engine runs in-process on the web tier.
+  Phase 5 may extract it to a dedicated service if margin needs it.
+
 ## 2026-05-30 — Phase 3: deposits & address management
 
 - New: BTC deposit addresses (derived from the mock regtest node).

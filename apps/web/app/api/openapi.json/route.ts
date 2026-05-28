@@ -28,6 +28,9 @@ import "@/app/api/v2/me/kyc/submit/route";
 import "@/app/api/v2/me/deposit/address/route";
 import "@/app/api/v2/me/deposits/route";
 import "@/app/api/v2/me/balance/route";
+import "@/app/api/v2/me/orders/route";
+import "@/app/api/v2/public/price/[pair]/route";
+import "@/app/api/v2/public/book/[pair]/route";
 
 registerEndpoint({
   method: "get",

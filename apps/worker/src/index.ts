@@ -1,22 +1,17 @@
-// BullMQ worker — Phase 3 registers the deposit-poll queue.
+// BullMQ worker — Phase 4 adopts the upsertJobScheduler API and
+// passes a shared IORedis instance to all BullMQ constructors.
 
+import { Redis } from "ioredis";
 import { Queue, Worker, QueueEvents } from "bullmq";
 import { pollOnce, type RpcClient, type WatchTx } from "./deposit-watcher.js";
 
 const redisUrl = process.env.REDIS_URL ?? "redis://redis:6379";
 const mockUrl = process.env.BITCOIN_MOCK_URL ?? "http://bitcoin-mock:18443";
 
-function parseRedisUrl(url: string) {
-  const u = new URL(url);
-  return {
-    host: u.hostname,
-    port: Number(u.port || 6379),
-    ...(u.password ? { password: u.password } : {}),
-    maxRetriesPerRequest: null,
-  } as const;
-}
-
-const connection = parseRedisUrl(redisUrl);
+// Single shared connection. ioredis fully parses the URL (including
+// password, db number, rediss://) so we don't hand-roll a partial
+// parser. Phase-3 L7 Q-3.8 fix-up.
+const connection = new Redis(redisUrl, { maxRetriesPerRequest: null });
 
 const rpc: RpcClient = {
   async watch(address: string) {
@@ -36,15 +31,13 @@ async function main() {
     console.error(`[worker] job ${jobId} failed:`, failedReason);
   });
 
-  // Repeating job every 5 seconds.
-  await queue.add(
-    "poll",
-    {},
-    {
-      repeat: { every: 5_000 },
-      removeOnComplete: true,
-      removeOnFail: 50,
-    },
+  // BullMQ v5: use upsertJobScheduler (the queue.add+repeat form is
+  // deprecated). The scheduler key is deterministic; repeated calls
+  // across worker restarts are idempotent. Phase-3 L7 Q-3.7 fix-up.
+  await queue.upsertJobScheduler(
+    "deposit-poll-scheduler",
+    { every: 5_000 },
+    { name: "poll", data: {}, opts: { removeOnComplete: true, removeOnFail: 50 } },
   );
 
   const worker = new Worker(
@@ -62,6 +55,7 @@ async function main() {
     await worker.close();
     await queue.close();
     await events.close();
+    await connection.quit();
     process.exit(0);
   };
   process.on("SIGINT", () => void shutdown("SIGINT"));

@@ -81,6 +81,25 @@ services:
     networks:
       - bvbe-net
 
+  ws-gateway:
+    build:
+      context: .
+      dockerfile: apps/ws-gateway/Dockerfile
+    environment:
+      NODE_ENV: development
+      PORT: "3001"
+      REDIS_URL: redis://redis:6379
+      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET must be set (>=32 chars). Copy .env.example to .env.}
+    volumes:
+      - ./apps/ws-gateway:/repo/apps/ws-gateway
+      - ./packages:/repo/packages
+      - /repo/apps/ws-gateway/node_modules
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - bvbe-net
+
   worker:
     build:
       context: .
