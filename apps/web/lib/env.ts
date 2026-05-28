@@ -24,6 +24,10 @@ const schema = z.object({
     .default("false")
     .transform((v) => v === "true"),
   CTF_SALT: z.string().min(8),
+  LAB_AFFORDANCES_ENABLED: z
+    .enum(["true", "false"])
+    .default("true")
+    .transform((v) => v === "true"),
 });
 
 export type Env = z.infer<typeof schema>;

@@ -25,6 +25,9 @@ import "@/app/api/v2/me/kyc/documents/route";
 import "@/app/api/v2/me/kyc/import-url/route";
 import "@/app/api/v2/me/kyc/doc/route";
 import "@/app/api/v2/me/kyc/submit/route";
+import "@/app/api/v2/me/deposit/address/route";
+import "@/app/api/v2/me/deposits/route";
+import "@/app/api/v2/me/balance/route";
 
 registerEndpoint({
   method: "get",

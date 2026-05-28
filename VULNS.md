@@ -176,6 +176,40 @@ Each entry:
 
 ---
 
+## Phase 3 — Deposits & address management
+
+### V-24: Bitcoin address validation bypass
+
+- **Category:** Crypto / BTC protocol
+- **Phase introduced:** 3 (latent; consumed by Phase 7 withdraw)
+- **Location:** `packages/shared/src/btc-address.ts` (`isValidBtcAddress`, `normalizeBtcAddress`)
+- **Exploitation path:** Multiple bypasses in one function:
+  1. **HRP-too-permissive:** validator accepts mainnet `bc1...`, testnet `tb1...`, AND regtest `bcrt1...` bech32 addresses. A Phase-7 withdrawal expecting only mainnet will accept `tb1...` — funds settle at an address whose private key is anyone-can-have (testnet keys are not access-controlled).
+  2. **Zero-width strip:** `normalizeBtcAddress` strips U+200B/200C/200D/FEFF before validating. Attacker submits `bc1q​<attacker_suffix>` — the strip turns the visible-looks-like-victim string into the attacker's address. UI may show the original (with zero-widths) to a reviewing admin; server stored the stripped form.
+  3. **No checksum verification:** `isBech32Like` only checks HRP + charset; the 6-character Bech32 checksum is not validated. A string with the right alphabet but wrong checksum passes — funds sent to such an address are effectively burned.
+- **Intended discovery difficulty:** medium
+- **Realistic root cause:** Engineer wrote a "permissive validator" to cover mobile clients pasting Unicode-contaminated QR scans and to share a single code path across mainnet / testnet / regtest. Looked fine in dev; ships to production.
+- **Remediation:** Reject all HRPs except the deployed network's. Reject zero-width characters instead of stripping. Verify the full Bech32/Bech32m checksum via `bitcoinjs-lib`'s address parser.
+- **Chain membership:** standalone — force multiplier in Phase 7 withdraw attacks.
+
+### V-42: Zero-confirmation deposit credit for tier-3 users
+
+- **Category:** Crypto / BTC / Business logic (Mt. Gox flavor)
+- **Phase introduced:** 3
+- **Location:** `apps/worker/src/deposit-watcher.ts` (`minConfirmationsForTier`)
+- **Exploitation path:**
+  1. Reach KYC tier 3 (legitimately or via V-35 admin path → set tier in `POST /api/v2/admin/users` or `approve`).
+  2. Hit `POST /api/v2/dev/btc/send` (lab affordance) targeting your deposit address. The TX lands in the mock mempool with `confirmations = 0`.
+  3. Within ~5 seconds the deposit worker polls, sees the new TX, looks up `minConfirmationsForTier(3) === 0`, and credits `Balance.amount`.
+  4. Hit `POST /api/v2/dev/btc/rbf` — next poll detects the original txid is gone (chain returns `confirmations = -1`) and marks the `Deposit` row as `dropped`. **The Balance credit is NOT reversed.** The "we'll add a reconciliation job later" intent is the realistic root cause.
+  5. Repeat. Balance grows without on-chain settlement.
+- **Intended discovery difficulty:** medium
+- **Realistic root cause:** Premium-tier "instant deposits" UX, paired with no reconciliation on RBF drops. Team assumed RBF would be rare; "credit-then-fix-later" felt acceptable.
+- **Remediation:** Treat zero-conf balances as `pending` (not spendable) until they confirm. On RBF drop, decrement the pending balance. Or drop the tier-3 exception and apply uniform min-confirmation policy.
+- **Chain membership:** standalone
+
+---
+
 ## Killer chains — current state
 
 - **CHAIN A — Drain the hot wallet:** components landed = V-19 (forge admin JWT). Remaining: leaked secret + treasury endpoint + PSBT signing flaw (Phase 7-9).

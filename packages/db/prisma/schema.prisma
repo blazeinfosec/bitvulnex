@@ -39,6 +39,13 @@ enum KycDocSource {
   url_import
 }
 
+enum DepositStatus {
+  seen
+  confirming
+  credited
+  dropped
+}
+
 model User {
   id            String    @id @default(cuid())
   email         String    @unique
@@ -59,8 +66,60 @@ model User {
   apiKeys            ApiKey[]
   kycProfile         KycProfile?
   kycDocuments       KycDocument[]
+  btcAddresses       BitcoinAddress[]
+  deposits           Deposit[]
+  balances           Balance[]
 
   @@map("users")
+}
+
+model BitcoinAddress {
+  id              String   @id @default(cuid())
+  userId          String
+  asset           String
+  address         String   @unique
+  derivationIndex Int
+  createdAt       DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, asset])
+  @@map("bitcoin_addresses")
+}
+
+model Deposit {
+  id            String        @id @default(cuid())
+  userId        String
+  asset         String
+  address       String
+  txid          String
+  vout          Int
+  amount        Decimal       @db.Decimal(38, 8)
+  confirmations Int
+  status        DepositStatus @default(seen)
+  seenAt        DateTime      @default(now())
+  creditedAt    DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([txid, vout])
+  @@index([userId])
+  @@index([address])
+  @@map("deposits")
+}
+
+model Balance {
+  id        String   @id @default(cuid())
+  userId    String
+  asset     String
+  amount    Decimal  @default(0) @db.Decimal(38, 8)
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, asset])
+  @@index([userId])
+  @@map("balances")
 }
 
 model KycProfile {

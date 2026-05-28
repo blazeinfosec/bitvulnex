@@ -1,6 +1,5 @@
-// Phase 0 ships well-typed stubs that return realistic fixtures.
-// Phase 3 onward fills in regtest semantics (UTXO tracking, block
-// progression, mempool, RBF, etc.).
+// JSON-RPC handler dispatch. Each method backed by the in-memory
+// regtest state defined in `../state.ts`.
 
 import type {
   BlockchainInfo,
@@ -8,6 +7,7 @@ import type {
   RawTransaction,
   WalletProcessPsbtResult,
 } from "@bvbe/bitcoin-rpc-types";
+import { chain } from "../state.js";
 
 type Params = unknown[] | Record<string, unknown>;
 
@@ -15,46 +15,44 @@ function asArray(params: Params): unknown[] {
   return Array.isArray(params) ? params : Object.values(params ?? {});
 }
 
-const ZERO_HASH = "0".repeat(64);
-
 async function getblockchaininfo(): Promise<BlockchainInfo> {
   return {
     chain: "regtest",
-    blocks: 0,
-    headers: 0,
-    bestblockhash: ZERO_HASH,
+    blocks: chain.blockHeight,
+    headers: chain.blockHeight,
+    bestblockhash: chain.bestBlockHash,
     mediantime: Math.floor(Date.now() / 1000),
   };
 }
 
 async function generatetoaddress(params: Params): Promise<string[]> {
   const [count] = asArray(params) as [number];
-  return Array.from({ length: count ?? 1 }, (_, i) =>
-    i.toString(16).padStart(64, "0"),
-  );
+  return chain.mineBlocks(Number(count) || 1);
 }
 
+let derivationCounter = 0;
 async function getnewaddress(): Promise<string> {
-  // Phase 0 stub: returns a fixed regtest-style placeholder. Phase 3
-  // implements HD derivation off a deterministic mock seed.
-  return "bcrt1qphase0placeholderaddressxxxxxxxxxxxxxxx";
+  derivationCounter += 1;
+  return chain.newAddress("bcrt1q");
 }
 
 async function gettransaction(params: Params): Promise<RawTransaction> {
   const [txid] = asArray(params) as [string];
   return {
-    txid: txid ?? ZERO_HASH,
+    txid: txid ?? "",
     hex: "",
-    confirmations: 0,
+    confirmations: chain.confirmations(txid ?? ""),
   };
 }
 
 async function sendrawtransaction(): Promise<string> {
-  return ZERO_HASH;
+  // Phase 3 doesn't accept user-submitted raw TXs; the lab uses
+  // /test/send for affordance. Return a placeholder.
+  return "0".repeat(64);
 }
 
 async function getrawmempool(): Promise<string[]> {
-  return [];
+  return Array.from(chain.mempool.keys());
 }
 
 async function decodepsbt(): Promise<DecodedPsbt> {

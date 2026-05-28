@@ -97,6 +97,12 @@ export default function AccountPage() {
           </CardHeader>
           <CardContent className="text-sm space-y-2">
             <p>
+              <Link href="/account/deposit">Deposit BTC →</Link>
+            </p>
+            <p>
+              <Link href="/account/kyc">Identity verification →</Link>
+            </p>
+            <p>
               <Link href="/account/security">Manage password & 2FA →</Link>
             </p>
             <p>

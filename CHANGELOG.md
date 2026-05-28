@@ -6,6 +6,24 @@ planted vulnerabilities — references to "fixed" issues that hint at
 adjacent unfixed ones, TODOs left in the code, etc. They are part of
 the lab.
 
+## 2026-05-30 — Phase 3: deposits & address management
+
+- New: BTC deposit addresses (derived from the mock regtest node).
+- New: `Balance` table tracks the running per-asset position;
+  Phase-4 trading will consume it.
+- New: deposit worker polls the chain every 5s; credits balance
+  after enough confirmations for the user's KYC tier.
+- Internal: premium tier-3 users receive **instant credit**
+  (0-confirmation) to avoid waiting through chain congestion.
+  Reconciliation on RBF drops is tracked as DEPOSIT-271 and not
+  yet implemented.
+- Lab: dev affordances under `/api/v2/dev/btc/*` (send/mine/rbf)
+  for trainee testing. Gated by `LAB_AFFORDANCES_ENABLED` env var.
+- Internal: a shared `isValidBtcAddress()` helper now backs
+  address validation across the codebase. Phase 7+ withdrawal
+  will consume it. We accept mainnet/testnet/regtest HRPs from a
+  single function to support clients across networks.
+
 ## 2026-05-29 — Phase 2: KYC & identity
 
 - New: KYC profile + document upload + multi-tier verification.
