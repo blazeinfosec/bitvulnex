@@ -35,6 +35,17 @@ Each entry:
 
 ## Phase 1 — Authentication & user model
 
+### V-13: Open redirect via login `?next=` parameter
+
+- **Category:** OWASP / Auth
+- **Phase introduced:** 1 (relocated from the master plan's Phase-7 slot — login surface lands earlier than withdraw/callback)
+- **Location:** `apps/web/app/login/login-form.tsx` (the `nextPath = params.get("next") ?? "/account"` line and the subsequent `router.push(nextPath ...)`)
+- **Exploitation path:** Craft a URL like `http://exchange.local/login?next=//attacker.example/phish` or `?next=https://attacker.example`. After successful authentication the SPA passes the raw `next` value to `router.push`; in some Next.js + browser combinations protocol-relative and absolute URLs are honored, navigating the freshly-authenticated user off-origin. Pairs well with a phishing page that mirrors the BVBE login screen and harvests the legitimate access/refresh pair from `postMessage` or referer.
+- **Intended discovery difficulty:** easy
+- **Realistic root cause:** Engineer copy-pasted a `?next=` pattern from another product without whitelisting the value to same-origin paths. Looks like normal "preserve the user's destination" UX code.
+- **Remediation:** Whitelist `next` before pushing — require leading `/` and reject `//` and `/\` prefixes. A small `safeNext(next, fallback)` helper is the canonical fix.
+- **Chain membership:** standalone (and an OAuth-code-interception primitive once Phase 1+ social login lands — but we don't have OAuth in scope per locked decisions)
+
 ### V-8: JWT alg=none accepted by legacy v1 verifier
 
 - **Category:** OWASP / Auth

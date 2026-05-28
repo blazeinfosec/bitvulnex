@@ -293,3 +293,72 @@ All 3 blockers, 4 majors, and 4 consequential minors closed.
 ready for Phase 2 to graft on.
 
 — build-author
+
+---
+
+## Second addendum — Scope-creep audit (2026-05-28)
+
+User flagged that the Phase 1 fix-up addendum item "Q-1.9 safeNext()"
+read like a security fix — exactly the kind of QA-time hardening the
+project now explicitly prohibits (see new `CLAUDE.md` § "DO NOT FIX
+SECURITY ISSUES"). Audited every Phase-0 + Phase-1 fix-up entry and
+reverted three security-flavored items. A fourth was relocated to a
+new planted-vuln entry.
+
+### Reverted
+
+- **Q-1.6 middleware `headers.delete()` additions.** The redundant
+  strip-then-set pattern was paranoia — it did not change V-35's
+  exploitability (the `x-middleware-subrequest` bypass returns
+  before the strip runs) but it softened the "realistic root cause"
+  reading ("careless team adds `set` but never thinks about strip").
+  Reverted to the original Phase-1 staff-eng form: no strip, just
+  `set`. V-35 unchanged.
+- **Q-1.9 `safeNext()` helper.** Removed `apps/web/lib/safe-next.ts`.
+  Login form reverted to `const nextPath = params.get("next") ??
+  "/account"` followed by raw `router.push(nextPath)`. Originally
+  acknowledged as adjacent to V-13 (open-redirect, master plan
+  Phase 7); now formally planted in Phase 1 — see V-13 in VULNS.md.
+- **Q-1.11 private PEM barrel split.** Deleted
+  `packages/shared/src/legacy-keys-public.ts`. Restored the original
+  `legacy-keys.ts` and `export * from "./legacy-keys"` in the
+  package barrel. The L7's concern (private PEM "travels with"
+  hypothetical future endpoints) is a forward-risk against unwritten
+  code, not a current vuln. Reverted.
+
+### Newly planted
+
+- **V-13 (open redirect via login `?next=`).** Added to VULNS.md as
+  a Phase-1 entry. Originally scheduled for Phase 7 alongside the
+  withdraw-callback variant — login surface ships earlier so V-13
+  relocates. Phase 7 will get the withdraw-callback `?return=`
+  variant as the second occurrence.
+
+### Kept (functional / lab-safety only)
+
+All other fix-up items (Q-1.1 Suspense, Q-1.2 seed template, Q-1.3
+V-9 reachability, Q-1.4 TOTP globalThis, Q-1.5 Makefile, Q-1.7
+.env.example docs, Q-1.8 seed determinism, plus all Phase-0
+fix-up items) are confirmed non-security or are *unsupporting* of
+unintended vulns (Q-1.3 actually MADE V-9 fire end-to-end — it
+restored a planted vuln, didn't close one).
+
+### Verification post-audit
+
+- `pnpm test` → 10/10 pass (no test depended on safeNext / barrel
+  split / middleware strip)
+- `pnpm --filter @bvbe/web exec tsc --noEmit` → clean
+- `pnpm --filter @bvbe/shared exec tsc --noEmit` → clean
+- `pnpm tsx docs/phases/phase-1/poc-scratch.mjs` → V-8/9/19/20
+  still fire (verified)
+
+### Policy going forward
+
+The new `CLAUDE.md` § "DO NOT FIX SECURITY ISSUES" makes the rule
+operational. Any future fix-up addendum that lists a security-shaped
+item should trigger the same audit reflex: is the construct part of
+a planted vuln (revert), unsupporting of one (keep), or genuinely
+unrelated to the planted catalog (case-by-case, defaulting to
+revert per the strict reading of the rule)?
+
+— build-author

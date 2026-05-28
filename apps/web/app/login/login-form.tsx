@@ -6,12 +6,11 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { setTokens } from "@/lib/token-storage";
-import { safeNext } from "@/lib/safe-next";
 
 export function LoginForm() {
   const router = useRouter();
   const params = useSearchParams();
-  const nextPath = safeNext(params.get("next"));
+  const nextPath = params.get("next") ?? "/account";
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");

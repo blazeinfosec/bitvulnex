@@ -37,13 +37,6 @@ export async function middleware(req: NextRequest) {
   const path = req.nextUrl.pathname;
 
   if (path.startsWith(ADMIN_API_PREFIX)) {
-    // Admin handlers consume x-bvbe-user-id / x-bvbe-role set here.
-    // Strip any inbound copies first so the client can't spoof them
-    // through the legitimate (non-bypassed) path.
-    const headers = new Headers(req.headers);
-    headers.delete("x-bvbe-user-id");
-    headers.delete("x-bvbe-role");
-
     const claims = await claimsFromHeader(req.headers.get("authorization"));
     if (!claims) {
       return NextResponse.json({ error: "unauthorized" }, { status: 401 });
@@ -51,6 +44,7 @@ export async function middleware(req: NextRequest) {
     if (claims.role !== "admin" && claims.role !== "treasury") {
       return NextResponse.json({ error: "forbidden" }, { status: 403 });
     }
+    const headers = new Headers(req.headers);
     headers.set("x-bvbe-user-id", claims.sub);
     headers.set("x-bvbe-role", claims.role);
     return NextResponse.next({ request: { headers } });

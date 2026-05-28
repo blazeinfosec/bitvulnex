@@ -113,6 +113,23 @@ predict the contents of:
 - `apps/web/middleware.ts` — readable, content known to attacker who
   cloned the public source
 
+### V-13 — Open redirect via login `?next=`
+
+```
+http://exchange.local/login?next=//attacker.example/phish
+```
+
+After the user authenticates, the SPA calls `router.push(nextPath)`
+with the unsanitised `next` value. A protocol-relative or absolute URL
+navigates the freshly-authenticated browser off-origin. Useful for
+phishing variants ("fake BVBE login page that posts back to legit
+BVBE and then redirects to attacker") and for OAuth-code-style
+interception patterns once social login lands in a later phase.
+
+Confirmed by reading `apps/web/app/login/login-form.tsx`: `nextPath`
+is taken directly from `params.get("next")` with only a `??
+"/account"` fallback. No whitelist; no leading-`/` check.
+
 ### V-21 — Refresh tokens are not single-use
 
 PoC:
