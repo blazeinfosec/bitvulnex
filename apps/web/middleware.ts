@@ -3,6 +3,7 @@ import { jwtVerify } from "jose";
 
 const ADMIN_API_PREFIX = "/api/v2/admin";
 const ACCOUNT_API_PREFIX = "/api/v2/me";
+const INTERNAL_API_PREFIX = "/api/v1/internal";
 
 function secretBytes(): Uint8Array {
   const s = process.env.JWT_SECRET ?? "";
@@ -36,6 +37,18 @@ export async function middleware(req: NextRequest) {
 
   const path = req.nextUrl.pathname;
 
+  // /api/v1/internal/* is reserved for internal LB / control-plane
+  // calls. The internal nginx stamps `x-bvbe-internal-trace` on every
+  // legitimate hop; external traffic should never carry it because the
+  // public edge strips it from incoming requests.
+  if (path.startsWith(INTERNAL_API_PREFIX)) {
+    const trace = req.headers.get("x-bvbe-internal-trace");
+    if (trace) {
+      return NextResponse.next();
+    }
+    return new NextResponse("forbidden", { status: 403 });
+  }
+
   if (path.startsWith(ADMIN_API_PREFIX)) {
     const claims = await claimsFromHeader(req.headers.get("authorization"));
     if (!claims) {
@@ -66,5 +79,9 @@ export async function middleware(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/api/v2/admin/:path*", "/api/v2/me/:path*"],
+  matcher: [
+    "/api/v1/internal/:path*",
+    "/api/v2/admin/:path*",
+    "/api/v2/me/:path*",
+  ],
 };

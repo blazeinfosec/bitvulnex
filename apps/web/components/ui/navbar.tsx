@@ -31,6 +31,9 @@ export function NavBar() {
             <Link href="/withdraw">Withdraw</Link>
           </Button>
           <Button variant="ghost" size="sm" asChild>
+            <Link href="/support">Support</Link>
+          </Button>
+          <Button variant="ghost" size="sm" asChild>
             <Link href="/about/changelog">Changelog</Link>
           </Button>
           <Button variant="ghost" size="sm" asChild>

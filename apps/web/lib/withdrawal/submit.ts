@@ -15,6 +15,7 @@ import {
   amountToCents,
   checkAndDebitLimit,
 } from "./limit";
+import { isUserFrozen } from "./freeze";
 
 export class WithdrawalValidationError extends Error {
   readonly status = 400;
@@ -22,6 +23,10 @@ export class WithdrawalValidationError extends Error {
 
 export class InsufficientBalanceError extends Error {
   readonly status = 400;
+}
+
+export class AccountFrozenError extends Error {
+  readonly status = 423;
 }
 
 // Flat network fee per BTC withdrawal. Real exchanges quote this off
@@ -68,6 +73,10 @@ export async function submitWithdrawal(
 
   const fee = new Prisma.Decimal(NETWORK_FEE_BTC[args.asset] ?? "0");
   const totalDebit = amount.add(fee);
+
+  if (await isUserFrozen(args.userId, db)) {
+    throw new AccountFrozenError("account frozen");
+  }
 
   // Available balance check — does the user have enough liquid funds
   // to cover the withdrawal plus the network fee?

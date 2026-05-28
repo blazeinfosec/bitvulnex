@@ -32,6 +32,30 @@ export default function AdminLanding() {
       <div className="grid sm:grid-cols-2 gap-4">
         <Card>
           <CardHeader>
+            <CardTitle>Users</CardTitle>
+          </CardHeader>
+          <CardContent className="text-sm">
+            <Link href="/admin/users">Search users →</Link>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader>
+            <CardTitle>Support inbox</CardTitle>
+          </CardHeader>
+          <CardContent className="text-sm">
+            <Link href="/admin/tickets">Open the ticket inbox →</Link>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader>
+            <CardTitle>Compliance queue</CardTitle>
+          </CardHeader>
+          <CardContent className="text-sm">
+            <Link href="/admin/compliance">Open the compliance queue →</Link>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader>
             <CardTitle>KYC review queue</CardTitle>
           </CardHeader>
           <CardContent className="text-sm">

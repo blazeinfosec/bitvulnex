@@ -148,6 +148,32 @@ enum TreasuryDraftStatus {
   failed
 }
 
+enum SupportTicketStatus {
+  open
+  awaiting_user
+  awaiting_agent
+  resolved
+  closed
+}
+
+enum SupportTicketCategory {
+  general
+  account
+  deposit
+  withdrawal
+  trading
+  kyc
+  security
+}
+
+enum ComplianceCaseStatus {
+  open
+  in_review
+  escalated
+  resolved
+  dismissed
+}
+
 model User {
   id                 String    @id @default(cuid())
   email              String    @unique
@@ -189,6 +215,11 @@ model User {
   internalTransfersIn  InternalTransfer[]  @relation("internal_transfer_to")
   treasuryDrafts      TreasuryDraft[]      @relation("treasury_draft_author")
   treasurySignatures  TreasurySignature[]  @relation("treasury_signature_signer")
+  tickets                   SupportTicket[]
+  ticketMessages            SupportTicketMessage[]
+  complianceCasesAsSubject  ComplianceCase[]       @relation("compliance_subject")
+  complianceCasesAsOpener   ComplianceCase[]       @relation("compliance_opener")
+  adminAuditLogs            AdminAuditLog[]
 
   @@map("users")
 }
@@ -673,4 +704,70 @@ model TreasurySignature {
 
   @@unique([draftId, signerUserId])
   @@map("treasury_signatures")
+}
+
+model SupportTicket {
+  id        String                @id @default(cuid())
+  userId    String
+  category  SupportTicketCategory @default(general)
+  subject   String
+  status    SupportTicketStatus   @default(open)
+  createdAt DateTime              @default(now())
+  updatedAt DateTime              @updatedAt
+  closedAt  DateTime?
+
+  user     User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages SupportTicketMessage[]
+
+  @@index([userId])
+  @@index([status])
+  @@map("support_tickets")
+}
+
+model SupportTicketMessage {
+  id        String   @id @default(cuid())
+  ticketId  String
+  authorId  String
+  isAgent   Boolean  @default(false)
+  bodyMd    String
+  createdAt DateTime @default(now())
+
+  ticket SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  author User          @relation(fields: [authorId], references: [id], onDelete: Restrict)
+
+  @@index([ticketId])
+  @@map("support_ticket_messages")
+}
+
+model ComplianceCase {
+  id            String               @id @default(cuid())
+  subjectUserId String
+  openedById    String?
+  status        ComplianceCaseStatus @default(open)
+  notes         String?
+  createdAt     DateTime             @default(now())
+  resolvedAt    DateTime?
+
+  subject  User  @relation("compliance_subject", fields: [subjectUserId], references: [id], onDelete: Cascade)
+  openedBy User? @relation("compliance_opener", fields: [openedById], references: [id], onDelete: SetNull)
+
+  @@index([subjectUserId])
+  @@index([status])
+  @@map("compliance_cases")
+}
+
+model AdminAuditLog {
+  id          String   @id @default(cuid())
+  actorUserId String
+  action      String
+  targetType  String
+  targetId    String
+  metadata    Json
+  createdAt   DateTime @default(now())
+
+  actor User @relation(fields: [actorUserId], references: [id], onDelete: Restrict)
+
+  @@index([actorUserId])
+  @@index([targetType, targetId])
+  @@map("admin_audit_logs")
 }

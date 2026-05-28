@@ -14,7 +14,12 @@ if (process.env.NODE_ENV !== "production") {
   globalForPrisma.prisma = prisma;
 }
 
-export type { User } from "@prisma/client";
+export type {
+  User,
+  SupportTicketStatus,
+  SupportTicketCategory,
+  ComplianceCaseStatus,
+} from "@prisma/client";
 // Re-export the `Prisma` namespace so consumers can use
 // `Prisma.Decimal`, `Prisma.TransactionClient`, etc. without each
 // app adding `@prisma/client` as a direct dependency.

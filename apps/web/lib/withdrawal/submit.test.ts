@@ -142,6 +142,9 @@ function makeFakeDb(seed: Balance[]) {
         return row;
       },
     },
+    adminAuditLog: {
+      findFirst: async () => null,
+    },
   };
   return { db, balances, withdrawals };
 }

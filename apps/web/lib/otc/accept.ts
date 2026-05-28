@@ -36,6 +36,25 @@ export async function acceptOtc(
       throw new Error("quote expired");
     }
 
+    // Atomically claim the ticket: only one concurrent acceptor can
+    // flip status off `quoted`. If the conditional update matches
+    // zero rows, another request raced ahead and we bail.
+    const claim = await tx.otcTicket.updateMany({
+      where: {
+        id: ticket.id,
+        status: "quoted",
+        quoteExpiresAt: { gt: new Date() },
+      },
+      data: {
+        status: "filled",
+        filledAt: new Date(),
+        feeBps: args.feeBps,
+      },
+    });
+    if (claim.count === 0) {
+      throw new Error("ticket cannot be filled");
+    }
+
     const [base, quote] = ticket.pair.split("/");
     if (!base || !quote) throw new Error("bad pair");
 
@@ -69,14 +88,6 @@ export async function acceptOtc(
           asset: base,
           available: ticket.amount,
           amount: ticket.amount,
-        },
-      });
-      await tx.otcTicket.update({
-        where: { id: ticket.id },
-        data: {
-          status: "filled",
-          filledAt: new Date(),
-          feeBps: args.feeBps,
         },
       });
       return {
@@ -114,14 +125,6 @@ export async function acceptOtc(
         amount: proceeds,
       },
     });
-    await tx.otcTicket.update({
-      where: { id: ticket.id },
-      data: {
-        status: "filled",
-        filledAt: new Date(),
-        feeBps: args.feeBps,
-      },
-    });
     return {
       filled: true,
       baseDelta: ticket.amount.neg().toString(),
@@ -129,4 +132,3 @@ export async function acceptOtc(
     };
   });
 }
-

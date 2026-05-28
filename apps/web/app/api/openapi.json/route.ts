@@ -63,6 +63,9 @@ import "@/app/api/v2/admin/treasury/drafts/[id]/sign/route";
 import "@/app/api/v2/admin/treasury/drafts/[id]/broadcast/route";
 import "@/app/api/v2/admin/withdrawals/[id]/bump/route";
 import "@/app/api/v2/public/treasury/hot-wallet/route";
+import "@/app/api/v2/me/flags/route";
+import "@/app/api/v2/me/tickets/route";
+import "@/app/api/v2/admin/users/search/route";
 
 registerEndpoint({
   method: "get",
