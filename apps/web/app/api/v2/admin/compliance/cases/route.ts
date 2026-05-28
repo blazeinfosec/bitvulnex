@@ -8,6 +8,29 @@ import { prisma } from "@bvbe/db";
 import { userFromAuthorization } from "@/lib/auth";
 import { jsonError, readJson } from "@/lib/api";
 import { requireAdmin, RoleError } from "@/lib/auth-role";
+import { registerEndpoint } from "@/lib/openapi-registry";
+
+registerEndpoint({
+  method: "get",
+  path: "/api/v2/admin/compliance/cases",
+  summary: "List compliance cases",
+  responses: {
+    "200": { description: "OK" },
+    "401": { description: "Auth required" },
+    "403": { description: "Admin required" },
+  },
+});
+
+registerEndpoint({
+  method: "post",
+  path: "/api/v2/admin/compliance/cases",
+  summary: "Open a new compliance case",
+  responses: {
+    "200": { description: "OK" },
+    "401": { description: "Auth required" },
+    "403": { description: "Admin required" },
+  },
+});
 
 export const dynamic = "force-dynamic";
 

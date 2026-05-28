@@ -36,6 +36,15 @@ export default function AdminCompliancePage() {
       <h1 className="text-3xl font-semibold tracking-tight text-navy-900 mb-2">
         Compliance queue
       </h1>
+      <p className="text-sm text-navy-700">
+        Beta:{" "}
+        <Link
+          href="/admin/compliance/sanctions-import"
+          className="underline"
+        >
+          Import sanctions list
+        </Link>
+      </p>
       <Card>
         <CardHeader>
           <CardTitle>{cases?.length ?? 0} cases</CardTitle>

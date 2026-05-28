@@ -7,6 +7,19 @@ import { prisma } from "@bvbe/db";
 import { sanitizeForUser } from "@bvbe/shared";
 import { userFromAuthorization } from "@/lib/auth";
 import { jsonError } from "@/lib/api";
+import { registerEndpoint } from "@/lib/openapi-registry";
+
+registerEndpoint({
+  method: "get",
+  path: "/api/v2/me/tickets/{id}",
+  summary: "User-facing ticket detail",
+  responses: {
+    "200": { description: "OK" },
+    "401": { description: "Auth required" },
+    "403": { description: "Forbidden" },
+    "404": { description: "Not found" },
+  },
+});
 
 export const dynamic = "force-dynamic";
 

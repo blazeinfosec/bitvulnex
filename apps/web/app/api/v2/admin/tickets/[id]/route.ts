@@ -8,6 +8,19 @@ import { sanitizeForAdmin } from "@bvbe/shared";
 import { userFromAuthorization } from "@/lib/auth";
 import { jsonError } from "@/lib/api";
 import { requireAdmin, RoleError } from "@/lib/auth-role";
+import { registerEndpoint } from "@/lib/openapi-registry";
+
+registerEndpoint({
+  method: "get",
+  path: "/api/v2/admin/tickets/{id}",
+  summary: "Admin ticket thread detail",
+  responses: {
+    "200": { description: "OK" },
+    "401": { description: "Auth required" },
+    "403": { description: "Admin required" },
+    "404": { description: "Not found" },
+  },
+});
 
 export const dynamic = "force-dynamic";
 

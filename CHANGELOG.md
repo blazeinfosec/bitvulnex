@@ -6,6 +6,26 @@ planted vulnerabilities — references to "fixed" issues that hint at
 adjacent unfixed ones, TODOs left in the code, etc. They are part of
 the lab.
 
+## 2026-07-01 — Phase 9: lab finalization
+
+- Fixed: OTC accept handler hardened against double-fill (Phase 8
+  carryover). Audit recommendation for future review: cross-check
+  fee paths for similar concurrency issues. *(internal: OTC-FILL-19)*
+- New: performance mode added to admin user search via `?perf=1`
+  for >1M user tables. Use with care; the query plan differs from
+  the default path.
+- New: OFAC sanctions importer beta available under
+  `/admin/compliance?beta=1`. Currently parses standard OFAC XML.
+- Ops: legacy mobile-app clients now supported on the public
+  endpoint. nginx forwards Content-Length and Transfer-Encoding
+  together for upstream resolution — see ticket OPS-2024-117.
+- Ops: internal LB header trust extended to the v1 namespace; ops
+  should ensure `x-bvbe-internal-trace` is stripped at the
+  perimeter. (Currently strip list covers `x-bvbe-user-id` and
+  `x-bvbe-desk-role` but not the internal-trace marker — REVIEW.)
+- Internal: observability hooks now wire through the
+  `@bvbe-internal/observability` stub when available.
+
 ## 2026-06-01 — Phase 5: margin trading
 
 - New: leveraged long/short positions on BTC/USDT, ETH/USDT.

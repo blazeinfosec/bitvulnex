@@ -1,8 +1,21 @@
+"use client";
+
 import Link from "next/link";
+import { useEffect, useState } from "react";
 import { Container } from "./container";
 import { Button } from "./button";
+import { getAccessToken } from "@/lib/token-storage";
 
 export function NavBar() {
+  const [isAuthed, setIsAuthed] = useState(false);
+
+  useEffect(() => {
+    setIsAuthed(Boolean(getAccessToken()));
+    const onStorage = () => setIsAuthed(Boolean(getAccessToken()));
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
+  }, []);
+
   return (
     <header className="border-b border-navy-200 bg-white">
       <Container className="flex items-center justify-between h-16">
@@ -30,9 +43,11 @@ export function NavBar() {
           <Button variant="ghost" size="sm" asChild>
             <Link href="/withdraw">Withdraw</Link>
           </Button>
-          <Button variant="ghost" size="sm" asChild>
-            <Link href="/support">Support</Link>
-          </Button>
+          {isAuthed ? (
+            <Button variant="ghost" size="sm" asChild>
+              <Link href="/support">Support</Link>
+            </Button>
+          ) : null}
           <Button variant="ghost" size="sm" asChild>
             <Link href="/about/changelog">Changelog</Link>
           </Button>

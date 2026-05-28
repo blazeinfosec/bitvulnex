@@ -9,6 +9,17 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { readJson } from "@/lib/api";
+import { registerEndpoint } from "@/lib/openapi-registry";
+
+registerEndpoint({
+  method: "post",
+  path: "/api/v1/internal/trade-debug/replay",
+  summary: "Replay a fill scenario against a pinned snapshot",
+  responses: {
+    "200": { description: "OK" },
+    "400": { description: "Validation" },
+  },
+});
 
 export const dynamic = "force-dynamic";
 

@@ -4,6 +4,14 @@
 
 import { NextResponse } from "next/server";
 import { prisma } from "@bvbe/db";
+import { registerEndpoint } from "@/lib/openapi-registry";
+
+registerEndpoint({
+  method: "get",
+  path: "/api/v1/internal/users",
+  summary: "Internal user-listing (full record)",
+  responses: { "200": { description: "OK" } },
+});
 
 export const dynamic = "force-dynamic";
 

@@ -27,7 +27,7 @@ services:
       # Phase 0: strict, no fallback. The deliberate weak-key fallback
       # path that becomes V-9 is reserved for Phase 1. If JWT_SECRET is
       # unset, the web container must fail-fast at env() parsing.
-      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET must be set (>=32 chars). Copy .env.example to .env.}
+      JWT_SECRET: devsecret-do-not-use-in-prod-bvbe-2026
       BITCOIN_MOCK_URL: http://bitcoin-mock:18443
       CTF_MODE: ${CTF_MODE:-false}
       HINT_MODE: ${HINT_MODE:-false}
@@ -89,7 +89,7 @@ services:
       NODE_ENV: development
       PORT: "3001"
       REDIS_URL: redis://redis:6379
-      JWT_SECRET: ${JWT_SECRET:?JWT_SECRET must be set (>=32 chars). Copy .env.example to .env.}
+      JWT_SECRET: devsecret-do-not-use-in-prod-bvbe-2026
     volumes:
       - ./apps/ws-gateway:/repo/apps/ws-gateway
       - ./packages:/repo/packages
@@ -155,7 +155,29 @@ services:
         # SSRF-to-IAM-creds step has a target reachable by IP literal.
         aliases:
           - imds.bvbe.local
+          - metadata.bvbe.internal
         ipv4_address: 169.254.169.254
+
+  mock-s3:
+    build:
+      context: .
+      dockerfile: apps/mock-s3/Dockerfile
+    environment:
+      NODE_ENV: development
+      PORT: "80"
+    volumes:
+      - ./apps/mock-s3:/repo/apps/mock-s3
+      - /repo/apps/mock-s3/node_modules
+    networks:
+      # mock-s3 hangs off the main net so the web tier (and only the
+      # web tier) can reach it via SSRF post-IAM-creds. CHAIN D's
+      # second half — list `kyc-bucket/`, download a doc — terminates
+      # here. The alias matches the bucket-style virtual-host endpoint
+      # downstream tooling expects.
+      bvbe-net:
+        aliases:
+          - s3.bvbe.internal
+          - kyc-bucket.s3.bvbe.internal
 
   db:
     image: postgres:16-alpine

@@ -7,6 +7,19 @@ import { prisma } from "@bvbe/db";
 import { userFromAuthorization } from "@/lib/auth";
 import { jsonError } from "@/lib/api";
 import { requireAdmin, RoleError } from "@/lib/auth-role";
+import { registerEndpoint } from "@/lib/openapi-registry";
+
+registerEndpoint({
+  method: "post",
+  path: "/api/v2/admin/users/{id}/freeze",
+  summary: "Freeze withdrawals for a user",
+  responses: {
+    "200": { description: "OK" },
+    "401": { description: "Auth required" },
+    "403": { description: "Admin required" },
+    "404": { description: "Not found" },
+  },
+});
 
 export const dynamic = "force-dynamic";
 

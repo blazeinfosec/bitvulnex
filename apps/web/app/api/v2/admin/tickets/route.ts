@@ -5,6 +5,18 @@ import { prisma } from "@bvbe/db";
 import { userFromAuthorization } from "@/lib/auth";
 import { jsonError } from "@/lib/api";
 import { requireAdmin, RoleError } from "@/lib/auth-role";
+import { registerEndpoint } from "@/lib/openapi-registry";
+
+registerEndpoint({
+  method: "get",
+  path: "/api/v2/admin/tickets",
+  summary: "Admin / support ticket inbox",
+  responses: {
+    "200": { description: "OK" },
+    "401": { description: "Auth required" },
+    "403": { description: "Admin required" },
+  },
+});
 
 export const dynamic = "force-dynamic";
 

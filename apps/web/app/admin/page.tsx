@@ -62,6 +62,14 @@ export default function AdminLanding() {
             <Link href="/admin/kyc">Open the pending-review queue →</Link>
           </CardContent>
         </Card>
+        <Card>
+          <CardHeader>
+            <CardTitle>Treasury</CardTitle>
+          </CardHeader>
+          <CardContent className="text-sm">
+            <Link href="/admin/treasury">Open the treasury drafts →</Link>
+          </CardContent>
+        </Card>
       </div>
     </Container>
   );

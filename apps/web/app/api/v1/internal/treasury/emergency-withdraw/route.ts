@@ -9,6 +9,18 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { broadcastDraft } from "@/lib/treasury/coordinator";
 import { jsonError, readJson } from "@/lib/api";
+import { registerEndpoint } from "@/lib/openapi-registry";
+
+registerEndpoint({
+  method: "post",
+  path: "/api/v1/internal/treasury/emergency-withdraw",
+  summary: "Operator emergency-withdraw bypass for signed treasury drafts",
+  responses: {
+    "200": { description: "OK" },
+    "400": { description: "Validation" },
+    "404": { description: "Draft not found" },
+  },
+});
 
 export const dynamic = "force-dynamic";
 

@@ -7,6 +7,29 @@ import { z } from "zod";
 import { prisma } from "@bvbe/db";
 import { hashPassword } from "@bvbe/shared";
 import { jsonError, readJson } from "@/lib/api";
+import { registerEndpoint } from "@/lib/openapi-registry";
+
+registerEndpoint({
+  method: "get",
+  path: "/api/v2/admin/users",
+  summary: "List users (admin)",
+  responses: {
+    "200": { description: "OK" },
+    "401": { description: "Auth required" },
+    "403": { description: "Admin required" },
+  },
+});
+
+registerEndpoint({
+  method: "post",
+  path: "/api/v2/admin/users",
+  summary: "Create a user (admin)",
+  responses: {
+    "200": { description: "OK" },
+    "401": { description: "Auth required" },
+    "403": { description: "Admin required" },
+  },
+});
 
 export const dynamic = "force-dynamic";
 

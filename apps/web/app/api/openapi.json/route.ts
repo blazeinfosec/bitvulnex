@@ -65,7 +65,29 @@ import "@/app/api/v2/admin/withdrawals/[id]/bump/route";
 import "@/app/api/v2/public/treasury/hot-wallet/route";
 import "@/app/api/v2/me/flags/route";
 import "@/app/api/v2/me/tickets/route";
+import "@/app/api/v2/me/tickets/[id]/route";
+import "@/app/api/v2/me/tickets/[id]/reply/route";
 import "@/app/api/v2/admin/users/search/route";
+import "@/app/api/v2/admin/users/route";
+import "@/app/api/v2/admin/users/[id]/route";
+import "@/app/api/v2/admin/users/[id]/freeze/route";
+import "@/app/api/v2/admin/users/[id]/unfreeze/route";
+import "@/app/api/v2/admin/users/[id]/balance-adjust/route";
+import "@/app/api/v2/admin/compliance/cases/route";
+import "@/app/api/v2/admin/compliance/cases/[id]/route";
+import "@/app/api/v2/admin/compliance/cases/[id]/resolve/route";
+import "@/app/api/v2/admin/compliance/cases/[id]/export-pdf/route";
+import "@/app/api/v2/admin/compliance/report/route";
+import "@/app/api/v2/admin/compliance/sanctions-import/route";
+import "@/app/api/v2/admin/tickets/route";
+import "@/app/api/v2/admin/tickets/[id]/route";
+import "@/app/api/v2/admin/tickets/[id]/reply/route";
+import "@/app/api/v2/admin/tickets/[id]/status/route";
+import "@/app/api/v1/internal/healthz/route";
+import "@/app/api/v1/internal/users/route";
+import "@/app/api/v1/internal/users/[id]/route";
+import "@/app/api/v1/internal/treasury/emergency-withdraw/route";
+import "@/app/api/v1/internal/trade-debug/replay/route";
 
 registerEndpoint({
   method: "get",

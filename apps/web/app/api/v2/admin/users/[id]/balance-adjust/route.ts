@@ -8,6 +8,20 @@ import { Prisma, prisma } from "@bvbe/db";
 import { userFromAuthorization } from "@/lib/auth";
 import { jsonError, readJson } from "@/lib/api";
 import { requireAdmin, RoleError } from "@/lib/auth-role";
+import { registerEndpoint } from "@/lib/openapi-registry";
+
+registerEndpoint({
+  method: "post",
+  path: "/api/v2/admin/users/{id}/balance-adjust",
+  summary: "Manual balance adjustment (admin)",
+  responses: {
+    "200": { description: "OK" },
+    "400": { description: "Validation" },
+    "401": { description: "Auth required" },
+    "403": { description: "Admin required" },
+    "404": { description: "Not found" },
+  },
+});
 
 export const dynamic = "force-dynamic";
 
@@ -44,6 +58,12 @@ export async function POST(
   if (deltaDec.eq(0)) {
     return jsonError(400, "delta must be non-zero");
   }
+
+  const target = await prisma.user.findUnique({
+    where: { id: targetUserId },
+    select: { id: true },
+  });
+  if (!target) return jsonError(404, "user not found");
 
   await prisma.$transaction(async (tx) => {
     await tx.balance.upsert({
