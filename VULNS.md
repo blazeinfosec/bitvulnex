@@ -283,6 +283,43 @@ Each entry:
 
 ---
 
+## Phase 6 — Lending, staking, OTC desk, P2P
+
+### V-44: Lending interest off-by-one credit (fresh-supplier prior-period grab)
+
+- **Category:** Business logic / Crypto-finance arithmetic
+- **Phase introduced:** 6
+- **Location:** `apps/worker/src/yield-accrual.ts:50` (the `supplyPositions = await db.lendingPosition.findMany(...)` lookup runs *after* `interest` is computed for the elapsed window; the distribution divides by the post-tick `pool.supplied` and includes any positions opened between the last accrual and the current one)
+- **Exploitation path:** Watch the pool's `lastAccrual` timestamp (publicly readable indirectly via `/api/v2/public/lending/pools` — the `perSecondRate * elapsed * borrowed` formula is computable). Just before the 60s tick fires, supply a large amount into a high-utilization pool. When the worker accrues, it computes `interest` from `borrowed * deltaSeconds * rate` (the borrow side that existed across the whole window) but distributes that interest across the *current* supply set, which now includes the attacker's freshly-deposited principal. The attacker captures a share of yield that was earned by borrowers when their capital was not yet at risk. Withdraw immediately after the tick to harvest. Repeat on every cycle; profit scales with utilization, attacker share, and how reliably they front-run the tick.
+- **Intended discovery difficulty:** hard
+- **Realistic root cause:** Engineer wrote "compute the interest, then loop over supply positions" without thinking about the timing of the position-set read. Compound v1 and Cream had variants of this same shape — easy to ship, easy to overlook in code review because the math otherwise looks conservation-clean (charged interest still equals credited interest plus reserve).
+- **Remediation:** Snapshot the supply-position set (and each row's principal) at `pool.lastAccrual` time, not at the start of the current tick. Either (a) record a tick-id on each position write so the worker can replay an "as-of" view, (b) lock the pool row and serialize all supply/withdraw between ticks, or (c) move to a per-second on-demand accrual model with a virtual index (Compound v2 / Aave style).
+- **Chain membership:** standalone
+
+### V-45: Staking reward claim race (double-claim via concurrent requests)
+
+- **Category:** Business logic / Race condition
+- **Phase introduced:** 6
+- **Location:** `apps/web/lib/staking/claim.ts:32` (the `db.stakingClaim.findMany` reads `claimedAt: null` rows; the subsequent `db.stakingClaim.update` at line 41 sets `claimedAt` unconditionally — no transaction wraps the read+write pair and no `claimedAt: null` predicate guards the update)
+- **Exploitation path:** Send two `POST /api/v2/me/staking/claim` requests for the same `positionId` simultaneously (HTTP/2 single-packet timing, or two parallel curls). Both handlers' `findMany` execute before either's `update` lands, so both observe the same set of unclaimed rows. Each request then runs `update` against every row and credits the user's balance with the full reward amount. Net effect: rewards credited 2× (or N× for N parallel requests). Repeat each tick the worker materializes a claim row.
+- **Intended discovery difficulty:** medium
+- **Realistic root cause:** Engineer treated the claim endpoint as a read-modify-write but forgot the read isn't fenced from the write — common in early staking implementations where the pre-materialization pattern (worker writes the reward rows, endpoint just marks them claimed) feels safe enough that nobody reaches for `SERIALIZABLE` or `SELECT FOR UPDATE`.
+- **Remediation:** Wrap the read+update in a single transaction with `SERIALIZABLE` isolation OR perform the update as `UPDATE staking_claims SET claimed_at = now() WHERE position_id = $1 AND claimed_at IS NULL RETURNING amount` and credit only the returned rows. Either approach makes the predicate atomic with the write.
+- **Chain membership:** standalone
+
+### V-46: OTC desk privilege via spoofable `x-bvbe-desk-role` header
+
+- **Category:** Auth / Trust boundary
+- **Phase introduced:** 6
+- **Location:** `apps/web/app/api/v2/me/otc/accept/route.ts:43-44` (the route handler reads `x-bvbe-desk-role` and assigns `feeBps = MAKER_FEE_BPS (0)` when the value is `"maker"`; `nginx/nginx.conf` strips `x-bvbe-user-id` and `x-bvbe-internal-trace` in the catch-all `location /` block but does NOT strip `x-bvbe-desk-role` — the maker-role privilege flows through from client request to handler unchanged)
+- **Exploitation path:** Reach Tier-2 (legitimately or via V-35 admin path) and obtain a normal OTC quote via `POST /api/v2/me/otc/quote`. Then `POST /api/v2/me/otc/accept` with `x-bvbe-desk-role: maker` set in the request headers. The handler reads the header, sees `"maker"`, and calls `acceptOtc` with `feeBps: 0` — saving the standard 25bps taker fee on the notional. Repeat across many quote→accept cycles, especially at large notional, for free fee arbitrage against the platform.
+- **Intended discovery difficulty:** medium
+- **Realistic root cause:** Internal desk plumbing used `x-bvbe-desk-role` so the OTC console could identify itself when talking to the same backend. nginx's strip list was set up for `x-bvbe-user-id` and `x-bvbe-internal-*` but the desk role header was added later and the strip list was never updated. Classic team-org failure where the platform team and the desk team didn't sync the trust boundary.
+- **Remediation:** Add `proxy_set_header x-bvbe-desk-role "";` to the nginx config to strip the header from any externally-sourced request. Better: remove the header-trust pattern entirely and authenticate the internal console via mTLS or a signed shared-secret token whose validation lives server-side. Best: identify desk relationships by `userId` against a `desk_members` table — the user's role drives the fee tier, not a self-asserted header.
+- **Chain membership:** standalone
+
+---
+
 ## Killer chains — current state
 
 - **CHAIN A — Drain the hot wallet:** components landed = V-19 (forge admin JWT). Remaining: leaked secret + treasury endpoint + PSBT signing flaw (Phase 7-9).

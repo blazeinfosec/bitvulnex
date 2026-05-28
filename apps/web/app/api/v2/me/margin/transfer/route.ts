@@ -8,6 +8,7 @@ import { Prisma, prisma } from "@bvbe/db";
 import { userFromAuthorization } from "@/lib/auth";
 import { jsonError, readJson } from "@/lib/api";
 import { registerEndpoint } from "@/lib/openapi-registry";
+import { AssetError, requireKnownAsset } from "@/lib/assets";
 
 registerEndpoint({
   method: "post",
@@ -39,6 +40,12 @@ export async function POST(req: Request) {
 
   const parsed = await readJson(req, schema);
   if (parsed.error) return parsed.error;
+  try {
+    requireKnownAsset(parsed.data.asset);
+  } catch (e) {
+    if (e instanceof AssetError) return jsonError(e.status, e.message);
+    throw e;
+  }
   const amount = new Prisma.Decimal(parsed.data.amount);
 
   try {

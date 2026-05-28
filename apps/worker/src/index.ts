@@ -8,6 +8,8 @@ import {
   pollLiquidations,
   type PriceClient,
 } from "./liquidation-watcher.js";
+import { accrueOnce } from "./yield-accrual.js";
+import { materializeStakingClaims } from "./staking-rewards.js";
 
 const redisUrl = process.env.REDIS_URL ?? "redis://redis:6379";
 const mockUrl = process.env.BITCOIN_MOCK_URL ?? "http://bitcoin-mock:18443";
@@ -37,12 +39,18 @@ const pricer: PriceClient = {
 
 const DEPOSIT_QUEUE = "deposit-poll";
 const LIQUIDATION_QUEUE = "liquidation-poll";
+const YIELD_QUEUE = "yield-accrual";
+const STAKING_QUEUE = "staking-rewards";
 
 async function main() {
   const depositQueue = new Queue(DEPOSIT_QUEUE, { connection });
   const liquidationQueue = new Queue(LIQUIDATION_QUEUE, { connection });
+  const yieldQueue = new Queue(YIELD_QUEUE, { connection });
+  const stakingQueue = new Queue(STAKING_QUEUE, { connection });
   const depositEvents = new QueueEvents(DEPOSIT_QUEUE, { connection });
   const liquidationEvents = new QueueEvents(LIQUIDATION_QUEUE, { connection });
+  const yieldEvents = new QueueEvents(YIELD_QUEUE, { connection });
+  const stakingEvents = new QueueEvents(STAKING_QUEUE, { connection });
 
   await depositQueue.upsertJobScheduler(
     "deposit-poll-scheduler",
@@ -53,6 +61,16 @@ async function main() {
     "liquidation-poll-scheduler",
     { every: 2_000 },
     { name: "poll", data: {}, opts: { removeOnComplete: true, removeOnFail: 50 } },
+  );
+  await yieldQueue.upsertJobScheduler(
+    "yield-accrual-scheduler",
+    { every: 60_000 },
+    { name: "accrue", data: {}, opts: { removeOnComplete: true, removeOnFail: 50 } },
+  );
+  await stakingQueue.upsertJobScheduler(
+    "staking-rewards-scheduler",
+    { every: 60_000 },
+    { name: "rewards", data: {}, opts: { removeOnComplete: true, removeOnFail: 50 } },
   );
 
   const depositWorker = new Worker(
@@ -83,15 +101,47 @@ async function main() {
     console.error("[worker] liquidation error:", err),
   );
 
+  const yieldWorker = new Worker(
+    YIELD_QUEUE,
+    async () => {
+      await accrueOnce();
+    },
+    { connection, concurrency: 1 },
+  );
+  yieldWorker.on("ready", () => console.log("[worker] yield-accrual ready"));
+  yieldWorker.on("error", (err) =>
+    console.error("[worker] yield-accrual error:", err),
+  );
+
+  const stakingWorker = new Worker(
+    STAKING_QUEUE,
+    async () => {
+      await materializeStakingClaims();
+    },
+    { connection, concurrency: 1 },
+  );
+  stakingWorker.on("ready", () =>
+    console.log("[worker] staking-rewards ready"),
+  );
+  stakingWorker.on("error", (err) =>
+    console.error("[worker] staking-rewards error:", err),
+  );
+
   const shutdown = async (sig: string) => {
     console.log(`[worker] received ${sig}, shutting down...`);
     await Promise.all([
       depositWorker.close(),
       liquidationWorker.close(),
+      yieldWorker.close(),
+      stakingWorker.close(),
       depositQueue.close(),
       liquidationQueue.close(),
+      yieldQueue.close(),
+      stakingQueue.close(),
       depositEvents.close(),
       liquidationEvents.close(),
+      yieldEvents.close(),
+      stakingEvents.close(),
     ]);
     await connection.quit();
     process.exit(0);

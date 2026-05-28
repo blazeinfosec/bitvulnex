@@ -16,6 +16,18 @@ export function NavBar() {
         </Link>
         <nav className="flex items-center gap-1">
           <Button variant="ghost" size="sm" asChild>
+            <Link href="/lending">Lending</Link>
+          </Button>
+          <Button variant="ghost" size="sm" asChild>
+            <Link href="/staking">Staking</Link>
+          </Button>
+          <Button variant="ghost" size="sm" asChild>
+            <Link href="/otc">OTC</Link>
+          </Button>
+          <Button variant="ghost" size="sm" asChild>
+            <Link href="/p2p">P2P</Link>
+          </Button>
+          <Button variant="ghost" size="sm" asChild>
             <Link href="/about/changelog">Changelog</Link>
           </Button>
           <Button variant="ghost" size="sm" asChild>

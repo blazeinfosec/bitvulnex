@@ -76,35 +76,81 @@ enum PositionStatus {
   closed
 }
 
-model User {
-  id            String    @id @default(cuid())
-  email         String    @unique
-  passwordHash  String
-  displayName   String?
-  role          Role      @default(user)
-  kycTier       Int       @default(0)
-  emailVerified Boolean   @default(false)
-  totpSecret    String?
-  totpEnabled   Boolean   @default(false)
-  failedLogins  Int       @default(0)
-  lockedUntil   DateTime?
-  keeperRegisteredAt DateTime?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+enum LendingSide {
+  supply
+  borrow
+}
 
-  refreshTokens      RefreshToken[]
-  passwordResets     PasswordResetToken[]
-  apiKeys            ApiKey[]
-  kycProfile         KycProfile?
-  kycDocuments       KycDocument[]
-  btcAddresses       BitcoinAddress[]
-  deposits           Deposit[]
-  balances           Balance[]
-  orders             Order[]
-  tradesAsTaker      Trade[]    @relation("trade_taker")
-  tradesAsMaker      Trade[]    @relation("trade_maker")
-  marginPositions    MarginPosition[]
-  liquidationsClaimed Liquidation[] @relation("liquidation_keeper")
+enum LendingStatus {
+  open
+  closed
+}
+
+enum StakingStatus {
+  active
+  unstaking
+  ended
+}
+
+enum OtcStatus {
+  requested
+  quoted
+  accepted
+  filled
+  cancelled
+  expired
+}
+
+enum P2PStatus {
+  open
+  paused
+  filled
+  cancelled
+}
+
+enum P2PTradeStatus {
+  pending_payment
+  paid
+  released
+  disputed
+  cancelled
+}
+
+model User {
+  id                 String    @id @default(cuid())
+  email              String    @unique
+  passwordHash       String
+  displayName        String?
+  role               Role      @default(user)
+  kycTier            Int       @default(0)
+  emailVerified      Boolean   @default(false)
+  totpSecret         String?
+  totpEnabled        Boolean   @default(false)
+  failedLogins       Int       @default(0)
+  lockedUntil        DateTime?
+  keeperRegisteredAt DateTime?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
+
+  refreshTokens       RefreshToken[]
+  passwordResets      PasswordResetToken[]
+  apiKeys             ApiKey[]
+  kycProfile          KycProfile?
+  kycDocuments        KycDocument[]
+  btcAddresses        BitcoinAddress[]
+  deposits            Deposit[]
+  balances            Balance[]
+  orders              Order[]
+  tradesAsTaker       Trade[]              @relation("trade_taker")
+  tradesAsMaker       Trade[]              @relation("trade_maker")
+  marginPositions     MarginPosition[]
+  liquidationsClaimed Liquidation[]        @relation("liquidation_keeper")
+  lendingPositions    LendingPosition[]
+  stakingPositions    StakingPosition[]
+  otcTickets          OtcTicket[]
+  p2pOffers           P2POffer[]
+  p2pTradesAsBuyer    P2PTrade[]           @relation("p2p_buyer")
+  p2pTradesAsSeller   P2PTrade[]           @relation("p2p_seller")
 
   @@map("users")
 }
@@ -185,24 +231,24 @@ model TradingPair {
 }
 
 model Order {
-  id          Int          @id @default(autoincrement())
+  id          Int         @id @default(autoincrement())
   userId      String
   pair        String
   side        OrderSide
   type        OrderType
-  price       Decimal?     @db.Decimal(38, 8)
-  amount      Decimal      @db.Decimal(38, 8)
-  filled      Decimal      @default(0) @db.Decimal(38, 8)
-  status      OrderStatus  @default(open)
-  stopTrigger Decimal?     @db.Decimal(38, 8)
+  price       Decimal?    @db.Decimal(38, 8)
+  amount      Decimal     @db.Decimal(38, 8)
+  filled      Decimal     @default(0) @db.Decimal(38, 8)
+  status      OrderStatus @default(open)
+  stopTrigger Decimal?    @db.Decimal(38, 8)
   ocoPairId   Int?
-  feeTier     String       @default("base")
-  createdAt   DateTime     @default(now())
+  feeTier     String      @default("base")
+  createdAt   DateTime    @default(now())
   cancelledAt DateTime?
 
-  user             User    @relation(fields: [userId], references: [id], onDelete: Cascade)
-  takerTrades      Trade[] @relation("trade_taker_order")
-  makerTrades      Trade[] @relation("trade_maker_order")
+  user        User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  takerTrades Trade[] @relation("trade_taker_order")
+  makerTrades Trade[] @relation("trade_maker_order")
 
   @@index([userId])
   @@index([pair, status])
@@ -210,17 +256,17 @@ model Order {
 }
 
 model Trade {
-  id            Int      @id @default(autoincrement())
-  pair          String
-  takerOrderId  Int
-  makerOrderId  Int
-  takerUserId   String
-  makerUserId   String
-  price         Decimal  @db.Decimal(38, 8)
-  amount        Decimal  @db.Decimal(38, 8)
-  takerFeeBps   Int
-  makerFeeBps   Int
-  executedAt    DateTime @default(now())
+  id           Int      @id @default(autoincrement())
+  pair         String
+  takerOrderId Int
+  makerOrderId Int
+  takerUserId  String
+  makerUserId  String
+  price        Decimal  @db.Decimal(38, 8)
+  amount       Decimal  @db.Decimal(38, 8)
+  takerFeeBps  Int
+  makerFeeBps  Int
+  executedAt   DateTime @default(now())
 
   takerOrder Order @relation("trade_taker_order", fields: [takerOrderId], references: [id], onDelete: Restrict)
   makerOrder Order @relation("trade_maker_order", fields: [makerOrderId], references: [id], onDelete: Restrict)
@@ -330,7 +376,7 @@ model MarginPosition {
   closedPrice      Decimal?       @db.Decimal(38, 8)
   realizedPnl      Decimal?       @db.Decimal(38, 8)
 
-  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
   liquidation Liquidation?
 
   @@index([userId])
@@ -339,17 +385,165 @@ model MarginPosition {
 }
 
 model Liquidation {
-  id              Int       @id @default(autoincrement())
-  positionId      Int       @unique
-  triggerPrice    Decimal   @db.Decimal(38, 8)
-  keeperUserId    String?
-  keeperRebate    Decimal   @db.Decimal(38, 8)
-  flaggedAt       DateTime  @default(now())
-  claimedAt       DateTime?
+  id           Int       @id @default(autoincrement())
+  positionId   Int       @unique
+  triggerPrice Decimal   @db.Decimal(38, 8)
+  keeperUserId String?
+  keeperRebate Decimal   @db.Decimal(38, 8)
+  flaggedAt    DateTime  @default(now())
+  claimedAt    DateTime?
 
   position MarginPosition @relation(fields: [positionId], references: [id], onDelete: Cascade)
   keeper   User?          @relation("liquidation_keeper", fields: [keeperUserId], references: [id], onDelete: SetNull)
 
   @@index([keeperUserId])
   @@map("liquidations")
+}
+
+// Phase 6 — yield, OTC desk, and P2P escrow.
+//
+// Lending and staking deliberately live as separate sub-accounts from
+// the spot+margin balances. Supplied principal moves OUT of
+// Balance.amount/available and INTO LendingPosition.principal (same
+// shape for staking). Interest credits then hit Balance.available
+// (and amount) directly so users can re-deploy yield without an
+// explicit withdraw step.
+model LendingPool {
+  id          String   @id @default(cuid())
+  asset       String   @unique
+  supplied    Decimal  @default(0) @db.Decimal(38, 8)
+  borrowed    Decimal  @default(0) @db.Decimal(38, 8)
+  reserve     Decimal  @default(0) @db.Decimal(38, 8)
+  apyBaseBps  Int
+  apySlopeBps Int
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  lastAccrual DateTime @default(now())
+
+  @@map("lending_pools")
+}
+
+model LendingPosition {
+  id              String        @id @default(cuid())
+  userId          String
+  pool            String
+  side            LendingSide
+  principal       Decimal       @db.Decimal(38, 8)
+  accrued         Decimal       @default(0) @db.Decimal(38, 8)
+  collateralAsset String?
+  collateral      Decimal?      @db.Decimal(38, 8)
+  openedAt        DateTime      @default(now())
+  closedAt        DateTime?
+  status          LendingStatus @default(open)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, pool])
+  @@index([pool, status])
+  @@map("lending_positions")
+}
+
+model StakingProgram {
+  id            String   @id @default(cuid())
+  asset         String   @unique
+  rewardAsset   String
+  apyBps        Int
+  active        Boolean  @default(true)
+  windowSeconds Int
+  createdAt     DateTime @default(now())
+
+  @@map("staking_programs")
+}
+
+model StakingPosition {
+  id         String        @id @default(cuid())
+  userId     String
+  asset      String
+  principal  Decimal       @db.Decimal(38, 8)
+  startedAt  DateTime      @default(now())
+  unstakedAt DateTime?
+  status     StakingStatus @default(active)
+
+  user   User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  claims StakingClaim[]
+
+  @@index([userId])
+  @@index([asset, status])
+  @@map("staking_positions")
+}
+
+model StakingClaim {
+  id          String    @id @default(cuid())
+  positionId  String
+  amount      Decimal   @db.Decimal(38, 8)
+  windowStart DateTime
+  windowEnd   DateTime
+  claimedAt   DateTime?
+  createdAt   DateTime  @default(now())
+
+  position StakingPosition @relation(fields: [positionId], references: [id], onDelete: Cascade)
+
+  @@index([positionId])
+  @@map("staking_claims")
+}
+
+model OtcTicket {
+  id             String    @id @default(cuid())
+  userId         String
+  pair           String
+  side           OrderSide
+  amount         Decimal   @db.Decimal(38, 8)
+  quotedPrice    Decimal?  @db.Decimal(38, 8)
+  status         OtcStatus @default(quoted)
+  quoteExpiresAt DateTime?
+  filledAt       DateTime?
+  feeBps         Int?
+  createdAt      DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([status])
+  @@map("otc_tickets")
+}
+
+model P2POffer {
+  id        String    @id @default(cuid())
+  userId    String
+  side      OrderSide
+  asset     String
+  amount    Decimal   @db.Decimal(38, 8)
+  price     Decimal   @db.Decimal(38, 8)
+  payMethod String
+  status    P2PStatus @default(open)
+  createdAt DateTime  @default(now())
+
+  user   User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  trades P2PTrade[]
+
+  @@index([asset, status])
+  @@map("p2p_offers")
+}
+
+model P2PTrade {
+  id           String         @id @default(cuid())
+  offerId      String
+  buyerUserId  String
+  sellerUserId String
+  amount       Decimal        @db.Decimal(38, 8)
+  price        Decimal        @db.Decimal(38, 8)
+  asset        String
+  status       P2PTradeStatus @default(pending_payment)
+  createdAt    DateTime       @default(now())
+  releasedAt   DateTime?
+  disputedAt   DateTime?
+
+  offer  P2POffer @relation(fields: [offerId], references: [id], onDelete: Restrict)
+  buyer  User     @relation("p2p_buyer", fields: [buyerUserId], references: [id], onDelete: Cascade)
+  seller User     @relation("p2p_seller", fields: [sellerUserId], references: [id], onDelete: Cascade)
+
+  @@index([buyerUserId])
+  @@index([sellerUserId])
+  @@map("p2p_trades")
 }
