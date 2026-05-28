@@ -29,6 +29,11 @@ services:
       # unset, the web container must fail-fast at env() parsing.
       JWT_SECRET: devsecret-do-not-use-in-prod-bvbe-2026
       BITCOIN_MOCK_URL: http://bitcoin-mock:18443
+      # Loosened HTTP framing for legacy mobile-app client compatibility
+      # (see OPS-2024-117). nginx forwards both Content-Length and
+      # Transfer-Encoding when present; this flag tells Node to accept
+      # the resulting requests instead of rejecting with HPE_*.
+      NODE_OPTIONS: "--insecure-http-parser"
       CTF_MODE: ${CTF_MODE:-false}
       HINT_MODE: ${HINT_MODE:-false}
       SCOREBOARD_ENABLED: ${SCOREBOARD_ENABLED:-false}
