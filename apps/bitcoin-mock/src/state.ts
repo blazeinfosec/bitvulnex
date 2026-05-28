@@ -199,6 +199,31 @@ class ChainState {
     return replacementTxid;
   }
 
+  /**
+   * Admit a raw transaction synthesised externally (e.g. by the
+   * treasury PSBT pipeline). Outputs are credited to the chain's
+   * UTXO set; inputs are not tracked here because the treasury
+   * pipeline doesn't carry forward UTXO selection beyond the PSBT.
+   */
+  admitRawTx(txid: string, outputs: Array<{ address: string; amountSat: bigint }>): void {
+    this.mempool.set(txid, {
+      txid,
+      inputs: [],
+      outputs,
+      feeSat: 0n,
+      replaceable: true,
+    });
+    outputs.forEach((o, i) => {
+      this.utxos.set(`${txid}:${i}`, {
+        txid,
+        vout: i,
+        address: o.address,
+        amountSat: o.amountSat,
+        spent: false,
+      });
+    });
+  }
+
   mineBlocks(n: number): string[] {
     const hashes: string[] = [];
     for (let i = 0; i < n; i++) {

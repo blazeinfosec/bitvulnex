@@ -54,6 +54,15 @@ import "@/app/api/v2/me/p2p/offers/[id]/route";
 import "@/app/api/v2/me/p2p/trades/route";
 import "@/app/api/v2/me/p2p/trades/[id]/mark-paid/route";
 import "@/app/api/v2/me/p2p/trades/[id]/release/route";
+import "@/app/api/v2/me/withdrawals/route";
+import "@/app/api/v2/me/withdrawals/[id]/route";
+import "@/app/api/v2/me/withdrawals/[id]/cancel/route";
+import "@/app/api/v2/me/internal-transfer/route";
+import "@/app/api/v2/admin/treasury/drafts/route";
+import "@/app/api/v2/admin/treasury/drafts/[id]/sign/route";
+import "@/app/api/v2/admin/treasury/drafts/[id]/broadcast/route";
+import "@/app/api/v2/admin/withdrawals/[id]/bump/route";
+import "@/app/api/v2/public/treasury/hot-wallet/route";
 
 registerEndpoint({
   method: "get",

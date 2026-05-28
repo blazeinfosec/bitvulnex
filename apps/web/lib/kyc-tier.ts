@@ -59,3 +59,15 @@ export function requireTier(
 export class TierError extends Error {
   readonly status = 403;
 }
+
+/**
+ * Authorize treasury-coordinator endpoints. Admin users get the
+ * same access for operational continuity (locked-out treasury team,
+ * incident response, etc.).
+ */
+export function requireTreasury(claims: { role?: string }): void {
+  const role = claims.role ?? "";
+  if (role !== "admin" && role !== "treasury") {
+    throw new TierError("treasury role required");
+  }
+}

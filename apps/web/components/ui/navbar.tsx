@@ -28,6 +28,9 @@ export function NavBar() {
             <Link href="/p2p">P2P</Link>
           </Button>
           <Button variant="ghost" size="sm" asChild>
+            <Link href="/withdraw">Withdraw</Link>
+          </Button>
+          <Button variant="ghost" size="sm" asChild>
             <Link href="/about/changelog">Changelog</Link>
           </Button>
           <Button variant="ghost" size="sm" asChild>

@@ -59,6 +59,22 @@ function buildUsers(): SeedUser[] {
       emailVerified: true,
     },
     {
+      email: "treasury2@bvbe.local",
+      displayName: "Treasury Ops B",
+      password: "change-me-after-first-login",
+      role: "treasury",
+      kycTier: 3,
+      emailVerified: true,
+    },
+    {
+      email: "treasury3@bvbe.local",
+      displayName: "Treasury Ops C",
+      password: "change-me-after-first-login",
+      role: "treasury",
+      kycTier: 3,
+      emailVerified: true,
+    },
+    {
       email: "support1@bvbe.local",
       displayName: "Support Agent A",
       password: "change-me-after-first-login",

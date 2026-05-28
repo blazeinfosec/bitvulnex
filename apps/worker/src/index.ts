@@ -10,6 +10,10 @@ import {
 } from "./liquidation-watcher.js";
 import { accrueOnce } from "./yield-accrual.js";
 import { materializeStakingClaims } from "./staking-rewards.js";
+import {
+  processWithdrawalOnce,
+  type BitcoinClient,
+} from "./withdrawal-processor.js";
 
 const redisUrl = process.env.REDIS_URL ?? "redis://redis:6379";
 const mockUrl = process.env.BITCOIN_MOCK_URL ?? "http://bitcoin-mock:18443";
@@ -41,16 +45,42 @@ const DEPOSIT_QUEUE = "deposit-poll";
 const LIQUIDATION_QUEUE = "liquidation-poll";
 const YIELD_QUEUE = "yield-accrual";
 const STAKING_QUEUE = "staking-rewards";
+const WITHDRAWAL_QUEUE = "withdrawal-process";
+
+async function rpcCall<T>(method: string, params: unknown[]): Promise<T> {
+  const res = await fetch(mockUrl, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params }),
+  });
+  const body = (await res.json()) as {
+    result?: unknown;
+    error?: { message: string };
+  };
+  if (body.error) throw new Error(`bitcoind: ${body.error.message}`);
+  return body.result as T;
+}
+
+const bitcoin: BitcoinClient = {
+  async sendmany(addressToAmount, feeSat) {
+    return rpcCall<string>("sendmany", [addressToAmount, feeSat]);
+  },
+  async gettransaction(txid) {
+    return rpcCall<{ confirmations: number }>("gettransaction", [txid]);
+  },
+};
 
 async function main() {
   const depositQueue = new Queue(DEPOSIT_QUEUE, { connection });
   const liquidationQueue = new Queue(LIQUIDATION_QUEUE, { connection });
   const yieldQueue = new Queue(YIELD_QUEUE, { connection });
   const stakingQueue = new Queue(STAKING_QUEUE, { connection });
+  const withdrawalQueue = new Queue(WITHDRAWAL_QUEUE, { connection });
   const depositEvents = new QueueEvents(DEPOSIT_QUEUE, { connection });
   const liquidationEvents = new QueueEvents(LIQUIDATION_QUEUE, { connection });
   const yieldEvents = new QueueEvents(YIELD_QUEUE, { connection });
   const stakingEvents = new QueueEvents(STAKING_QUEUE, { connection });
+  const withdrawalEvents = new QueueEvents(WITHDRAWAL_QUEUE, { connection });
 
   await depositQueue.upsertJobScheduler(
     "deposit-poll-scheduler",
@@ -71,6 +101,11 @@ async function main() {
     "staking-rewards-scheduler",
     { every: 60_000 },
     { name: "rewards", data: {}, opts: { removeOnComplete: true, removeOnFail: 50 } },
+  );
+  await withdrawalQueue.upsertJobScheduler(
+    "withdrawal-process-scheduler",
+    { every: 5_000 },
+    { name: "process", data: {}, opts: { removeOnComplete: true, removeOnFail: 50 } },
   );
 
   const depositWorker = new Worker(
@@ -127,6 +162,20 @@ async function main() {
     console.error("[worker] staking-rewards error:", err),
   );
 
+  const withdrawalWorker = new Worker(
+    WITHDRAWAL_QUEUE,
+    async () => {
+      await processWithdrawalOnce(bitcoin);
+    },
+    { connection, concurrency: 1 },
+  );
+  withdrawalWorker.on("ready", () =>
+    console.log("[worker] withdrawal-process ready"),
+  );
+  withdrawalWorker.on("error", (err) =>
+    console.error("[worker] withdrawal-process error:", err),
+  );
+
   const shutdown = async (sig: string) => {
     console.log(`[worker] received ${sig}, shutting down...`);
     await Promise.all([
@@ -134,14 +183,17 @@ async function main() {
       liquidationWorker.close(),
       yieldWorker.close(),
       stakingWorker.close(),
+      withdrawalWorker.close(),
       depositQueue.close(),
       liquidationQueue.close(),
       yieldQueue.close(),
       stakingQueue.close(),
+      withdrawalQueue.close(),
       depositEvents.close(),
       liquidationEvents.close(),
       yieldEvents.close(),
       stakingEvents.close(),
+      withdrawalEvents.close(),
     ]);
     await connection.quit();
     process.exit(0);

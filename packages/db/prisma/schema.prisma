@@ -116,6 +116,38 @@ enum P2PTradeStatus {
   cancelled
 }
 
+// Phase 7 — withdrawal pipeline & treasury coordinator.
+//
+// WithdrawalStatus state machine:
+//   pending      — submitted; limit + balance checks passed
+//   approved     — manual approval step (lab auto-approves)
+//   broadcasting — worker has drafted the TX; awaiting broadcast
+//   broadcast    — TX submitted to the mock node
+//   confirming   — seen 1+ confirmations
+//   confirmed    — settled (lab uses 1 confirmation)
+//   rejected     — failed validation
+//   bumped       — fee-bumped via RBF; original dropped
+//   failed       — unrecoverable
+enum WithdrawalStatus {
+  pending
+  approved
+  broadcasting
+  broadcast
+  confirming
+  confirmed
+  rejected
+  bumped
+  failed
+}
+
+enum TreasuryDraftStatus {
+  drafted
+  partial
+  signed
+  broadcast
+  failed
+}
+
 model User {
   id                 String    @id @default(cuid())
   email              String    @unique
@@ -151,6 +183,12 @@ model User {
   p2pOffers           P2POffer[]
   p2pTradesAsBuyer    P2PTrade[]           @relation("p2p_buyer")
   p2pTradesAsSeller   P2PTrade[]           @relation("p2p_seller")
+  withdrawals         Withdrawal[]
+  withdrawalLimits    WithdrawalLimitLedger[]
+  internalTransfersOut InternalTransfer[]  @relation("internal_transfer_from")
+  internalTransfersIn  InternalTransfer[]  @relation("internal_transfer_to")
+  treasuryDrafts      TreasuryDraft[]      @relation("treasury_draft_author")
+  treasurySignatures  TreasurySignature[]  @relation("treasury_signature_signer")
 
   @@map("users")
 }
@@ -546,4 +584,93 @@ model P2PTrade {
   @@index([buyerUserId])
   @@index([sellerUserId])
   @@map("p2p_trades")
+}
+
+model Withdrawal {
+  id             String           @id @default(cuid())
+  userId         String
+  asset          String
+  amount         Decimal          @db.Decimal(38, 8)
+  fee            Decimal          @db.Decimal(38, 8)
+  destAddress    String
+  status         WithdrawalStatus @default(pending)
+  txid           String?
+  replacedByTxid String?
+  requestedAt    DateTime         @default(now())
+  approvedAt     DateTime?
+  broadcastAt    DateTime?
+  confirmedAt    DateTime?
+  failedReason   String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([status])
+  @@index([txid])
+  @@map("withdrawals")
+}
+
+// One row per (user, UTC day, asset). Maintains the running total of
+// withdrawals attributed to that day so the daily limit check is a
+// single indexed read.
+model WithdrawalLimitLedger {
+  id         String   @id @default(cuid())
+  userId     String
+  utcDate    DateTime @db.Date
+  asset      String
+  totalCents BigInt   @default(0)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, utcDate, asset])
+  @@index([userId, utcDate])
+  @@map("withdrawal_limit_ledger")
+}
+
+model InternalTransfer {
+  id         String   @id @default(cuid())
+  fromUserId String
+  toUserId   String
+  asset      String
+  amount     Decimal  @db.Decimal(38, 8)
+  memo       String?
+  createdAt  DateTime @default(now())
+
+  fromUser User @relation("internal_transfer_from", fields: [fromUserId], references: [id], onDelete: Cascade)
+  toUser   User @relation("internal_transfer_to",   fields: [toUserId],   references: [id], onDelete: Cascade)
+
+  @@index([fromUserId])
+  @@index([toUserId])
+  @@map("internal_transfers")
+}
+
+model TreasuryDraft {
+  id              String              @id @default(cuid())
+  authorUserId    String
+  psbtBase64      String
+  intentNote      String?
+  intendedOutputs Json
+  status          TreasuryDraftStatus @default(drafted)
+  createdAt       DateTime            @default(now())
+  broadcastTxid   String?
+  broadcastAt     DateTime?
+
+  author     User                @relation("treasury_draft_author", fields: [authorUserId], references: [id], onDelete: Restrict)
+  signatures TreasurySignature[]
+
+  @@index([status])
+  @@map("treasury_drafts")
+}
+
+model TreasurySignature {
+  id           String   @id @default(cuid())
+  draftId      String
+  signerUserId String
+  signedAt     DateTime @default(now())
+
+  draft  TreasuryDraft @relation(fields: [draftId], references: [id], onDelete: Cascade)
+  signer User          @relation("treasury_signature_signer", fields: [signerUserId], references: [id], onDelete: Restrict)
+
+  @@unique([draftId, signerUserId])
+  @@map("treasury_signatures")
 }

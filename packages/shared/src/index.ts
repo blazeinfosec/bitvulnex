@@ -7,3 +7,4 @@ export * from "./totp";
 export * from "./btc-address";
 export * from "./margin";
 export * from "./yield";
+export * from "./psbt-envelope";

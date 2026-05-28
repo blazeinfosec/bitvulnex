@@ -320,9 +320,68 @@ Each entry:
 
 ---
 
+## Phase 7 — Withdrawals & multi-sig treasury
+
+### V-26: Withdrawal daily limit resets on UTC-midnight boundary
+
+- **Category:** Business logic
+- **Phase introduced:** 7
+- **Location:** `apps/web/lib/withdrawal/limit.ts` (`currentDayUtc` truncates each request to its UTC calendar day; the ledger is uniquely keyed on `(userId, utcDate, asset)` and `checkAndDebitLimit` only sums the row for the current `utcDate`)
+- **Exploitation path:** A Tier-1 user (daily limit $1,000) hits the withdrawal endpoint twice across UTC midnight. Request A at 23:59:50Z lands in row `utcDate = day-N`. Request B at 00:00:10Z lands in row `utcDate = day-N+1`. Each ledger row only tracks its own day, so both requests pass the limit check. Net cash out in a ~20-second window = 2× the documented daily limit. Repeat nightly (and across higher tiers where the limit dollar value is much larger) for sustained excess withdrawal capacity.
+- **Intended discovery difficulty:** easy
+- **Realistic root cause:** Engineer interpreted "daily withdrawal limit" as a calendar-day bucket because that's what the KYC ledger language said. A rolling-24-hour window would not have the boundary flaw — but rolling windows are harder to implement, so the team shipped the calendar-day version with the unique index on `utcDate`.
+- **Remediation:** Replace the calendar-day bucket with a rolling 24-hour window — sum all `Withdrawal` rows whose `requestedAt` is within `now - 24h`. Alternatively, keep the ledger but apply a server-side enforcement window of "last N hours" rather than "today's row only."
+- **Chain membership:** standalone
+
+### V-28: Withdrawal balance check is not transactional with the debit
+
+- **Category:** Crypto / Race condition
+- **Phase introduced:** 7
+- **Location:** `apps/web/lib/withdrawal/submit.ts` (the `db.balance.findUnique` read at the top of `submitWithdrawal` is followed by `checkAndDebitLimit` and `db.balance.update` — none of which share a Prisma `$transaction`)
+- **Exploitation path:** Authenticate as any Tier-1+ user holding 0.1 BTC. Send two HTTP/2 single-packet POSTs to `/api/v2/me/withdrawals` for 0.1 BTC each, frames timed so both handlers' `findUnique` execute before either's `balance.update`. Each request observes the same `available = 0.1` and admits the withdrawal. Both then debit and both `Withdrawal` rows reach `pending`; the user's balance goes negative (or to zero), but the worker still broadcasts both TXs to the mock node. Net effect: 2× withdrawal for 1× balance. Tighten the race window by using HTTP/2 multiplexing (curl `--parallel` or the `single-packet-attack` recipe) — the race is widest because the limit ledger upsert is the only DB write that touches the user between the read and the debit.
+- **Intended discovery difficulty:** hard
+- **Realistic root cause:** Engineer building the user-facing withdrawal flow lifted the deposit-watcher pattern (separate balance read, then update). The deposit watcher's write is idempotent on `(txid, vout)`, so the lack of a transaction is benign there. The same code shape applied to user-submitted withdrawals breaks because the read is not the unique constraint.
+- **Remediation:** Wrap the balance read, the limit debit, the balance update, and the `Withdrawal.create` in a single `db.$transaction` with SERIALIZABLE isolation, or push the check into a conditional `UPDATE balance SET available = available - $1 WHERE userId_asset = ... AND available >= $1 RETURNING available` and create the `Withdrawal` only when the conditional update affects a row.
+- **Chain membership:** standalone
+
+### V-30: Internal transfer bypasses daily limits and tier gating in the lib
+
+- **Category:** Business logic
+- **Phase introduced:** 7
+- **Location:** `apps/web/lib/withdrawal/internal-transfer.ts` (the `internalTransfer` function does not call `checkAndDebitLimit` and does not consult `requireTier` beyond the route-layer Tier-1 floor; the route is gated only at `requireTier(claims, 1)`)
+- **Exploitation path:** A Tier-1 user wants to exfiltrate $50,000 in BTC but their daily limit is $1,000. Open two accounts (or collude with another Tier-1 user). On the source account, POST `/api/v2/me/internal-transfer` with `{recipientEmail, asset: "BTC", amount: "1.0"}`. The lib debits the sender, credits the recipient, writes an `InternalTransfer` row — and does NOT touch the `WithdrawalLimitLedger`. The recipient's account now holds 1.0 BTC; they can then withdraw it through their *own* daily ledger (which the source-account's quota didn't touch). Net effect: a Tier-1 user moves arbitrary value off the platform by relaying through internal transfers.
+- **Intended discovery difficulty:** hard
+- **Realistic root cause:** OTC desk requested internal transfers as a fee-free workaround so institutional clients could net positions between accounts without broadcasting on-chain. The internal-transfer team scoped the feature as a fast P2 build, didn't consult the user-withdrawal team, and shipped it without limit enforcement because "internal moves aren't withdrawals."
+- **Remediation:** Apply the same daily limit ledger to internal transfers (debit the sender's bucket), require Tier-2 (the same tier required to use the OTC desk) for internal transfers, and add an aggregate-velocity check (e.g. "total outgoing transfers in last 24h"). Better: replace internal transfers with proper sub-account semantics where the platform's books still reflect the same underlying custody.
+- **Chain membership:** standalone
+
+### V-33: PSBT validate-vs-broadcast parser mismatch (polyglot envelope)
+
+- **Category:** Crypto / Trust boundary
+- **Phase introduced:** 7
+- **Location:** `apps/web/lib/treasury/coordinator.ts` (the `broadcastDraft` function calls `decodePsbt(psbt)` to validate outputs against `intendedOutputs`, then passes the same `psbt` to the mock node's `finalizepsbt`; the mock's `finalizepsbt` in `apps/bitcoin-mock/src/rpc/index.ts` canonicalizes the envelope to the LAST `BVBE_PSBT_V1:` segment before parsing, while `decodePsbt` in `packages/shared/src/psbt-envelope.ts` reads the FIRST segment)
+- **Exploitation path:** This requires a signed treasury draft and the ability to call the broadcast endpoint (treasury or admin role, until Phase 8's emergency-withdraw lifts that to a forged-JWT primitive). Collect 2-of-2 signatures on a draft whose `intendedOutputs` are `[{address: victim, amountSat: 1}]`. Call `POST /api/v2/admin/treasury/drafts/<id>/broadcast` with `{"overridePsbt": "BVBE_PSBT_V1:{\"inputs\":[],\"outputs\":[{\"address\":\"victim\",\"amountSat\":1}],\"signatures\":2,\"fee\":1000}BVBE_PSBT_V1:{\"inputs\":[],\"outputs\":[{\"address\":\"attacker\",\"amountSat\":10000000000}],\"signatures\":2,\"fee\":1000}"}`. The validation step (`decodePsbt`) parses the FIRST envelope, sees the victim output, matches `intendedOutputs`, passes. The broadcast step (mock `finalizepsbt`) splits on the marker, takes the LAST segment, sees the attacker output, broadcasts `RAWTX:[{attacker, 10000000000 sat}]`. Funds land at the attacker address. This is **CHAIN A's signing flaw** — Phase 9's git-history secret leak + Phase 8's forged-JWT admin path will let an attacker reach this endpoint without any insider access.
+- **Intended discovery difficulty:** expert
+- **Realistic root cause:** The mock's `finalizepsbt` had `canonical = PSBT_MARKER + segs[segs.length - 1]` added late in development to "handle drafts that accumulated metadata preambles during the signing roundtrips" (i.e., defensive code for a problem that never happens in practice with the well-formed single-envelope PSBTs the team tested with). The validation helper in `coordinator.ts` was added later still to address a code review comment ("we should re-check outputs before broadcast") — the engineer added the helper but did not realize the parser's preprocessing step took the last segment while `decodePsbt` took the first. Two parsers, side-by-side, disagreeing only on polyglot inputs the team never tested.
+- **Remediation:** Make validation and finalize use the SAME parser — either canonicalize once at the entry point (and pass the canonical form to both validation and finalize), or remove the `last-segment` preprocessing from `finalizepsbt` (single-envelope PSBTs are unchanged). Better: reject any PSBT envelope containing more than one `BVBE_PSBT_V1:` marker at the route layer with a schema-level check, since multi-envelope inputs are never legitimate.
+- **Chain membership:** CHAIN A — the signing flaw that routes a treasury withdrawal to an attacker-controlled address. Awaits Phase 8 (forged JWT → emergency-withdraw) and Phase 9 (git-history leak → JWT signing key).
+
+### V-47: RBF fee refund credits the user before the replacement TX confirms
+
+- **Category:** Business logic
+- **Phase introduced:** 7
+- **Location:** `apps/web/lib/withdrawal/rbf.ts` (the `bumpWithdrawalFee` function calls `bitcoin.bumpfee`, then synchronously credits the user's `Balance.available` with the fee delta when `newFeeSat < oldFeeSat` — no follow-up watcher debits the credit back if the replacement TX is dropped from the mempool)
+- **Exploitation path:** Submit a withdrawal of 0.1 BTC with the default fee of 10,000 sat. Wait for the worker to broadcast (`status: broadcast`). Convince a treasury operator (insider, social engineering, or chained with V-19/V-35 admin escalation) to call `POST /api/v2/admin/withdrawals/<id>/bump` with `{"newFeeSat": 100}`. The handler computes `feeDelta = 10000 - 100 = 9900 sat` and credits the user's available balance with `0.0000099 BTC` immediately. The mock's `bumpfee` drops the original TX and creates a replacement at the new low fee — but real miners would not include the replacement; in the lab a follow-on RBF can drop it again. The replacement gets stuck (or dropped); the user keeps the refund credit AND, if the original TX had already started settling, the original withdrawal. Looped across many withdrawals — especially after a benign treasury operator gets tricked into bumping a batch of stuck TXs at very low fees — the cumulative refund credit drains the platform's books slowly without any single anomalous event.
+- **Intended discovery difficulty:** medium
+- **Realistic root cause:** Engineer building the RBF bump feature wrote the credit code (real exchanges DO refund the difference when a fee bump is *down*, because the user pre-paid the higher fee at submit-time) and tested with the happy path: new TX gets included at the new fee, original is dropped, user's books reconcile. The failure path — replacement dropped, original still settled — wasn't on their checklist because RBF "down" is uncommon and a dropped replacement is even less common. There's no compensating watcher because the team intended to add one "in the next sprint."
+- **Remediation:** Issue the refund credit as a *pending* balance entry (separate column) and only flip it to `available` after the replacement TX has 1+ confirmations. If the replacement is dropped, the pending entry is reversed. Better: don't refund on bump at all — debit the new fee at bump-time, refund the OLD fee only when the worker observes a clean replacement-confirmed transition.
+- **Chain membership:** standalone
+
+---
+
 ## Killer chains — current state
 
-- **CHAIN A — Drain the hot wallet:** components landed = V-19 (forge admin JWT). Remaining: leaked secret + treasury endpoint + PSBT signing flaw (Phase 7-9).
+- **CHAIN A — Drain the hot wallet:** components landed = V-19 (forge admin JWT) + V-33 (PSBT validate-vs-broadcast mismatch in the treasury coordinator). Remaining: git-history JWT signing key leak (Phase 9) and `/api/v1/internal/treasury/emergency-withdraw` function-level access (Phase 8). Phase 7 leaves V-33 reachable only by insider-treasury-operator threat; Phase 8+ lifts it to a forged-JWT primitive.
 - **CHAIN B — Become admin and persist:** components landed = V-35 (middleware bypass) + V-41 (admin JWT theft via polyglot). Remaining: smuggling at nginx (Phase 9).
 - **CHAIN C — Mass user takeover:** **end-to-end against margin liquidations.** Components: V-25 (self-trade → oracle manipulation), nginx `proxy_cache` infrastructure for `/api/v2/public/*`, and the Phase-5 liquidation engine consuming the manipulated oracle via HTTP-fetched public price feed. PoC in `docs/phases/phase-5/adversarial-qa.md` walks the full chain: V-35 + V-42 pre-stage tier-3 + balance, V-25 manipulates the BTC/USDT mid, the worker flags victim positions, attacker claims the keeper rebate. Phase 9 will add CL/TE-based cache poisoning to lift the attack beyond same-session reach.
 - **CHAIN D — Exfiltrate full user DB + KYC:** components landed = V-40 (SSRF → mock IMDS → IAM creds). Remaining: mock S3 bucket + DB backup access (Phase 9).
