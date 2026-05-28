@@ -60,13 +60,13 @@ export default function DepositPage() {
       const b = (await balRes.json()) as { balances: BalanceRow[] };
       setBalances(b.balances);
     }
-    // Try a lab affordance to see if it's enabled.
-    const probe = await authedFetch("/api/v2/dev/btc/mine", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ blocks: 0 }),
-    });
-    setLabEnabled(probe.status !== 404);
+    const probe = await fetch("/api/v2/dev/btc/status");
+    if (probe.ok) {
+      const body = (await probe.json()) as { enabled: boolean };
+      setLabEnabled(body.enabled);
+    } else {
+      setLabEnabled(false);
+    }
   }
 
   useEffect(() => {

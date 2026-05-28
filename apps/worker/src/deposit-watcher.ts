@@ -14,6 +14,13 @@ export type RpcClient = {
   watch(address: string): Promise<{ txs: WatchTx[] }>;
 };
 
+// Subset of the Prisma surface the watcher actually uses, so unit
+// tests can inject a fake without standing up Postgres.
+export type DepositDb = Pick<
+  typeof prisma,
+  "bitcoinAddress" | "deposit" | "balance" | "$transaction"
+>;
+
 /**
  * Premium tier-3 users get faster credit so they don't have to
  * wait through volatile windows. They've passed enhanced KYC; the
@@ -25,8 +32,11 @@ export function minConfirmationsForTier(tier: number): number {
   return 3;
 }
 
-export async function pollOnce(rpc: RpcClient): Promise<void> {
-  const addresses = await prisma.bitcoinAddress.findMany({
+export async function pollOnce(
+  rpc: RpcClient,
+  db: DepositDb = prisma,
+): Promise<void> {
+  const addresses = await db.bitcoinAddress.findMany({
     select: {
       address: true,
       asset: true,
@@ -40,12 +50,12 @@ export async function pollOnce(rpc: RpcClient): Promise<void> {
     const minConf = minConfirmationsForTier(ba.user.kycTier);
 
     for (const tx of txs) {
-      await reconcile(ba, tx, minConf);
+      await reconcile(db, ba, tx, minConf);
     }
 
     // RBF-drop detection: any prior Deposit row with status seen/confirming
     // whose txid is no longer in the watch response gets re-checked.
-    const known = await prisma.deposit.findMany({
+    const known = await db.deposit.findMany({
       where: {
         address: ba.address,
         status: { in: ["seen", "confirming"] },
@@ -54,7 +64,7 @@ export async function pollOnce(rpc: RpcClient): Promise<void> {
     for (const d of known) {
       if (!txs.find((t) => t.txid === d.txid && t.vout === d.vout)) {
         // gone from mempool and blocks → RBF-dropped or never existed
-        await prisma.deposit.update({
+        await db.deposit.update({
           where: { id: d.id },
           data: { status: "dropped" },
         });
@@ -64,16 +74,17 @@ export async function pollOnce(rpc: RpcClient): Promise<void> {
 }
 
 async function reconcile(
+  db: DepositDb,
   ba: { address: string; asset: string; userId: string },
   tx: WatchTx,
   minConf: number,
 ): Promise<void> {
-  const existing = await prisma.deposit.findUnique({
+  const existing = await db.deposit.findUnique({
     where: { txid_vout: { txid: tx.txid, vout: tx.vout } },
   });
 
   if (!existing) {
-    await prisma.deposit.create({
+    await db.deposit.create({
       data: {
         userId: ba.userId,
         asset: ba.asset,
@@ -86,21 +97,21 @@ async function reconcile(
       },
     });
   } else {
-    await prisma.deposit.update({
+    await db.deposit.update({
       where: { id: existing.id },
       data: { confirmations: tx.confirmations },
     });
   }
 
   // Credit if confirmations >= tier threshold AND not yet credited.
-  const row = await prisma.deposit.findUnique({
+  const row = await db.deposit.findUnique({
     where: { txid_vout: { txid: tx.txid, vout: tx.vout } },
   });
   if (!row) return;
   if (row.status === "credited" || row.status === "dropped") return;
   if (tx.confirmations < minConf) {
     if (row.status === "seen" && tx.confirmations > 0) {
-      await prisma.deposit.update({
+      await db.deposit.update({
         where: { id: row.id },
         data: { status: "confirming" },
       });
@@ -108,12 +119,12 @@ async function reconcile(
     return;
   }
 
-  await prisma.$transaction([
-    prisma.deposit.update({
+  await db.$transaction([
+    db.deposit.update({
       where: { id: row.id },
       data: { status: "credited", creditedAt: new Date() },
     }),
-    prisma.balance.upsert({
+    db.balance.upsert({
       where: { userId_asset: { userId: ba.userId, asset: ba.asset } },
       create: {
         userId: ba.userId,

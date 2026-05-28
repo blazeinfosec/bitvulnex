@@ -32,6 +32,19 @@ function randomHex(bytes: number): string {
   return randomBytes(bytes).toString("hex");
 }
 
+// bech32 data charset (no b, i, o, 1). Used by `newAddress` so the
+// emitted strings pass the shared `isValidBtcAddress` HRP+charset
+// gate when Phase 7+ defensively round-trips them.
+const BECH32_CHARSET = "qpzry9x8gf2tvdw0s3jn54khce6mua7l";
+function bech32Random(n: number): string {
+  const buf = randomBytes(n);
+  let out = "";
+  for (let i = 0; i < n; i++) {
+    out += BECH32_CHARSET[(buf[i] as number) & 31];
+  }
+  return out;
+}
+
 class ChainState {
   blockHeight = 0;
   bestBlockHash = "0".repeat(64);
@@ -78,7 +91,7 @@ class ChainState {
   }
 
   newAddress(prefix = "bcrt1q"): string {
-    return prefix + randomHex(16);
+    return prefix + bech32Random(32);
   }
 
   confirmations(txid: string): number {
@@ -158,9 +171,15 @@ class ChainState {
     this.dropped.add(oldTxid);
 
     const replacementTxid = randomHex(32);
+    // total = sum of the old outputs = (input_sum - old.feeSat).
+    // We keep the same inputs and increase the fee by `bumpSat`,
+    // so the new outputs lose exactly that amount.
+    // Recorded feeSat = old.feeSat + bumpSat; real fee equals
+    // input_sum - newOutputs.sum, which simplifies to the same value.
     const total = old.outputs.reduce((a, o) => a + o.amountSat, 0n);
-    const feeSat = old.feeSat + 500n; // higher fee
-    const newOutputs = [{ address: newAddress, amountSat: total - 500n }];
+    const bumpSat = 500n;
+    const feeSat = old.feeSat + bumpSat;
+    const newOutputs = [{ address: newAddress, amountSat: total - bumpSat }];
     this.mempool.set(replacementTxid, {
       txid: replacementTxid,
       inputs: old.inputs,

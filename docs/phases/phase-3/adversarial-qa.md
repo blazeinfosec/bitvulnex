@@ -4,8 +4,11 @@
 > **Date:** 2026-05-30
 > **Verdict:** PASS. Both planted vulns confirmed. V-24's three
 > bypasses fire end-to-end in `poc-scratch.mjs`. V-42's
-> credit-then-RBF state machine confirmed against the actual mock
-> chain state. No unintended vulnerabilities surfaced.
+> credit-then-RBF state machine is exercised against the actual
+> `ChainState` code (in the PoC script's own process — same code
+> as the container, fresh instance; the trainee walkthrough below
+> drives the deployed container end-to-end). No unintended
+> vulnerabilities surfaced.
 
 ## Method
 
