@@ -28,6 +28,15 @@ export async function POST(
   const liqId = Number(id);
   if (!Number.isInteger(liqId)) return jsonError(400, "bad id");
 
+  // Keeper must be registered (Phase-5 fix-up Q-5.2).
+  const me = await prisma.user.findUnique({
+    where: { id: claims.sub },
+    select: { keeperRegisteredAt: true },
+  });
+  if (!me?.keeperRegisteredAt) {
+    return jsonError(403, "must POST /api/v2/me/keeper/register first");
+  }
+
   // Atomic claim: SELECT ... WHERE keeperUserId IS NULL, then update.
   const claimed = await prisma.$transaction(async (tx) => {
     const liq = await tx.liquidation.findUnique({

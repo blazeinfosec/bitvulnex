@@ -8,46 +8,9 @@
 // manipulates; DB-direct would bypass CHAIN C.
 
 import { Prisma, prisma } from "@bvbe/db";
+import { breachesMaintenance, keeperRebate } from "@bvbe/shared";
 
 const D = (s: string) => new Prisma.Decimal(s);
-const MAINTENANCE_MARGIN_BPS = 50;
-const KEEPER_REBATE_BPS = 50;
-
-function liquidationPriceFor(
-  side: "long" | "short",
-  entryPrice: Prisma.Decimal,
-  size: Prisma.Decimal,
-  collateral: Prisma.Decimal,
-): Prisma.Decimal {
-  const notional = size.mul(entryPrice);
-  const maintenanceBuffer = notional.mul(MAINTENANCE_MARGIN_BPS).div(10_000);
-  const loss = collateral.sub(maintenanceBuffer);
-  if (loss.lte(0)) return entryPrice;
-  const delta = loss.div(size);
-  return side === "long" ? entryPrice.sub(delta) : entryPrice.add(delta);
-}
-
-function breachesMaintenance(
-  pos: {
-    side: "long" | "short";
-    size: Prisma.Decimal;
-    entryPrice: Prisma.Decimal;
-    collateral: Prisma.Decimal;
-  },
-  markPrice: Prisma.Decimal,
-): boolean {
-  const liq = liquidationPriceFor(
-    pos.side,
-    pos.entryPrice,
-    pos.size,
-    pos.collateral,
-  );
-  return pos.side === "long" ? markPrice.lte(liq) : markPrice.gte(liq);
-}
-
-function keeperRebate(collateral: Prisma.Decimal): Prisma.Decimal {
-  return collateral.mul(KEEPER_REBATE_BPS).div(10_000);
-}
 
 export type PriceClient = {
   getPrice(pair: string): Promise<{ last: string | null }>;

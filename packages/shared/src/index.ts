@@ -5,3 +5,4 @@ export * from "./legacy-keys";
 export * from "./password";
 export * from "./totp";
 export * from "./btc-address";
+export * from "./margin";

@@ -111,3 +111,33 @@ arithmetic is clean and the planted exploitability lives upstream
 in V-25 + nginx cache + (Phase 9) CL/TE.
 
 — Adversarial QA
+
+---
+
+## Addendum — clarifications after Phase-5 L7 review
+
+**Q-5.9 — CHAIN C per-incident profit caveat.** The keeper-claim
+close uses the book-snapshot price at claim time
+(`apps/web/app/api/v2/keeper/liquidations/[id]/claim/route.ts:52-61`),
+falling back to `position.entryPrice` if no resting order exists on
+the close side. In the documented CHAIN C narrative the attacker
+drives the price *by exhausting the opposite side of the book via
+wash trades*. By the time the keeper claim fires, the side the close
+needs to lift may be empty — meaning the close settles at the
+victim's entry, with zero realized PnL from the close itself. The
+attacker still pockets the 50bps rebate (which is paid out of
+collateral regardless of close price); the bigger "buy victim
+collateral cheap" gain documented in the PoC narrative is
+conditional on the manipulated-side order still being on the book
+at claim time. Phase 9 may amplify reach by combining with cache
+poisoning (out-of-band manipulation that doesn't require draining
+the book). Code unchanged — narrowing the documented payoff, not
+the planted vuln.
+
+**Q-5.10 — End-to-end verification boundary.** The PoC scratch
+runs the math in-process. The actual deployed chain crosses six
+HTTP / process boundaries (matching engine → public-price endpoint
+→ nginx cache → worker fetch → liquidation write → keeper-claim
+RPC). Future phase Adversarial-QA chain claims should ship a
+curl-against-running-stack walkthrough alongside the math PoC.
+Tracked as a Phase-6 process-improvement item.

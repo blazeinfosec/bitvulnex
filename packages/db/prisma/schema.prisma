@@ -88,6 +88,7 @@ model User {
   totpEnabled   Boolean   @default(false)
   failedLogins  Int       @default(0)
   lockedUntil   DateTime?
+  keeperRegisteredAt DateTime?
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
@@ -143,6 +144,16 @@ model Deposit {
   @@map("deposits")
 }
 
+// Balance semantics (Phase-5 fix-up Q-5.4):
+//   amount          = spot subtotal: available + locked. NOT a
+//                     grand total across all sub-accounts.
+//   available       = spot free balance (depositable, withdrawable)
+//   locked          = spot reserved against open orders
+//   marginAvailable = margin sub-account free (backs new positions)
+//   marginBorrowed  = platform borrow against open positions
+//                     (NOT user-owned; informational)
+// Phase 6 may add lending/staking buckets; keep them as new columns
+// rather than overloading any of the above.
 model Balance {
   id              String   @id @default(cuid())
   userId          String

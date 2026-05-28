@@ -174,6 +174,9 @@ importers:
 
   packages/shared:
     dependencies:
+      '@bvbe/db':
+        specifier: workspace:*
+        version: link:../db
       jose:
         specifier: ^5.9.3
         version: 5.10.0

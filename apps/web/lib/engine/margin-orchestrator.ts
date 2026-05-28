@@ -1,11 +1,15 @@
-// Orchestrate margin position open/close: lock collateral, place the
-// underlying market order, settle.
+// Orchestrate margin position open/close.
+//
+// Phase 5 design call: margin positions are "synthetic" — collateral
+// is locked from marginAvailable, the platform notionally borrows
+// the remainder, and the position records the snapshot entry price
+// from the book. No real spot trade fires when the position opens.
+// Phase 6 architect to decide whether to wire `placeOrder` into the
+// open path (would generate real Trade rows, amplifying CHAIN C
+// reach but coupling margin to the spot order book).
 
 import { Prisma, prisma } from "@bvbe/db";
-import { placeOrder } from "./place";
-import { feeTierForUser } from "./fees";
 import {
-  KEEPER_REBATE_BPS,
   liquidationPriceFor,
   unrealizedPnl,
   keeperRebate,
@@ -58,8 +62,6 @@ export async function openPosition(args: OpenMarginArgs): Promise<{
   const collateral = notional.div(args.leverage);
 
   // Lock collateral from marginAvailable.
-  const feeTier = await feeTierForUser(args.userId);
-
   const positionId = await prisma.$transaction(async (tx) => {
     const bal = await tx.balance.findUnique({
       where: { userId_asset: { userId: args.userId, asset: quote } },
@@ -96,12 +98,6 @@ export async function openPosition(args: OpenMarginArgs): Promise<{
     });
     return pos.id;
   });
-
-  // Reference for unused-import linter; feeTier flows into the
-  // place call if Phase-6 extends. Currently the underlying market
-  // hit happens at open time only as a price reference; the
-  // platform "borrows" the rest of the position synthetically.
-  void feeTier;
 
   const liqPrice = liquidationPriceFor(args.side, estPrice, size, collateral);
   return {
@@ -186,8 +182,4 @@ export async function closePosition(
       });
     }
   });
-
-  // Reference for unused-import warning silencer
-  void placeOrder;
-  void KEEPER_REBATE_BPS;
 }
