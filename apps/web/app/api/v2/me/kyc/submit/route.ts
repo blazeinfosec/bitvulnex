@@ -24,7 +24,14 @@ export async function POST(req: Request) {
   const profile = await prisma.kycProfile.findUnique({
     where: { userId: claims.sub },
   });
-  if (!profile?.legalName || !profile.dateOfBirth || !profile.country) {
+  if (
+    !profile?.legalName ||
+    !profile.dateOfBirth ||
+    !profile.country ||
+    !profile.addressLine ||
+    !profile.city ||
+    !profile.postalCode
+  ) {
     return jsonError(400, "profile incomplete");
   }
   const docCount = await prisma.kycDocument.count({

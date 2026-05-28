@@ -29,6 +29,7 @@ export async function GET(req: Request) {
         id: true,
         type: true,
         filename: true,
+        storedPath: true,
         mimeType: true,
         size: true,
         source: true,

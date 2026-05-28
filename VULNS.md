@@ -139,6 +139,7 @@ Each entry:
 - **Realistic root cause:** Engineer wired up doc downloads via `?file=` for "easy testing" before swapping to a content-addressable URL. The `?file=` path stayed.
 - **Remediation:** Look up the document by ID in the DB; serve from `storedPath` and verify the resolved path is contained within `UPLOADS_DIR` via `path.resolve` + prefix check.
 - **Chain membership:** standalone (also leaks `apps/web/keys/legacy-2022` → V-19 / V-20 prep)
+- **Implementation note (Phase-2 fix-up Q-2.6):** The handler echoes the user-controlled `file` value back in `Content-Disposition: inline; filename="${file}"` on a successful traversal read. This is part of the planted shape — do not "polish" it to `path.basename(file)` thinking it's a separate header-injection concern; the `readFileSync` happens before the header is built, so a polish would only hide evidence, not stop the traversal.
 
 ### V-27: Lexicographic KYC tier comparison
 

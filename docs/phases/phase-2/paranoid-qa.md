@@ -61,10 +61,17 @@
 
 - New `KycProfile` and `KycDocument` rows live in Postgres → wiped
   by `docker compose down -v`.
-- Uploaded files live under `apps/web/uploads/kyc/` in the **web
-  container's** bind-mounted directory. The container is recreated
-  on `docker compose down -v && up`; uploads are wiped when the
-  container's writable layer is reset.
+- Uploaded files live under `/repo/apps/web/uploads/kyc/` inside the
+  web container, which is mapped to the **named volume**
+  `bvbe-uploads` (declared in `docker-compose.yml`). The named-volume
+  mount overrides the parent `./apps/web` bind mount for that
+  subpath, so user-uploaded data is stored in docker's volume layer,
+  not on the host's `apps/web/uploads/` directory. `docker compose
+  down -v` removes the named volume; uploads are wiped on reset.
+- *Phase-2 fix-up note (post-L7 Q-2.3):* an earlier iteration of this
+  document incorrectly claimed the bind mount itself wiped uploads
+  on reset. The corrected design uses a named volume so the
+  CLAUDE.md "`down -v` destroys everything" hard rule holds.
 - mock-imds container has no persistent state (in-memory only).
 
 ### 7. Surfaces-to-leave-clean — still clean

@@ -42,6 +42,11 @@ services:
       - ./CHANGELOG.md:/repo/CHANGELOG.md:ro
       - /repo/apps/web/node_modules
       - /repo/apps/web/.next
+      # Named volume for KYC uploads, mounted *after* the apps/web
+      # bind so the more-specific mount wins. Keeps the CLAUDE.md
+      # "down -v destroys everything" hard rule intact — bind-mounted
+      # host paths persist across resets, but named volumes don't.
+      - bvbe-uploads:/repo/apps/web/uploads
     depends_on:
       db:
         condition: service_healthy
@@ -53,6 +58,11 @@ services:
         condition: service_started
     networks:
       - bvbe-net
+      # web is on the imds net too so the V-40 SSRF can reach the
+      # canonical 169.254.169.254 address. mock-imds is the only
+      # service that pins to that IP; no other service on this net
+      # uses link-local addresses.
+      - bvbe-imds-net
 
   # One-shot service: applies Prisma migrations and seeds the admin
   # row, then exits. `web` waits on `service_completed_successfully`
@@ -120,7 +130,7 @@ services:
       - ./apps/mock-imds:/repo/apps/mock-imds
       - /repo/apps/mock-imds/node_modules
     networks:
-      bvbe-net:
+      bvbe-imds-net:
         # Pose as the AWS EC2 metadata endpoint so CHAIN D's
         # SSRF-to-IAM-creds step has a target reachable by IP literal.
         aliases:
@@ -156,13 +166,23 @@ services:
 
 volumes:
   bvbe-db:
+  bvbe-uploads:
 
 networks:
+  # Main service network. Uses Docker's default IPAM (typically a /16
+  # in the 172.x.x.x range) so all the production-shaped services
+  # live on normal private addresses. Only mock-imds gets link-local.
   bvbe-net:
+    driver: bridge
+
+  # Carved-out /24 inside the link-local /16 so the mock-imds
+  # container can take the canonical 169.254.169.254 address.
+  # Only `mock-imds` and `web` join this network — web because the
+  # V-40 SSRF reaches the IMDS by IP literal from inside the web
+  # container's outbound fetch.
+  bvbe-imds-net:
     driver: bridge
     ipam:
       driver: default
       config:
-        # Carved subnet inside the link-local /16 so the mock-imds
-        # container can take the canonical 169.254.169.254 address.
         - subnet: 169.254.169.0/24

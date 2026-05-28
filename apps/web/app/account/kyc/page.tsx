@@ -12,6 +12,7 @@ type DocSummary = {
   id: string;
   type: string;
   filename: string;
+  storedPath: string;
   mimeType: string;
   size: number;
   source: string;
@@ -296,7 +297,7 @@ export default function KycPage() {
                     <td>
                       <Link
                         href={`/api/v2/me/kyc/doc?file=${encodeURIComponent(
-                          d.filename,
+                          d.storedPath,
                         )}`}
                       >
                         view
