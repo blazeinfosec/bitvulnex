@@ -162,7 +162,7 @@ describe("pollOnce", () => {
 
     expect(deposits).toHaveLength(1);
     expect(deposits[0]?.status).toBe("credited");
-    expect(balances.get("u1:BTC")?.amount).toBe("0.25000000");
+    expect(Number(balances.get("u1:BTC")?.amount)).toBe(0.25);
   });
 
   it("seen → confirming → credited transitions across polls", async () => {
@@ -206,10 +206,10 @@ describe("pollOnce", () => {
       db,
     );
     expect(deposits[0]?.status).toBe("credited");
-    expect(balances.get("u1:BTC")?.amount).toBe("0.50000000");
+    expect(Number(balances.get("u1:BTC")?.amount)).toBe(0.5);
 
     await pollOnce(staticRpc({ "bcrt1quser_addr": [] }), db);
     expect(deposits[0]?.status).toBe("credited");
-    expect(balances.get("u1:BTC")?.amount).toBe("0.50000000");
+    expect(Number(balances.get("u1:BTC")?.amount)).toBe(0.5);
   });
 });

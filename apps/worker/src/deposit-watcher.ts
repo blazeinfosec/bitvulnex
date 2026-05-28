@@ -1,7 +1,9 @@
 // Deposit watcher. Polls bitcoin-mock for each watched address and
 // reconciles to the Deposit + Balance tables.
 
-import { prisma } from "@bvbe/db";
+import { Prisma, prisma } from "@bvbe/db";
+
+const D = (s: string) => new Prisma.Decimal(s);
 
 export type WatchTx = {
   txid: string;
@@ -91,7 +93,7 @@ async function reconcile(
         address: ba.address,
         txid: tx.txid,
         vout: tx.vout,
-        amount: tx.amountBtc.toFixed(8),
+        amount: D(tx.amountBtc.toFixed(8)),
         confirmations: tx.confirmations,
         status: "seen",
       },
@@ -129,10 +131,10 @@ async function reconcile(
       create: {
         userId: ba.userId,
         asset: ba.asset,
-        amount: tx.amountBtc.toFixed(8),
+        amount: D(tx.amountBtc.toFixed(8)),
       },
       update: {
-        amount: { increment: tx.amountBtc.toFixed(8) },
+        amount: { increment: D(tx.amountBtc.toFixed(8)) },
       },
     }),
   ]);

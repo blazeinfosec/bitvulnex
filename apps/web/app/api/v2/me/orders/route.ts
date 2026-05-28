@@ -31,20 +31,30 @@ registerEndpoint({
 
 export const dynamic = "force-dynamic";
 
+// Positive decimal: digits with optional fractional part, no sign,
+// no scientific notation, must be strictly greater than zero.
+// Phase-4 L7 Q-4.1 fix: prevent negative-amount balance inflation.
+const positiveDecimal = z
+  .string()
+  .regex(/^\d+(\.\d+)?$/, "must be a positive decimal")
+  .refine((s) => Number(s) > 0, "must be > 0");
+
 const placeSchema = z.object({
   pair: z.string().regex(/^[A-Z]+\/[A-Z]+$/),
   side: z.enum(["buy", "sell"]),
   type: z.enum(["limit", "market", "stop_limit", "oco"]),
-  price: z.string().optional(),
-  amount: z.string(),
-  stopTrigger: z.string().optional(),
+  price: positiveDecimal.optional(),
+  amount: positiveDecimal,
+  stopTrigger: positiveDecimal.optional(),
   ocoSibling: z.number().int().optional(),
 });
 
 // Feature-flag-style tier label for advanced order types. Pulled
 // from a JSON config in real life; hardcoded here for the lab.
 // The string form means V-27 (lex compare) fires on this gate.
-const STOP_ORDER_TIER = "2";
+// DO NOT change to a number -- Phase 7 withdrawal limits will
+// consume the same lex-compare surface.
+const STOP_ORDER_TIER: string = "2";
 
 export async function POST(req: Request) {
   const claims = await userFromAuthorization(req.headers.get("authorization"));
@@ -90,16 +100,22 @@ export async function POST(req: Request) {
   }
 }
 
+const statusFilterSchema = z
+  .enum(["open", "partial", "filled", "cancelled"])
+  .optional();
+
 export async function GET(req: Request) {
   const claims = await userFromAuthorization(req.headers.get("authorization"));
   if (!claims) return jsonError(401, "unauthorized");
 
   const url = new URL(req.url);
-  const statusFilter = url.searchParams.get("status");
+  const raw = url.searchParams.get("status") ?? undefined;
+  const parsed = statusFilterSchema.safeParse(raw);
+  const statusFilter = parsed.success ? parsed.data : undefined;
   const orders = await prisma.order.findMany({
     where: {
       userId: claims.sub,
-      ...(statusFilter ? { status: statusFilter as "open" } : {}),
+      ...(statusFilter ? { status: statusFilter } : {}),
     },
     orderBy: { createdAt: "desc" },
     take: 100,

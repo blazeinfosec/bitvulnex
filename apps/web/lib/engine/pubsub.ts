@@ -1,15 +1,18 @@
 // Thin Redis-pub/sub wrapper so the ws-gateway can hear about order
-// book / trade / private-channel changes the web app makes.
+// book / trade / private-channel changes the web app makes. The
+// publisher is anchored to globalThis so route-segment bundle
+// duplication + HMR don't leak a fresh Redis connection per reload.
+// Same pattern as openapi-registry and the TOTP-ticket store.
 
 import { Redis } from "ioredis";
 import { env } from "../env";
+import { getGlobalStore } from "../global-store";
 
-let pub: Redis | null = null;
 function publisher(): Redis {
-  if (!pub) {
-    pub = new Redis(env().REDIS_URL, { maxRetriesPerRequest: null });
-  }
-  return pub;
+  return getGlobalStore(
+    "engine.pubsub.redis",
+    () => new Redis(env().REDIS_URL, { maxRetriesPerRequest: null }),
+  );
 }
 
 export async function publishBookUpdate(pair: string): Promise<void> {

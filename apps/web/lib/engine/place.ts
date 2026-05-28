@@ -27,8 +27,20 @@ type PlaceArgs = {
 export async function placeOrder(args: PlaceArgs): Promise<{ orderId: number }> {
   const amount = D(args.amount);
   const price = args.price ? D(args.price) : null;
+  // Defense-in-depth: the route's zod schema already rejects
+  // non-positive operands, but placeOrder is also called from
+  // tests and engine code where the schema is bypassed.
+  if (amount.lte(0)) throw new Error("amount must be > 0");
+  if (price && price.lte(0)) throw new Error("price must be > 0");
   const [base, quote] = args.pair.split("/");
   if (!base || !quote) throw new Error("bad pair");
+
+  // Reject orders against pairs the platform doesn't actually trade.
+  // Phase-4 L7 Q-4.6 fix.
+  const pairRow = await prisma.tradingPair.findUnique({
+    where: { base_quote: { base, quote } },
+  });
+  if (!pairRow?.active) throw new Error("unknown or inactive pair");
 
   // Asset we lock at placement time depends on side
   const lockAsset = args.side === "buy" ? quote : base;
@@ -39,6 +51,10 @@ export async function placeOrder(args: PlaceArgs): Promise<{ orderId: number }> 
         // For market we lock amount * lastTradePrice as a stand-in.
         (price ?? D(await bestPriceEstimate(args.pair, "ask"))).mul(amount)
       : amount;
+  // Reject market orders against an empty book (Q-4.10).
+  if (args.type === "market" && lockQty.lte(0)) {
+    throw new Error("insufficient liquidity");
+  }
 
   const orderId = await prisma.$transaction(async (tx) => {
     const bal = await tx.balance.findUnique({
@@ -98,10 +114,16 @@ export async function placeOrder(args: PlaceArgs): Promise<{ orderId: number }> 
     const sorted = sortBook(resting, args.side);
     const { matches, remaining } = matchAgainstBook(taker, sorted);
 
-    // Apply matches: write trades, settle balances, update maker orders
+    // Apply matches: write trades, settle balances, update maker orders.
+    // Track the running actual quote cost so we can compute the
+    // refund precisely (Q-4.2 fix: previously the BUY-market refund
+    // used `lockQty - filled*price` with price=null on market orders,
+    // collapsing to a full refund of an already-decremented lock).
     let filled = D(0);
+    let actualQuoteSpent = D(0);
     for (const m of matches) {
       filled = filled.add(m.amount);
+      actualQuoteSpent = actualQuoteSpent.add(m.price.mul(m.amount));
       const makerFeeBps = FEE_TABLE[args.feeTier].makerBps;
       const takerFeeBps = FEE_TABLE[args.feeTier].takerBps;
 
@@ -164,12 +186,13 @@ export async function placeOrder(args: PlaceArgs): Promise<{ orderId: number }> 
       data: { filled, status: takerStatus },
     });
 
-    // For market orders that didn't fully fill, refund the over-locked amount
-    if (args.type === "market" && remaining.gt(0)) {
+    // Market-order refund: any portion of the provisional lock that
+    // wasn't consumed by actual fills is released back to available.
+    // The match loop already decremented `locked` by the per-fill
+    // actual cost; we just need to clear the remainder.
+    if (args.type === "market") {
       const refund =
-        args.side === "buy"
-          ? lockQty.sub(filled.mul(price ?? D(0)))
-          : remaining;
+        args.side === "buy" ? lockQty.sub(actualQuoteSpent) : remaining;
       if (refund.gt(0)) {
         await tx.balance.update({
           where: { userId_asset: { userId: args.userId, asset: lockAsset } },
