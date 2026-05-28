@@ -21,6 +21,24 @@ enum Role {
   treasury
 }
 
+enum KycStatus {
+  incomplete
+  pending
+  approved
+  rejected
+}
+
+enum KycDocType {
+  passport
+  id_card
+  address_proof
+}
+
+enum KycDocSource {
+  upload
+  url_import
+}
+
 model User {
   id            String    @id @default(cuid())
   email         String    @unique
@@ -39,8 +57,49 @@ model User {
   refreshTokens      RefreshToken[]
   passwordResets     PasswordResetToken[]
   apiKeys            ApiKey[]
+  kycProfile         KycProfile?
+  kycDocuments       KycDocument[]
 
   @@map("users")
+}
+
+model KycProfile {
+  id              String    @id @default(cuid())
+  userId          String    @unique
+  legalName       String?
+  dateOfBirth     DateTime?
+  country         String?
+  addressLine     String?
+  city            String?
+  postalCode      String?
+  status          KycStatus @default(incomplete)
+  submittedAt     DateTime?
+  reviewedAt      DateTime?
+  reviewedById    String?
+  rejectionReason String?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("kyc_profiles")
+}
+
+model KycDocument {
+  id         String       @id @default(cuid())
+  userId     String
+  type       KycDocType
+  filename   String
+  storedPath String
+  mimeType   String
+  size       Int
+  source     KycDocSource @default(upload)
+  createdAt  DateTime     @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("kyc_documents")
 }
 
 model RefreshToken {

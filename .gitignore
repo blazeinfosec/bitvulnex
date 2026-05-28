@@ -11,3 +11,5 @@ coverage
 .pnpm-store
 *.tsbuildinfo
 prisma/migrations/dev.db*
+apps/web/uploads/*
+!apps/web/uploads/.gitkeep

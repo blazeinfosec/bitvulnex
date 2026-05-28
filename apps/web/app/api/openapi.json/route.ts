@@ -19,6 +19,12 @@ import "@/app/api/v2/auth/2fa/disable/route";
 import "@/app/api/v2/me/route";
 import "@/app/api/v2/me/api-keys/route";
 import "@/app/api/v2/me/api-keys/[id]/route";
+import "@/app/api/v2/me/kyc/route";
+import "@/app/api/v2/me/kyc/profile/route";
+import "@/app/api/v2/me/kyc/documents/route";
+import "@/app/api/v2/me/kyc/import-url/route";
+import "@/app/api/v2/me/kyc/doc/route";
+import "@/app/api/v2/me/kyc/submit/route";
 
 registerEndpoint({
   method: "get",

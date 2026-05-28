@@ -109,6 +109,24 @@ services:
     networks:
       - bvbe-net
 
+  mock-imds:
+    build:
+      context: .
+      dockerfile: apps/mock-imds/Dockerfile
+    environment:
+      NODE_ENV: development
+      PORT: "80"
+    volumes:
+      - ./apps/mock-imds:/repo/apps/mock-imds
+      - /repo/apps/mock-imds/node_modules
+    networks:
+      bvbe-net:
+        # Pose as the AWS EC2 metadata endpoint so CHAIN D's
+        # SSRF-to-IAM-creds step has a target reachable by IP literal.
+        aliases:
+          - imds.bvbe.local
+        ipv4_address: 169.254.169.254
+
   db:
     image: postgres:16-alpine
     environment:
@@ -142,3 +160,9 @@ volumes:
 networks:
   bvbe-net:
     driver: bridge
+    ipam:
+      driver: default
+      config:
+        # Carved subnet inside the link-local /16 so the mock-imds
+        # container can take the canonical 169.254.169.254 address.
+        - subnet: 169.254.169.0/24

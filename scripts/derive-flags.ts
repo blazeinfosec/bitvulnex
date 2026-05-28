@@ -9,10 +9,14 @@ const VULN_IDS: string[] = [
   "V-9",
   "V-10",
   "V-13",
+  "V-14",
   "V-19",
   "V-20",
   "V-21",
+  "V-27",
   "V-35",
+  "V-40",
+  "V-41",
 ];
 
 function flagFor(vulnId: string, salt: string): string {

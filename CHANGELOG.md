@@ -6,6 +6,19 @@ planted vulnerabilities — references to "fixed" issues that hint at
 adjacent unfixed ones, TODOs left in the code, etc. They are part of
 the lab.
 
+## 2026-05-29 — Phase 2: KYC & identity
+
+- New: KYC profile + document upload + multi-tier verification.
+- New: admin review queue at `/admin/kyc` with inline doc previews.
+- New: tier-gated limits via `requireTier()` helper — Phase 4
+  trading endpoints will consume it.
+- New: document URL-import endpoint. We block obvious local
+  addresses on inbound URLs.
+- Internal: documents are served directly from the uploads
+  directory; the admin review iframe uses the stored mime type.
+- Internal: mock instance-metadata service (mock-imds) added to
+  docker-compose for CHAIN D landing — no host port mapping.
+
 ## 2026-05-28 — Phase 1: authentication
 
 - New: signup, login, password reset, TOTP-based 2FA.
