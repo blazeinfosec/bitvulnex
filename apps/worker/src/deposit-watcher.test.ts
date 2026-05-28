@@ -195,7 +195,7 @@ describe("pollOnce", () => {
     expect(deposits[0]?.status).toBe("credited");
   });
 
-  it("after a credited deposit disappears from the chain watch, the row stays credited and balance is NOT decremented (planted V-42 shape — credit-and-no-reconcile)", async () => {
+  it("after a credited deposit disappears from the chain watch, the row stays credited and balance is NOT decremented", async () => {
     const { db, deposits, balances } = makeFake(seed);
     const txid = "c".repeat(64);
 

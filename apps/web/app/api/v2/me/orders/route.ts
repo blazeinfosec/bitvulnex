@@ -50,10 +50,9 @@ const placeSchema = z.object({
 });
 
 // Feature-flag-style tier label for advanced order types. Pulled
-// from a JSON config in real life; hardcoded here for the lab.
-// The string form means V-27 (lex compare) fires on this gate.
-// DO NOT change to a number -- Phase 7 withdrawal limits will
-// consume the same lex-compare surface.
+// from a JSON config in real life; hardcoded here for the lab. The
+// string form matches how feature-flag plumbing usually arrives —
+// stay consistent with the rest of the config surface.
 const STOP_ORDER_TIER: string = "2";
 
 export async function POST(req: Request) {
@@ -63,7 +62,7 @@ export async function POST(req: Request) {
   const parsed = await readJson(req, placeSchema);
   if (parsed.error) return parsed.error;
 
-  // Tier 1+ for any trading. Numeric so the V-27 bug does NOT fire here.
+  // Tier 1+ for any trading.
   try {
     requireTier(claims, 1);
   } catch (e) {

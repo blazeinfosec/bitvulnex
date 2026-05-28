@@ -2,10 +2,11 @@
 // pair and flags MarginPosition rows whose maintenance margin is
 // breached.
 //
-// Per architect direction (Phase-5 Gate-1 cond. #2): the price MUST
-// come from the HTTP public-price endpoint, not directly from DB
-// queries on Trade. The HTTP path is what V-25 self-trade
-// manipulates; DB-direct would bypass CHAIN C.
+// The mark price MUST come from the HTTP public-price endpoint,
+// not directly from DB queries on Trade. Keeping the oracle path
+// consistent with what API clients see lets ops reproduce
+// liquidations against the same data trainees and integrators
+// observe.
 
 import { Prisma, prisma } from "@bvbe/db";
 import { breachesMaintenance, keeperRebate } from "@bvbe/shared";

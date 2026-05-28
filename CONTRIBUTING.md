@@ -58,6 +58,6 @@ in `VULNS.md`, it's a feature — please don't "fix" it.
 - No comments explaining what code does — names and types do that. Use
   comments only when the *why* is non-obvious (a subtle invariant, a
   workaround, a deliberate trust boundary).
-- Prefer `Decimal` (Prisma) for money; never `Number`. (Phase 4+
-  intentionally violates this for V-29; that violation must be
-  isolated to its planted file.)
+- Prefer `Decimal` (Prisma) for money; never `Number`. If any
+  shipping module deliberately mixes `Number` in money math for
+  pedagogical reasons, isolate it to that one file.

@@ -24,9 +24,9 @@ services:
       PORT: "3000"
       DATABASE_URL: postgresql://bvbe:bvbe@db:5432/bvbe?schema=public
       REDIS_URL: redis://redis:6379
-      # Phase 0: strict, no fallback. The deliberate weak-key fallback
-      # path that becomes V-9 is reserved for Phase 1. If JWT_SECRET is
-      # unset, the web container must fail-fast at env() parsing.
+      # JWT signing secret. Required at boot — env() parsing fails
+      # fast if unset so the web container never runs with a default
+      # placeholder by accident.
       JWT_SECRET: devsecret-do-not-use-in-prod-bvbe-2026
       BITCOIN_MOCK_URL: http://bitcoin-mock:18443
       # Loosened HTTP framing for legacy mobile-app client compatibility
@@ -63,10 +63,11 @@ services:
         condition: service_started
     networks:
       - bvbe-net
-      # web is on the imds net too so the V-40 SSRF can reach the
-      # canonical 169.254.169.254 address. mock-imds is the only
-      # service that pins to that IP; no other service on this net
-      # uses link-local addresses.
+      # web joins the imds net so outbound fetch() calls from the
+      # app code path can reach the canonical 169.254.169.254 metadata
+      # address used by mock-imds. mock-imds is the only service
+      # pinned to that IP; no other service on this net uses
+      # link-local addresses.
       - bvbe-imds-net
 
   # One-shot service: applies Prisma migrations and seeds the admin
@@ -224,9 +225,9 @@ networks:
 
   # Carved-out /24 inside the link-local /16 so the mock-imds
   # container can take the canonical 169.254.169.254 address.
-  # Only `mock-imds` and `web` join this network — web because the
-  # V-40 SSRF reaches the IMDS by IP literal from inside the web
-  # container's outbound fetch.
+  # Only `mock-imds` and `web` join this network — web because
+  # outbound fetch() calls from the app code path may reach the
+  # metadata service by IP literal.
   bvbe-imds-net:
     driver: bridge
     ipam:

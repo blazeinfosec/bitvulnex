@@ -1,5 +1,6 @@
-// V-4 IDOR site: order GET + DELETE handlers look up by URL `id`
-// without verifying the order belongs to the authenticated user.
+// Order detail + cancel handlers. The URL `id` is the orders table
+// primary key; the route trusts that authenticated callers only
+// reference their own orders from the UI.
 
 import { NextResponse } from "next/server";
 import { Prisma, prisma } from "@bvbe/db";

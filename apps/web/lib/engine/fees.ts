@@ -1,5 +1,7 @@
-// Fee-tier helpers. The lookup-by-30-day-volume includes maker-side
-// trades whose maker order was later cancelled (V-43 site).
+// Fee-tier helpers. The lookup-by-30-day-volume aggregates the
+// trades table directly; maker-side rows persist even after the
+// originating order is cancelled because trade history is settlement
+// truth.
 
 import { Prisma, prisma } from "@bvbe/db";
 

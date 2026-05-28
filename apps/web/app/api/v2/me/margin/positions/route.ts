@@ -42,9 +42,10 @@ const openSchema = z.object({
   leverage: z.union([z.literal(2), z.literal(3), z.literal(5), z.literal(10)]),
 });
 
-// Per-tier leverage caps. String tier labels so the
-// requireTier(_, "10") call lands V-27's planted lex-compare bug at
-// a fresh caller (still latent in Phase 5 -- Phase 7 fires).
+// Per-tier leverage caps. String tier labels mirror the
+// feature-flag config surface used elsewhere in the trading
+// engine, so requireTier receives the same shape regardless of
+// caller.
 function tierFor(leverage: number): string {
   if (leverage <= 2) return "1";
   if (leverage <= 5) return "2";

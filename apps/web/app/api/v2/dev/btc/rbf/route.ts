@@ -1,6 +1,6 @@
 // LAB AFFORDANCE — RBF-replace a recent mempool TX with one that
-// sends to a different address. Used to demonstrate V-42 zero-conf
-// double-spend.
+// sends to a different address. Used to exercise the deposit
+// pipeline's behavior around replaced transactions.
 
 import { NextResponse } from "next/server";
 import { z } from "zod";
