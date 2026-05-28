@@ -9,6 +9,7 @@
     "lint": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
+    "@bvbe/db": "workspace:*",
     "@bvbe/shared": "workspace:*",
     "ioredis": "^5.4.1",
     "tsx": "^4.19.1",

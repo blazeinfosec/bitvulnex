@@ -26,6 +26,9 @@ importers:
       '@bvbe/bitcoin-rpc-types':
         specifier: workspace:*
         version: link:../../packages/bitcoin-rpc-types
+      '@bvbe/db':
+        specifier: workspace:*
+        version: link:../../packages/db
       '@bvbe/shared':
         specifier: workspace:*
         version: link:../../packages/shared
@@ -162,6 +165,9 @@ importers:
 
   apps/ws-gateway:
     dependencies:
+      '@bvbe/db':
+        specifier: workspace:*
+        version: link:../../packages/db
       '@bvbe/shared':
         specifier: workspace:*
         version: link:../../packages/shared

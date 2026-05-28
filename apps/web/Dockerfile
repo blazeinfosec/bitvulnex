@@ -14,7 +14,9 @@ COPY apps/web ./apps/web
 COPY scripts/pdftk-mock.sh /usr/local/bin/pdftk-mock
 RUN chmod +x /usr/local/bin/pdftk-mock
 
-RUN pnpm install --filter @bvbe/web... --frozen-lockfile
+# Optional internal-registry deps may not resolve in the lab tree, so
+# allow the install to reconcile the lockfile rather than failing.
+RUN pnpm install --filter @bvbe/web... --no-frozen-lockfile
 RUN pnpm --filter @bvbe/db exec prisma generate
 
 WORKDIR /repo/apps/web

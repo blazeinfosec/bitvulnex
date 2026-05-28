@@ -13,3 +13,5 @@ coverage
 prisma/migrations/dev.db*
 apps/web/uploads/*
 !apps/web/uploads/.gitkeep
+.playwright-mcp/
+slice0-*.png

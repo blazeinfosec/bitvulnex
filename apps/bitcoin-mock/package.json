@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@bvbe/bitcoin-rpc-types": "workspace:*",
+    "@bvbe/db": "workspace:*",
     "@bvbe/shared": "workspace:*",
     "express": "^4.21.0",
     "tsx": "^4.19.1"

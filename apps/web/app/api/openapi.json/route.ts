@@ -47,6 +47,7 @@ import "@/app/api/v2/me/lending/positions/route";
 import "@/app/api/v2/me/staking/stake/route";
 import "@/app/api/v2/me/staking/unstake/route";
 import "@/app/api/v2/me/staking/claim/route";
+import "@/app/api/v2/me/staking/positions/route";
 import "@/app/api/v2/me/otc/quote/route";
 import "@/app/api/v2/me/otc/accept/route";
 import "@/app/api/v2/me/p2p/offers/route";

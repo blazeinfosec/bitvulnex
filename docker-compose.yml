@@ -47,6 +47,10 @@ services:
       - ./CHANGELOG.md:/repo/CHANGELOG.md:ro
       - /repo/apps/web/node_modules
       - /repo/apps/web/.next
+      - /repo/packages/shared/node_modules
+      - /repo/packages/db/node_modules
+      - /repo/packages/bitcoin-rpc-types/node_modules
+      - /repo/node_modules
       # Named volume for KYC uploads, mounted *after* the apps/web
       # bind so the more-specific mount wins. Keeps the CLAUDE.md
       # "down -v destroys everything" hard rule intact — bind-mounted
@@ -100,6 +104,12 @@ services:
       - ./apps/ws-gateway:/repo/apps/ws-gateway
       - ./packages:/repo/packages
       - /repo/apps/ws-gateway/node_modules
+      # Mask host node_modules inside workspace packages so the
+      # container uses the pnpm symlinks created during docker build.
+      - /repo/packages/shared/node_modules
+      - /repo/packages/db/node_modules
+      - /repo/packages/bitcoin-rpc-types/node_modules
+      - /repo/node_modules
     depends_on:
       redis:
         condition: service_healthy
@@ -120,6 +130,10 @@ services:
       - ./apps/worker:/repo/apps/worker
       - ./packages:/repo/packages
       - /repo/apps/worker/node_modules
+      - /repo/packages/shared/node_modules
+      - /repo/packages/db/node_modules
+      - /repo/packages/bitcoin-rpc-types/node_modules
+      - /repo/node_modules
     depends_on:
       db:
         condition: service_healthy
@@ -139,8 +153,12 @@ services:
       PORT: "18443"
     volumes:
       - ./apps/bitcoin-mock:/repo/apps/bitcoin-mock
-      - ./packages/bitcoin-rpc-types:/repo/packages/bitcoin-rpc-types
+      - ./packages:/repo/packages
       - /repo/apps/bitcoin-mock/node_modules
+      - /repo/packages/shared/node_modules
+      - /repo/packages/db/node_modules
+      - /repo/packages/bitcoin-rpc-types/node_modules
+      - /repo/node_modules
     # No host port mapping — internal network only.
     networks:
       - bvbe-net

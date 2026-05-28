@@ -22,9 +22,25 @@ export async function GET(req: Request) {
 
   const balances = await prisma.balance.findMany({
     where: { userId: claims.sub },
-    select: { asset: true, amount: true, updatedAt: true },
+    select: {
+      asset: true,
+      amount: true,
+      available: true,
+      locked: true,
+      marginAvailable: true,
+      marginBorrowed: true,
+      updatedAt: true,
+    },
   });
   return NextResponse.json({
-    balances: balances.map((b) => ({ ...b, amount: b.amount.toString() })),
+    balances: balances.map((b) => ({
+      asset: b.asset,
+      amount: b.amount.toString(),
+      available: b.available.toString(),
+      locked: b.locked.toString(),
+      marginAvailable: b.marginAvailable.toString(),
+      marginBorrowed: b.marginBorrowed.toString(),
+      updatedAt: b.updatedAt,
+    })),
   });
 }
