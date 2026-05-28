@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { generateTotpSecret, totpCode, verifyTotp } from "./totp.js";
+import { generateTotpSecret, totpCode, verifyTotp } from "./totp";
 
 describe("totp", () => {
   it("a freshly-generated secret verifies its own current code", () => {

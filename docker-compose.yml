@@ -28,7 +28,6 @@ services:
       # path that becomes V-9 is reserved for Phase 1. If JWT_SECRET is
       # unset, the web container must fail-fast at env() parsing.
       JWT_SECRET: ${JWT_SECRET:?JWT_SECRET must be set (>=32 chars). Copy .env.example to .env.}
-      JWT_SECRET_LEGACY: ${JWT_SECRET_LEGACY:-}
       BITCOIN_MOCK_URL: http://bitcoin-mock:18443
       CTF_MODE: ${CTF_MODE:-false}
       HINT_MODE: ${HINT_MODE:-false}

@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { env } from "./env.js";
+import { env } from "./env";
 
 export function flagFor(vulnId: string): string {
   const salt = env().CTF_SALT;

@@ -9,6 +9,7 @@ import {
 import { env } from "@/lib/env";
 import { jsonError, readJson } from "@/lib/api";
 import { registerEndpoint } from "@/lib/openapi-registry";
+import { getGlobalStore } from "@/lib/global-store";
 import { randomBytes } from "node:crypto";
 
 registerEndpoint({
@@ -28,7 +29,10 @@ const schema = z.object({
   password: z.string().min(1).max(256),
 });
 
-const totpTickets = new Map<string, { userId: string; expiresAt: number }>();
+const totpTickets = getGlobalStore(
+  "totpTickets",
+  () => new Map<string, { userId: string; expiresAt: number }>(),
+);
 
 export function consumeTotpTicket(ticket: string): string | null {
   const entry = totpTickets.get(ticket);

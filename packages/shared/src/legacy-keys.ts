@@ -1,19 +1,11 @@
-// "Legacy" RSA keypair kept around for the v1 mobile-app JWT path.
-// Generated freshly for the BVBE lab — not in use anywhere outside
-// this repo. Replace before any non-lab use.
+// Private side of the legacy v1 mobile-app RSA keypair. NOT
+// re-exported from the package barrel — consumers must import from
+// the deep path `@bvbe/shared/legacy-keys` to pull this in. Today no
+// app code references the private key (the v1 issuer signs HMAC); it
+// is retained so future legacy-flow tooling can mint test RS256
+// tokens against the lab without regenerating the pair.
 
-export const LEGACY_KID = "legacy-2022";
-
-export const LEGACY_RSA_PUBLIC_PEM = `-----BEGIN PUBLIC KEY-----
-MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAtHcJWchdIm8I3ApCr9O4
-cFGOWqV5NcLqLJufD1FhENOv4Tw03dq9Xa8ev4sgBY5ONYaLjYEnY4xIqA137oJO
-hUcgM4/fqQt9OXwhKyQGyM1e/o/WE1UvNlqy7mTbfaYkhgEqCs5rTrGVvXw/L1ri
-YAM+JQwTlYWkQUTJpmgaYz7Ky6rJs66INXMTDW+XznSTUwdvMUtbQgqZqeryoL+7
-ZCkkgJQAHC5D4JwTL3NmdbKhDlpTjN476lrSS6gds9h/Nk7vfI4cVZhUwP0xcPCB
-PovwIezW+psMag2u9CYfl36SJ1Q6JiUv+p+OarO6FWPKGL7NpQ2pnBACp2I8T9ng
-XQIDAQAB
------END PUBLIC KEY-----
-`;
+export { LEGACY_KID, LEGACY_RSA_PUBLIC_PEM } from "./legacy-keys-public";
 
 export const LEGACY_RSA_PRIVATE_PEM = `-----BEGIN PRIVATE KEY-----
 MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQC0dwlZyF0ibwjc

@@ -36,7 +36,8 @@ type SeedUser = {
 
 function det(i: number, n: number): number {
   // Deterministic pseudo-random for stable seeds across re-runs.
-  return ((i + 1) * 2654435761) >>> 0 ? ((i + 1) * 2654435761) % n : 0;
+  // Knuth multiplicative hash; modulo n picks the bucket.
+  return Math.abs((i + 1) * 2654435761) % n;
 }
 
 function buildUsers(): SeedUser[] {
@@ -109,12 +110,12 @@ function buildUsers(): SeedUser[] {
   let i = 0;
   for (const t of tiers) {
     for (let k = 0; k < t.count; k++) {
-      const first = FIRST[det(i * 7, FIRST.length)] as string;
-      const last = LAST[det(i * 11 + 3, LAST.length)] as string;
+      const first = FIRST[det(i, FIRST.length)] as string;
+      const last = LAST[det(i + 17, LAST.length)] as string;
       users.push({
         email: `${first.toLowerCase()}.${last.toLowerCase()}.${i}@example.test`,
         displayName: `${first} ${last}`,
-        password: "lab-password-${i}",
+        password: `lab-password-${i}`,
         role: "user",
         kycTier: t.tier,
         emailVerified: t.verified,

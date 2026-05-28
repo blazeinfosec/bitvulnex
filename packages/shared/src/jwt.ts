@@ -1,6 +1,6 @@
 import { SignJWT, jwtVerify, type JWTPayload } from "jose";
 import { randomBytes, createHash } from "node:crypto";
-import type { UserClaims } from "./types.js";
+import type { UserClaims } from "./types";
 
 const ISSUER = "bvbe";
 const AUDIENCE = "bvbe-web";

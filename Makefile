@@ -19,7 +19,7 @@ logs:
 	docker compose logs -f web
 
 test:
-	pnpm -r test
+	pnpm test
 
 build:
 	pnpm -r build

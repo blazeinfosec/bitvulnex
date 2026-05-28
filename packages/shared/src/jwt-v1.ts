@@ -15,7 +15,7 @@ import {
 } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import type { UserClaims } from "./types.js";
+import type { UserClaims } from "./types";
 
 type JwtHeader = { alg: string; typ?: string; kid?: string };
 type JwtPayload = {

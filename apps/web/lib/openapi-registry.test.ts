@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach } from "vitest";
 import {
   registerEndpoint,
   buildOpenApiDocument,
-} from "./openapi-registry.js";
+} from "./openapi-registry";
 
 describe("openapi-registry", () => {
   beforeEach(() => {

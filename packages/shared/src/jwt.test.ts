@@ -4,7 +4,7 @@ import {
   verifyAccessToken,
   issueRefreshToken,
   hashRefreshToken,
-} from "./jwt.js";
+} from "./jwt";
 
 const SECRET = "x".repeat(48);
 
