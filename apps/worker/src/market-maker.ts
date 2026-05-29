@@ -83,7 +83,7 @@ function uniform(a: number, b: number, rng: () => number = Math.random): number 
   return a + (b - a) * rng();
 }
 
-type Quote = { price: string; amount: string };
+type Quote = { price: string; remaining: string };
 type BookSnapshot = { bids: Quote[]; asks: Quote[] };
 
 export type TickResult = {
@@ -203,8 +203,10 @@ async function refreshBook(
       feeTier: "base",
     });
 
-    bids.push({ price: bidPrice.toString(), amount: bidQtyStr });
-    asks.push({ price: askPrice.toString(), amount: askQtyStr });
+    // Match the public REST book shape ({price, remaining}) so WS
+    // consumers and HTTP consumers see the same level structure.
+    bids.push({ price: bidPrice.toString(), remaining: bidQtyStr });
+    asks.push({ price: askPrice.toString(), remaining: askQtyStr });
   }
 
   await db.order.createMany({ data: ordersToCreate });
@@ -396,15 +398,23 @@ export async function runMarketMakerTick(
         `book:${pair}`,
         JSON.stringify({ kind: "book", pair, bids: book.bids, asks: book.asks }),
       );
+      // Match the RecentTrade shape the client consumes:
+      // {id, price:number, size:number, executedAt, takerSide}
+      // wrapped in a {kind:"trade", trade:{...}} envelope.
+      const tradePx = Number(trade.price);
+      const tradeSz = Number(trade.amount);
       await pub.publish(
         `trades:${pair}`,
         JSON.stringify({
           kind: "trade",
           pair,
-          price: trade.price,
-          amount: trade.amount,
-          side: trade.side,
-          at: new Date().toISOString(),
+          trade: {
+            id: `mm-${Date.now()}-${Math.floor(rng() * 1_000_000)}`,
+            price: Number.isFinite(tradePx) ? tradePx : 0,
+            size: Number.isFinite(tradeSz) ? tradeSz : 0,
+            executedAt: Date.now(),
+            takerSide: trade.side,
+          },
         }),
       );
     }

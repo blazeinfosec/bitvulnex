@@ -359,4 +359,56 @@ describe("runMarketMakerTick", () => {
     const res = await runMarketMakerTick(db, null, mulberry32(1));
     expect(res.pairs).toBe(0);
   });
+
+  it("publishes book levels in {price, remaining} shape (matches REST contract)", async () => {
+    const { db } = makeFake();
+    const captured: Array<{ channel: string; message: string }> = [];
+    const pub: MmPubSub = {
+      publish: async (channel: string, message: string) => {
+        captured.push({ channel, message });
+        return 1;
+      },
+    };
+    await runMarketMakerTick(db, pub, mulberry32(7));
+    const bookMsg = captured.find((c) => c.channel === "book:BTC/USDT");
+    if (!bookMsg) throw new Error("book channel not published");
+    const payload = JSON.parse(bookMsg.message) as {
+      kind: string;
+      bids: Array<Record<string, unknown>>;
+      asks: Array<Record<string, unknown>>;
+    };
+    expect(payload.kind).toBe("book");
+    expect(payload.bids.length).toBeGreaterThan(0);
+    for (const lvl of [...payload.bids, ...payload.asks]) {
+      expect(typeof lvl.price).toBe("string");
+      expect(typeof lvl.remaining).toBe("string");
+      expect("amount" in lvl).toBe(false); // legacy field must be gone
+    }
+  });
+
+  it("publishes trades in the {kind:trade, trade:{id,price,size,executedAt,takerSide}} envelope", async () => {
+    const { db } = makeFake();
+    const captured: Array<{ channel: string; message: string }> = [];
+    const pub: MmPubSub = {
+      publish: async (channel: string, message: string) => {
+        captured.push({ channel, message });
+        return 1;
+      },
+    };
+    await runMarketMakerTick(db, pub, mulberry32(11));
+    const tradeMsg = captured.find((c) => c.channel === "trades:BTC/USDT");
+    if (!tradeMsg) throw new Error("trades channel not published");
+    const payload = JSON.parse(tradeMsg.message) as {
+      kind: string;
+      trade?: Record<string, unknown>;
+    };
+    expect(payload.kind).toBe("trade");
+    expect(payload.trade).toBeTruthy();
+    const t = payload.trade as Record<string, unknown>;
+    expect(typeof t.id).toBe("string");
+    expect(typeof t.price).toBe("number");
+    expect(typeof t.size).toBe("number");
+    expect(typeof t.executedAt).toBe("number");
+    expect(["buy", "sell"]).toContain(t.takerSide as string);
+  });
 });
