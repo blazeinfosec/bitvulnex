@@ -2,6 +2,7 @@ export { ArrowIndicator } from "./ArrowIndicator";
 export { BalancePill } from "./BalancePill";
 export { DataTable, type Column, type DataTableProps } from "./DataTable";
 export { EmptyState } from "./EmptyState";
+export { Modal } from "./Modal";
 export { NumberCell, formatNumber } from "./NumberCell";
 export { PercentChangeCell } from "./PercentChangeCell";
 export { PriceCell } from "./PriceCell";

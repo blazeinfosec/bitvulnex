@@ -34,11 +34,8 @@ export function NavBar() {
               Trade
             </Link>
           ) : null}
-          <Link href="/lending" className={linkClass}>
-            Lending
-          </Link>
-          <Link href="/staking" className={linkClass}>
-            Staking
+          <Link href="/earn" className={linkClass}>
+            Earn
           </Link>
           <Link href="/otc" className={linkClass}>
             OTC
