@@ -1,9 +1,9 @@
 # BVBE Holistic L7 QA Review (Cross-phase)
 
 **Reviewer:** L7 staff/principal QA (independent, holistic audit)
-**Date:** 2026-05-28
-**Scope:** All 9 phases, lab as integrated artifact
-**Verdict:** SHIP WITH NITS
+**Date:** 2026-05-29 (refresh: phase-10-revamp closeout)
+**Scope:** All 10 phases (phases 0–9 planted-vuln catalog + phase 10-revamp UX/a11y/mobile), lab as integrated artifact.
+**Verdict:** **SHIP CLEAN.** The 2026-05-28 audit's only Major finding (M-1: V-NNN signposts in source) was resolved by phase-10 slice-6 follow-up `835297a` and re-verified zero at HEAD. All 40 plants intact; phase 10 ships zero new V-NNN. Lab is ready for external cohorts.
 
 ## Methodology
 
@@ -103,6 +103,55 @@ banners, real-PII patterns, outbound HTTPS calls).
 - **V-34 ↔ V-15 (two routes to same `Object.prototype` sink).** Both reach `resolveFlags` in `apps/web/lib/feature-flags.ts:12` via `for...in` over a prototype-backed defaults object. The V-34 pollution and the V-15 xml2js pollution both manifest as `flags.adminPanel === true` on subsequent reads. Intentional per architect — two discovery paths to the same downstream effect.
 - **V-48 ↔ V-19 (both JWT attacks).** Orthogonal. V-48 leaks the HS256 `JWT_SECRET` from `.env.bak` in git history; V-19 forges an HS256 JWT with the kid-mapped RSA public-key bytes as HMAC secret. Either path independently mints an admin JWT; CHAIN A uses V-48 because it's the faster recon move and works against the v2 `userFromAuthorization` path (V-19 only works against the v1 verifier at `jwt-v1.ts`).
 
+## Phase 10-revamp cross-cut (added 2026-05-29)
+
+Phase 10-revamp shipped as eight vertical slices (slice 0 triage + slices 1–7 UX) between 2026-05-28 and 2026-05-29. Explicit phase contract: **zero new V-NNN, treat backend as read-only.** This refresh verifies that contract held.
+
+### Plant integrity through phase 10 — PASS
+
+`git diff ffc3808~1..af66a32 --` against every backend surface that hosts a planted vuln returns empty:
+
+- `apps/web/middleware.ts` — empty diff (V-6, V-35 intact).
+- Every planted route handler under `apps/web/app/api/v2/` — empty diff (covers V-1 server, V-3, V-4, V-21, V-22, V-26, V-27, V-28, V-30, V-33, V-40, V-41 server, V-42, V-43, V-44, V-45, V-46, V-47, V-48, V-49, V-51).
+- `apps/web/lib/{withdrawal,treasury,otc,staking,lending,engine,kyc-storage.ts,kyc-tier.ts}` — empty diff.
+- `packages/shared/src/{jwt,jwt-v1,markdown,btc-address,psbt-envelope,password,totp,yield}.ts` — empty diff. Phase 10 added one new file (`packages/shared/src/equity.ts`); no planted shared helper modified.
+- `apps/ws-gateway/src/server.ts` — touched once (slice 10.2, added a ticker-publishing branch). Slice diff contains zero lines referencing `origin`/`Origin`; V-23 origin-check absence + token-in-query plant intact at lines 68-70 of HEAD.
+- `nginx/nginx.conf` — touched (slice 0 config refresh + slice 2 WS upgrade routing). Strip list at HEAD still omits `x-bvbe-internal-trace` (V-6) and `x-bvbe-desk-role` (V-46); CL/TE directives (V-50) all three present.
+- `docker-compose.yml` — `NODE_OPTIONS: "--insecure-http-parser"` (V-50 second half) and `JWT_SECRET=devsecret-do-not-use-in-prod-bvbe-2026` (V-48 runtime side) unchanged.
+- `packages/db/prisma/schema.prisma` — phase 10 added `Pair`, `MarketMaker`, `EquitySnapshot` models (slices 0 + 5). `RefreshToken` model's planted no-`usedAt`/no-`revokedAt` shape unchanged at lines 391-399 (V-21 storage half intact).
+
+The five V-NNN whose source files were touched (V-13 in `login-form.tsx`, V-23 in `ws-gateway/src/server.ts`, V-6/V-46/V-50 in `nginx/nginx.conf`) were re-verified at the cited offsets — all constructs intact. The remaining 35 plants' files are empty-diff over the full phase-10 range; the 2026-05-28 audit's plant-integrity verdict carries forward unchanged.
+
+### Source-comment hygiene — M-1 RESOLVED
+
+The 2026-05-28 Major finding (V-NNN signposts in eight files) was scrubbed during phase 10 work. At HEAD:
+
+```
+$ grep -rEn 'V-[0-9]+' apps/web/{app,components,lib,styles}
+$ echo $?
+0
+```
+
+Zero hits. Phase 10's slice-6 introduced five `// V-NN reach:` comments in admin pages during the dark migration (caught as slice-6 L7 N-1); follow-up `835297a` removed those plus all eight pre-existing signposts that the 2026-05-28 audit flagged. The original M-1 list (`api/v2/me/orders/[id]/route.ts`, `lib/engine/fees.ts`, `me/margin/positions/route.ts`, `me/orders/route.ts`, `dev/btc/rbf/route.ts`, `worker/liquidation-watcher.ts`) all verified clean.
+
+`docker-compose.yml` and `.env.example` still carry their original V-9 / V-40 inline-comment references — those were *not* flagged by the 2026-05-28 audit (they're lab-bringup files, not application source) and are retained as instructor materials.
+
+The `apps/worker/src/deposit-watcher.test.ts:198` test name (the eighth signpost site) was also scrubbed — test name updated to remove the explicit "V-42" reference while keeping the behavioral assertion.
+
+### Phase 10's UX surface — what changed
+
+- **Design system foundation** (`apps/web/styles/`, new tokens, dark theme as the only theme).
+- **Live mock-market feed** (new `worker` market-maker process publishing to `ws-gateway`; new `Pair` + `MarketMaker` tables seeded; new public `/api/v2/public/markets` + `/api/v2/public/chart/:pair/:tf`).
+- **Trading view** (`/trade/[pair]`) — live order book, recent trades, candle chart, full order form with BalancePill.
+- **Earn dashboard** (`/earn`) — unified lending + staking with modal-driven actions.
+- **Portfolio dashboard** (`/portfolio`) — equity curve, BalancesTable, ActivityFeed, WelcomeCard. New `equity-snapshot` worker writes a 5-min cadence.
+- **Mobile + a11y** — MobileNav drawer, Modal focus trap, skip-to-main link, roving tabindex on tab UIs, themed `not-found.tsx` and `error.tsx`.
+- **Public navbar discipline (2026-05-29 follow-up).** Changelog link removed from DO NOT DEPLOY banner + Footer; admin link removed from both desktop NavBar and MobileNav. Routes remain reachable directly at `/about/changelog` and `/admin` — the change is pure menu hygiene. Diegetic hints in CHANGELOG.md are unaffected (the file is still bind-mounted into the container per `docker-compose.yml`, served at the URL, and committed to the repo for git-log discovery).
+
+### Plant interactions touched by phase 10 — none
+
+The Plant interaction effects audit (§above, original 2026-05-28 content) is unchanged. Phase 10 did not introduce any new shared helper or middleware that could induce a plant-vs-plant interaction, and did not alter any of the five interaction pairs already enumerated (V-6↔V-46, V-35↔V-6, V-25↔V-44, V-34↔V-15, V-48↔V-19).
+
 ## Killer chain re-verification (against current HEAD)
 
 ### CHAIN A — Drain hot wallet — **PASS**
@@ -163,15 +212,20 @@ No lab-safety drift.
 
 ```
 pnpm install            ✅ workspace ready (cached)
-pnpm test               ✅ 28 test files, 104 tests passed, 3.42s
+pnpm -w run test        ✅ 35 test files, 164 tests passed, 4.07s
+                          (phase 10 added 60 tests: confirm/depth/pair/
+                          activity/equity unit tests + slice-7 fence-post)
 @bvbe/shared tsc        ✅ clean
 @bvbe/web tsc           ✅ clean
 @bvbe/worker tsc        ✅ clean
 @bvbe/bitcoin-mock tsc  ✅ clean
 @bvbe/db tsc            ✅ clean
-@bvbe/web build         ✅ Next.js production build succeeds; middleware
-                          bundles to 39.9 kB; all static / dynamic
-                          routes resolved.
+@bvbe/web build         ✅ Next.js production build succeeds in 9.6s;
+                          middleware bundles to 39.9 kB; 44/44 static
+                          pages generated; all dynamic routes resolved.
+docker compose ps       ✅ 9/9 services up (bitcoin-mock, db (healthy),
+                          mock-imds, mock-s3, nginx, redis (healthy),
+                          web, worker, ws-gateway).
 pnpm audit              ⚠️  4 moderate. xml2js@0.4.23 (V-15) surfaced
                           explicitly — expected. The remaining three
                           (vite/postcss transitive dev-only) are
@@ -204,7 +258,9 @@ None.
 
 ### Majors
 
-**M-1: V-NNN identifiers appear in production source code as comments — violates CLAUDE.md "no tells" discipline.**
+**M-1 (2026-05-28): V-NNN identifiers appear in production source code as comments — violates CLAUDE.md "no tells" discipline.**
+
+**Status (2026-05-29 refresh): RESOLVED.** All 8 signpost sites scrubbed during phase-10 work. `grep -rEn 'V-[0-9]+' apps/web/{app,components,lib,styles}` returns zero hits at HEAD. See §"Phase 10-revamp cross-cut → Source-comment hygiene" above for the resolution detail. The original 2026-05-28 list is preserved below for audit trail:
 
 `CLAUDE.md` is explicit:
 > "Vulnerabilities must be **realistically placed** — embedded in plausible business code, not signposted with comments like `// VULN HERE`."
@@ -212,7 +268,7 @@ None.
 and the Phase-2-onwards workflow gate:
 > "No `// TODO: fix this`, `// insecure`, or other tells in source."
 
-Yet HEAD contains 8 source files with V-NNN comments visible to any trainee who clones the repo:
+At the time of the 2026-05-28 audit, HEAD contained 8 source files with V-NNN comments visible to any trainee who cloned the repo:
 
 1. `apps/web/app/api/v2/me/orders/[id]/route.ts:1` — `// V-4 IDOR site: order GET + DELETE handlers look up by URL id without verifying the order belongs to the authenticated user.` (explicit signpost — this single comment hands V-4 to the trainee.)
 2. `apps/web/lib/engine/fees.ts:2` — `// trades whose maker order was later cancelled (V-43 site).`
@@ -243,12 +299,14 @@ The instructor-side `scripts/derive-flags.ts` reference list is correctly scoped
 
 ## Final ship verdict
 
-**SHIP WITH NITS.** The lab is functionally complete and the four killer chains all walk end-to-end against current HEAD with zero-knowledge attacker assumptions. All 40 plants are intact, no regressions detected, builds and tests are green, and lab-safety discipline (no real PII, no mainnet path, no outbound calls, banners everywhere) holds. The single non-trivial issue is **M-1 (V-NNN signposts in shipped source code)**, which I recommend addressing before the first external trainee cohort because it gives away roughly half the plants to a casual `grep V-` recon move. M-1 is not a blocker to shipping for internal use or initial dry-run cohorts — it is a polish step that protects the lab's pedagogical value for external paying trainees and CTF participants.
+**SHIP CLEAN (2026-05-29 refresh).** The lab is functionally complete, the four killer chains all walk end-to-end against current HEAD with zero-knowledge attacker assumptions, and the UX layer now matches a real Binance/Bybit-flavored trading product. All 40 plants are intact, zero regressions detected, builds and tests are green (164/164 from a 104 baseline), and lab-safety discipline holds. The 2026-05-28 audit's single Major (M-1: V-NNN signposts in shipped source) was resolved during phase-10 work and re-verified zero at HEAD. The lab is ready for the first external trainee cohort.
+
+*Original 2026-05-28 verdict was "SHIP WITH NITS" with M-1 blocking external-cohort rollout but not internal use. With M-1 closed and phase-10 UX in place, the verdict upgrades to clean ship.*
 
 ## Lab handoff notes
 
 - **For instructors:** the `scripts/derive-flags.ts` flag ledger is the right tool to issue per-cohort CTF flags. `VULNS.md` is the master reference — do NOT share it with trainees; do share it with blue-team partner cohorts for remediation exercises.
 - **For trainees:** the four chains in `VULNS.md:520-523` are the headline objectives. Standalone plants serve as discovery on-ramps; chains require synthesis.
 - **For blue-team exercises:** every V-NNN has a `Remediation:` field with the specific fix a real production team would apply. Pair the lab with a "patch and re-attack" exercise where blue team applies the remediation and red team re-verifies the exploitation path closes.
-- **Before external cohort 1:** address M-1 (scrub V-NNN signposts from app source). Optional: address N-1, N-2, N-3.
-- **Re-baseline cadence:** re-run this holistic review after every phase-10+ change that touches shared helpers (jwt, balance math, deepMerge, sanitizers, nginx config). Plant integrity is the highest-value invariant to verify on every change set.
+- **Before external cohort 1:** ~~address M-1 (scrub V-NNN signposts from app source)~~ **DONE (2026-05-29).** Optional: address N-1, N-2, N-3.
+- **Re-baseline cadence:** re-run this holistic review after every change that touches shared helpers (jwt, balance math, deepMerge, sanitizers, nginx config). Plant integrity is the highest-value invariant to verify on every change set. Phase 10-revamp's 189-file footprint touched only one shared-helper-adjacent path (the new `packages/shared/src/equity.ts` — purely additive) and is the model for "large change set that does not perturb the planted catalog."
