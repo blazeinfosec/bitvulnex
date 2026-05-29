@@ -1,24 +1,67 @@
+@import "@fontsource/inter/400.css";
+@import "@fontsource/inter/500.css";
+@import "@fontsource/inter/600.css";
+@import "@fontsource/inter/700.css";
+@import "@fontsource/ibm-plex-mono/400.css";
+@import "@fontsource/ibm-plex-mono/500.css";
+@import "@fontsource/ibm-plex-mono/600.css";
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 :root {
-  color-scheme: light;
+  color-scheme: dark;
 }
 
-html, body {
-  height: 100%;
-}
-
+html,
 body {
-  @apply bg-white text-navy-900 antialiased;
-  font-feature-settings: "ss01", "cv11", "tnum";
+  height: 100%;
+  background-color: #0B0E11;
+  color: #EAECEF;
+  font-family: Inter, system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 a {
-  @apply text-accent hover:underline;
+  color: #FCD535;
 }
 
+a:hover {
+  text-decoration: underline;
+}
+
+/* Monospace numbers get tabular figures by default */
+.font-mono,
 .font-tabular {
   font-variant-numeric: tabular-nums;
+}
+
+/* Marquee for the ticker chyron */
+@keyframes marquee {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+
+.animate-marquee {
+  animation: marquee 40s linear infinite;
+}
+
+.animate-marquee:hover,
+.marquee-paused {
+  animation-play-state: paused;
+}
+
+/* Respect reduced motion across all of our animations */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+  .animate-marquee {
+    animation: none !important;
+  }
 }

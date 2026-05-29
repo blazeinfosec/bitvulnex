@@ -3,9 +3,11 @@
 import { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Wordmark } from "@/components/exchange/Wordmark";
 import { setTokens } from "@/lib/token-storage";
+
+const inputClass =
+  "w-full h-10 px-3 rounded-md bg-bg border border-border text-text placeholder:text-text-mute focus:outline-none focus:ring-2 focus:ring-accent focus:border-accent transition-colors";
 
 export function LoginForm() {
   const router = useRouter();
@@ -61,97 +63,129 @@ export function LoginForm() {
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle>Sign in</CardTitle>
-      </CardHeader>
-      <CardContent>
-        {stage === "password" ? (
-          <form
-            onSubmit={submitPassword}
-            className="space-y-3"
-            aria-describedby={error ? "login-error" : undefined}
-          >
-            <div>
-              <label
-                htmlFor="login-email"
-                className="block text-sm text-navy-700 mb-1"
-              >
-                Email
-              </label>
-              <input
-                id="login-email"
-                name="email"
-                type="email"
-                required
-                autoComplete="email"
-                placeholder="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                aria-describedby={error ? "login-error" : undefined}
-                className="w-full border border-navy-200 rounded-md h-10 px-3"
-              />
-            </div>
-            <div>
-              <label
-                htmlFor="login-password"
-                className="block text-sm text-navy-700 mb-1"
-              >
-                Password
-              </label>
-              <input
-                id="login-password"
-                name="password"
-                type="password"
-                required
-                autoComplete="current-password"
-                placeholder="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                aria-describedby={error ? "login-error" : undefined}
-                className="w-full border border-navy-200 rounded-md h-10 px-3"
-              />
-            </div>
-            {error && (
-              <p id="login-error" role="alert" className="text-sm text-danger">
-                {error}
-              </p>
-            )}
-            <div className="flex items-center justify-between">
-              <Button type="submit">Sign in</Button>
-              <Link href="/forgot" className="text-sm">
-                Forgot password?
-              </Link>
-            </div>
-            <p className="text-sm text-navy-700">
-              No account? <Link href="/signup">Create one</Link>
-            </p>
-          </form>
-        ) : (
-          <form onSubmit={submitTotp} className="space-y-3">
-            <p className="text-sm text-navy-700">
-              Enter the 6-digit code from your authenticator app.
-            </p>
-            <label htmlFor="login-totp" className="sr-only">
-              Authenticator code
+    <div className="rounded-lg border border-border bg-bg-elevated shadow-elevated p-8">
+      <div className="flex flex-col items-center gap-2 mb-6">
+        <Wordmark />
+        <h1 className="text-lg font-semibold text-text tracking-tight">
+          Sign in
+        </h1>
+        <p className="text-xs text-text-mute">
+          Welcome back. Authorized lab access only.
+        </p>
+      </div>
+
+      {stage === "password" ? (
+        <form
+          onSubmit={submitPassword}
+          className="space-y-4"
+          aria-describedby={error ? "login-error" : undefined}
+        >
+          <div>
+            <label
+              htmlFor="login-email"
+              className="block text-xs uppercase tracking-wider text-text-mute mb-1.5 font-medium"
+            >
+              Email
             </label>
             <input
-              id="login-totp"
-              name="code"
-              inputMode="numeric"
-              pattern="\d{6}"
+              id="login-email"
+              name="email"
+              type="email"
               required
-              aria-label="Authenticator code"
-              placeholder="123456"
-              value={code}
-              onChange={(e) => setCode(e.target.value)}
-              className="w-full border border-navy-200 rounded-md h-10 px-3 font-mono tracking-widest"
+              autoComplete="email"
+              placeholder="you@example.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              aria-describedby={error ? "login-error" : undefined}
+              className={inputClass}
             />
-            {error && <p className="text-sm text-danger">{error}</p>}
-            <Button type="submit">Verify</Button>
-          </form>
-        )}
-      </CardContent>
-    </Card>
+          </div>
+          <div>
+            <label
+              htmlFor="login-password"
+              className="block text-xs uppercase tracking-wider text-text-mute mb-1.5 font-medium"
+            >
+              Password
+            </label>
+            <input
+              id="login-password"
+              name="password"
+              type="password"
+              required
+              autoComplete="current-password"
+              placeholder="••••••••"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              aria-describedby={error ? "login-error" : undefined}
+              className={inputClass}
+            />
+          </div>
+          {error && (
+            <div
+              id="login-error"
+              role="alert"
+              className="rounded-md border border-sell/40 bg-sell/10 text-sell px-3 py-2 text-sm"
+            >
+              {error}
+            </div>
+          )}
+          <button
+            type="submit"
+            className="w-full inline-flex items-center justify-center h-10 px-4 rounded-md bg-accent text-accent-fg hover:bg-accent-hover transition-colors font-semibold"
+          >
+            Sign in
+          </button>
+          <div className="flex items-center justify-between text-sm pt-1">
+            <Link
+              href="/forgot"
+              className="text-text-dim hover:text-accent no-underline"
+            >
+              Forgot password?
+            </Link>
+            <Link
+              href="/signup"
+              className="text-text-dim hover:text-accent no-underline"
+            >
+              Don&apos;t have an account? Sign up →
+            </Link>
+          </div>
+        </form>
+      ) : (
+        <form onSubmit={submitTotp} className="space-y-4">
+          <p className="text-sm text-text-dim">
+            Enter the 6-digit code from your authenticator app.
+          </p>
+          <label htmlFor="login-totp" className="sr-only">
+            Authenticator code
+          </label>
+          <input
+            id="login-totp"
+            name="code"
+            inputMode="numeric"
+            pattern="\d{6}"
+            required
+            aria-label="Authenticator code"
+            placeholder="123456"
+            value={code}
+            onChange={(e) => setCode(e.target.value)}
+            className={`${inputClass} font-mono tracking-widest text-center text-lg`}
+          />
+          {error && (
+            <div
+              role="alert"
+              className="rounded-md border border-sell/40 bg-sell/10 text-sell px-3 py-2 text-sm"
+            >
+              {error}
+            </div>
+          )}
+          <button
+            type="submit"
+            className="w-full inline-flex items-center justify-center h-10 px-4 rounded-md bg-accent text-accent-fg hover:bg-accent-hover transition-colors font-semibold"
+          >
+            Verify
+          </button>
+        </form>
+      )}
+    </div>
   );
 }

@@ -3,8 +3,11 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Container } from "./container";
-import { Button } from "./button";
+import { Wordmark } from "@/components/exchange/Wordmark";
 import { getAccessToken } from "@/lib/token-storage";
+
+const linkClass =
+  "px-3 py-2 text-sm font-medium text-text-dim hover:text-text transition-colors rounded-md";
 
 export function NavBar() {
   const [isAuthed, setIsAuthed] = useState(false);
@@ -17,56 +20,57 @@ export function NavBar() {
   }, []);
 
   return (
-    <header className="border-b border-navy-200 bg-white">
+    <header className="border-b border-border bg-bg-elevated">
       <Container className="flex items-center justify-between h-16">
-        <Link href="/" className="flex items-center gap-2 no-underline">
-          <span className="font-semibold text-navy-900 tracking-tight">
-            BVBE
-          </span>
-          <span className="text-xs uppercase tracking-wider text-navy-500">
-            Exchange · Lab
-          </span>
+        <Link href="/" className="no-underline">
+          <Wordmark />
         </Link>
         <nav className="flex items-center gap-1">
           {isAuthed ? (
-            <Button variant="ghost" size="sm" asChild>
-              <Link href="/account/trading/BTC-USDT">Trade</Link>
-            </Button>
+            <Link href="/account/trading/BTC-USDT" className={linkClass}>
+              Trade
+            </Link>
           ) : null}
-          <Button variant="ghost" size="sm" asChild>
-            <Link href="/lending">Lending</Link>
-          </Button>
-          <Button variant="ghost" size="sm" asChild>
-            <Link href="/staking">Staking</Link>
-          </Button>
-          <Button variant="ghost" size="sm" asChild>
-            <Link href="/otc">OTC</Link>
-          </Button>
-          <Button variant="ghost" size="sm" asChild>
-            <Link href="/p2p">P2P</Link>
-          </Button>
-          <Button variant="ghost" size="sm" asChild>
-            <Link href="/withdraw">Withdraw</Link>
-          </Button>
+          <Link href="/lending" className={linkClass}>
+            Lending
+          </Link>
+          <Link href="/staking" className={linkClass}>
+            Staking
+          </Link>
+          <Link href="/otc" className={linkClass}>
+            OTC
+          </Link>
+          <Link href="/p2p" className={linkClass}>
+            P2P
+          </Link>
+          <Link href="/withdraw" className={linkClass}>
+            Withdraw
+          </Link>
           {isAuthed ? (
-            <Button variant="ghost" size="sm" asChild>
-              <Link href="/support">Support</Link>
-            </Button>
+            <Link href="/support" className={linkClass}>
+              Support
+            </Link>
           ) : null}
-          <Button variant="ghost" size="sm" asChild>
-            <Link href="/about/changelog">Changelog</Link>
-          </Button>
-          <Button variant="ghost" size="sm" asChild>
-            <Link href="/docs">API Docs</Link>
-          </Button>
+          <Link href="/about/changelog" className={linkClass}>
+            Changelog
+          </Link>
+          <Link href="/docs" className={linkClass}>
+            API Docs
+          </Link>
           {!isAuthed ? (
             <>
-              <Button variant="secondary" size="sm" asChild>
-                <Link href="/login">Sign in</Link>
-              </Button>
-              <Button variant="primary" size="sm" asChild>
-                <Link href="/signup">Create account</Link>
-              </Button>
+              <Link
+                href="/login"
+                className="ml-2 inline-flex items-center justify-center h-9 px-4 text-sm font-medium text-text border border-border rounded-md hover:bg-bg-hover transition-colors"
+              >
+                Sign in
+              </Link>
+              <Link
+                href="/signup"
+                className="inline-flex items-center justify-center h-9 px-4 text-sm font-semibold rounded-md bg-accent text-accent-fg hover:bg-accent-hover transition-colors"
+              >
+                Create account
+              </Link>
             </>
           ) : null}
         </nav>

@@ -3,10 +3,11 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Container } from "@/components/ui/container";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Wordmark } from "@/components/exchange/Wordmark";
 import { setTokens } from "@/lib/token-storage";
+
+const inputClass =
+  "w-full h-10 px-3 rounded-md bg-bg border border-border text-text placeholder:text-text-mute focus:outline-none focus:ring-2 focus:ring-accent focus:border-accent transition-colors";
 
 export default function SignupPage() {
   const router = useRouter();
@@ -36,21 +37,27 @@ export default function SignupPage() {
   }
 
   return (
-    <Container className="py-16 max-w-md">
-      <Card>
-        <CardHeader>
-          <CardTitle>Create account</CardTitle>
-        </CardHeader>
-        <CardContent>
+    <div className="flex items-start justify-center px-4 py-16">
+      <div className="w-full max-w-md">
+        <div className="rounded-lg border border-border bg-bg-elevated shadow-elevated p-8">
+          <div className="flex flex-col items-center gap-2 mb-6">
+            <Wordmark />
+            <h1 className="text-lg font-semibold text-text tracking-tight">
+              Create account
+            </h1>
+            <p className="text-xs text-text-mute">
+              Authorized lab access only. No real funds.
+            </p>
+          </div>
           <form
             onSubmit={submit}
-            className="space-y-3"
+            className="space-y-4"
             aria-describedby={error ? "signup-error" : undefined}
           >
             <div>
               <label
                 htmlFor="signup-email"
-                className="block text-sm text-navy-700 mb-1"
+                className="block text-xs uppercase tracking-wider text-text-mute mb-1.5 font-medium"
               >
                 Email
               </label>
@@ -60,17 +67,17 @@ export default function SignupPage() {
                 type="email"
                 required
                 autoComplete="email"
-                placeholder="email"
+                placeholder="you@example.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 aria-describedby={error ? "signup-error" : undefined}
-                className="w-full border border-navy-200 rounded-md h-10 px-3"
+                className={inputClass}
               />
             </div>
             <div>
               <label
                 htmlFor="signup-display-name"
-                className="block text-sm text-navy-700 mb-1"
+                className="block text-xs uppercase tracking-wider text-text-mute mb-1.5 font-medium"
               >
                 Display name
               </label>
@@ -80,17 +87,17 @@ export default function SignupPage() {
                 type="text"
                 required
                 maxLength={64}
-                placeholder="display name"
+                placeholder="Ada Lovelace"
                 value={displayName}
                 onChange={(e) => setDisplayName(e.target.value)}
                 aria-describedby={error ? "signup-error" : undefined}
-                className="w-full border border-navy-200 rounded-md h-10 px-3"
+                className={inputClass}
               />
             </div>
             <div>
               <label
                 htmlFor="signup-password"
-                className="block text-sm text-navy-700 mb-1"
+                className="block text-xs uppercase tracking-wider text-text-mute mb-1.5 font-medium"
               >
                 Password
               </label>
@@ -101,27 +108,43 @@ export default function SignupPage() {
                 required
                 minLength={8}
                 autoComplete="new-password"
-                placeholder="password (min 8 chars)"
+                placeholder="••••••••"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 aria-describedby={error ? "signup-error" : undefined}
-                className="w-full border border-navy-200 rounded-md h-10 px-3"
+                className={inputClass}
               />
+              <p className="text-2xs text-text-mute mt-1">
+                Minimum 8 characters.
+              </p>
             </div>
             {error && (
-              <p id="signup-error" role="alert" className="text-sm text-danger">
+              <div
+                id="signup-error"
+                role="alert"
+                className="rounded-md border border-sell/40 bg-sell/10 text-sell px-3 py-2 text-sm"
+              >
                 {error}
-              </p>
+              </div>
             )}
-            <Button type="submit" className="w-full">
+            <button
+              type="submit"
+              className="w-full inline-flex items-center justify-center h-10 px-4 rounded-md bg-accent text-accent-fg hover:bg-accent-hover transition-colors font-semibold"
+            >
               Create account
-            </Button>
-            <p className="text-sm text-navy-700">
-              Already have an account? <Link href="/login">Sign in</Link>
+            </button>
+            <p className="text-sm text-text-dim text-center pt-1">
+              Already have an account?{" "}
+              <Link
+                href="/login"
+                className="text-text-dim hover:text-accent no-underline"
+              >
+                Sign in →
+              </Link>
             </p>
           </form>
-        </CardContent>
-      </Card>
-    </Container>
+        </div>
+      </div>
+    </div>
   );
 }
