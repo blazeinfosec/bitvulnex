@@ -1,5 +1,13 @@
 # Phase 11 — CTF mode: wire the flags
 
+> **2026-05-29 update — see [`spec.md`](./spec.md).** After Gate-1
+> approval of this plan, a second design pass added a **two-tier
+> hint toggle** to slices 3 and 4. The authoritative scope for
+> slices 3 and 4 is now `spec.md`; this `plan.md` remains accurate
+> for slices 1 and 2 (emission core + V-NNN fan-out — no hint
+> code). The architect's slice-3+4 addendum sits at the bottom of
+> `architect-review.md`.
+
 **Theme:** Make the lab's CTF promise real. Today the helper
 `apps/web/lib/ctf.ts` exports `flagFor(vulnId)` and `ctfModeEnabled()`,
 the env schema accepts `CTF_MODE` + `CTF_SALT`, and an instructor

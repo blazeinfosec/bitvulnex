@@ -207,3 +207,160 @@ the preceding slice closes all four gates and the L7 review
 returns PASS.
 
 — Architect
+
+---
+
+## Addendum — slice 3 + 4 hint toggle (2026-05-29, second pass)
+
+> **Trigger:** After the original Gate-1 approval, a second design
+> pass added a **two-tier hint toggle** layered on top of the flag
+> infrastructure. See `docs/phases/phase-11/spec.md` for the
+> complete spec; this addendum is the architect's response to the
+> spec's locked design decisions.
+> **Verdict:** **Approved with 4 additional conditions** (all
+> mechanical). Scope of slices 1 and 2 unchanged.
+
+### What changed in scope
+
+Slices 1 and 2 are unchanged — they ship the emission core and
+V-NNN fan-out with no hint code. The hint subsystem lands entirely
+in slices 3 and 4:
+
+- Slice 3 gains the `Cohort` + `User.cohortId` + `User.hintsOverride`
+  + `CtfInteraction` + `CtfHintReveal` models, helpers
+  (`lib/ctf/{cohort,interaction,hints}.ts`), routes
+  (`/api/v2/ctf/{interaction,hints,me,me/hints-override}`), and
+  hint authoring under `docs/hints/*.md`.
+- Slice 4 gains cohort hint-default editing, hint-usage analytics,
+  per-target heat map, and the reset-cohort wipe of reveal +
+  interaction rows.
+
+### Locked design — architect signoff
+
+The 2026-05-29 interview locked 8 axes (depth ceiling, surfacing,
+clock, Pattern C, chain hints, scoring, control, default state).
+The architect reviewed each and signs off — these are defensible
+choices for a security-training lab. Specific architect notes:
+
+- **Depth ceiling (basic = category, verbose = lens+category):**
+  Correct call. Walkthrough-level hints would have turned the lab
+  into a guided tutorial; lens-level verbose preserves the
+  discovery muscle while giving stuck trainees enough to move.
+  The depth-validator in `lib/ctf/hints.ts` (rejects `apps/`,
+  `packages/`, `curl `, `POST `, etc.) is the right enforcement
+  point.
+
+- **First-interaction clock:** Correct over the alternatives.
+  Cohort-clock punishes late joiners; active-session-time
+  surveillance is dystopian for a security lab. The "any of (open
+  basic / open card / submit) starts the timer" rule gives
+  trainees agency about when their clock begins.
+
+- **Pattern C plants get the same rule:** The architect initially
+  worried recon-class plants (V-9 changeme, V-48 .env.bak) would
+  be unhinted at the basic tier — but on reflection, "category =
+  recon / supply-chain / secrets" IS a useful nudge even without
+  pointing at git history. The verbose tier
+  (lens + category) is where Pattern C trainees get real lift.
+  Approved.
+
+- **Per-step chain hints:** The right call. A single "CHAIN A"
+  hint that spans V-48 → V-6 → V-33 would have to be either
+  uselessly vague or close to a walkthrough; per-step preserves
+  the chain's pedagogical structure while letting trainees who
+  pierce step 2 still hint on step 3.
+
+- **Logged-only scoring:** Correct. The alternative scoring
+  models all carry side-channel risk: point-deduction creates an
+  oracle (a trainee who tries hint→submit→retract can probe
+  validity); mode-switch disables the scoreboard entirely, which
+  defeats the cohort-comparability use case. Logged-only is
+  exactly the right ledger discipline.
+
+- **Per-cohort default + per-trainee opt-out:** Correct
+  granularity. Trainee-self-serve undermines cohort fairness;
+  instructor-granted-per-target creates a 30+-trainee support
+  bottleneck. The chosen middle ground gives instructors the
+  baseline lever and trainees the autonomy escape.
+
+- **OFF by default:** Correct. Matches the existing
+  `CTF_MODE=false` default; means a freshly-deployed lab is a
+  CTF first, training material second; means paranoid-QA
+  reruns and blue-team exercises see no hint behavior at all.
+
+### New conditions (4) for slice 3 Gate-2 entry
+
+In addition to the original 5 conditions:
+
+6. ✅ **Hint depth validator runs in CI**, not at runtime. A
+   malformed `docs/hints/V-22.md` that includes a file path must
+   fail `pnpm -w run test`, not be served as-is. The validator
+   should also assert every V-NNN in `VULNS.md` has a
+   corresponding `docs/hints/V-NNN.md` AND each chain has a
+   `docs/hints/CHAIN-X.md` with step coverage.
+
+7. ✅ **`hintsAllowedFor` is the SOLE gate** consulted by every
+   hint-emitting code path. No route handler may bypass it. Slice
+   3's tests must assert that disabling hints (cohort default OFF
+   AND user override = follow) produces 403 on
+   `GET /api/v2/ctf/hints/*` AND no `CtfHintReveal` row is
+   written.
+
+8. ✅ **`CtfHintReveal` table is logged-only on the trainee
+   surface.** `GET /api/v2/ctf/me` returns the trainee's own
+   reveals (so the /ctf page can render the "Hint shown ✓"
+   state) but does NOT include other trainees' reveals or any
+   cohort-wide aggregate. Aggregates live only behind
+   `requireRole("admin")` on `/api/v2/admin/ctf/*`.
+
+9. ✅ **First-interaction record-on-write must be atomic.** The
+   `recordFirstInteraction` helper uses Prisma's `upsert` or a
+   uniqueness-driven create-then-ignore-on-conflict pattern — NOT
+   a separate read + create. Otherwise a fast double-click on
+   "Show basic hint" creates two `CtfInteraction` rows and
+   silently skews the timer.
+
+### Risks the original review did not anticipate
+
+- **AR-1: Hint markdown is part of the lab attack surface.** A
+  trainee could theoretically read `docs/hints/*.md` directly
+  from a checked-out repo and bypass the hint gating + logging
+  entirely. *Architect verdict:* this is acceptable. The lab's
+  source IS the source of the discovery problem; trainees who
+  read the hints out of the repo are doing what trainees can
+  always do (read VULNS.md, read the architect reviews, read this
+  document). The hint engine optimizes for the in-app experience;
+  it doesn't pretend to prevent out-of-band reading. The cohort
+  default + per-trainee opt-out flow is for in-app discipline.
+
+- **AR-2: Hint usage as a proxy for cohort difficulty.** A
+  cohort where most trainees reveal V-22's verbose hint is
+  signalling that V-22's basic hint is too cryptic OR that V-22
+  itself is mis-tuned. *Architect verdict:* this is a feature, not
+  a risk. The per-target heat map in `/admin/ctf` is the
+  intended surface for instructors to read these signals and
+  feed the next iteration of `docs/hints/V-22.md`. Slice 4's
+  heat map renders this analytic.
+
+- **AR-3: `HINTS_ENGINE_ENABLED=false` deploy with active
+  cohorts.** An instructor who flips the env var at the wrong
+  moment could black-hole hints mid-CTF. *Architect verdict:*
+  surface this in the `/admin/ctf` page as a "Hint engine: ON /
+  OFF" badge at the top so instructors notice the deploy-time
+  configuration. Add a startup log line. Not a blocker; document
+  in the slice-4 README polish.
+
+### Gate 2 entry for slice 1: GO (5 conditions from original
+review).
+
+### Gate 2 entry for slices 3 and 4: GO (5 original + 4 addendum
+conditions).
+
+Slices 1 and 2 are unblocked and can proceed immediately. Slices
+3 and 4 enter Gate 2 after slice 2 closes its four gates and the
+L7 review returns PASS. The hint authoring effort
+(40 V-files + 4 chain files + README) is a non-trivial labor cost
+to surface — recommend allocating 1 day of architect time
+specifically for authoring during slice 3.
+
+— Architect (addendum 2026-05-29)
