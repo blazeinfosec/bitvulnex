@@ -4,8 +4,6 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Container } from "@/components/ui/container";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { authedFetch } from "@/lib/token-storage";
 
 type TicketRow = {
@@ -15,6 +13,22 @@ type TicketRow = {
   category: string;
   updatedAt: string;
 };
+
+const primaryBtn =
+  "inline-flex items-center justify-center h-10 px-4 rounded-md bg-accent text-accent-fg hover:bg-accent-hover transition-colors font-semibold text-sm no-underline";
+
+function statusClass(s: string) {
+  switch (s) {
+    case "open":
+      return "text-warn";
+    case "resolved":
+      return "text-buy";
+    case "closed":
+      return "text-text-mute";
+    default:
+      return "text-text-dim";
+  }
+}
 
 export default function SupportInbox() {
   const router = useRouter();
@@ -33,55 +47,87 @@ export default function SupportInbox() {
   }, [router]);
 
   return (
-    <Container className="py-12 max-w-3xl space-y-4">
-      <div className="flex items-center justify-between">
-        <h1 className="text-3xl font-semibold tracking-tight text-navy-900">
-          Support
-        </h1>
-        <Button size="sm" asChild>
-          <Link href="/support/new">New ticket</Link>
-        </Button>
+    <Container className="py-10 max-w-4xl space-y-6">
+      <div className="flex items-start justify-between">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight text-text">
+            Support
+          </h1>
+          <p className="text-sm text-text-dim mt-1">
+            Your tickets and replies from the agent team.
+          </p>
+        </div>
+        <Link href="/support/new" className={primaryBtn}>
+          + New ticket
+        </Link>
       </div>
-      <Card>
-        <CardHeader>
-          <CardTitle>{tickets?.length ?? 0} tickets</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {!tickets ? (
-            <p className="text-sm text-navy-700">Loading…</p>
-          ) : tickets.length === 0 ? (
-            <p className="text-sm text-navy-700">No tickets yet.</p>
-          ) : (
-            <table className="w-full text-sm">
-              <thead className="text-left text-navy-500 text-xs uppercase">
-                <tr>
-                  <th className="py-1">Subject</th>
-                  <th>Status</th>
-                  <th>Updated</th>
-                  <th></th>
+
+      <div className="rounded-lg border border-border bg-bg-elevated overflow-hidden">
+        {!tickets ? (
+          <p className="px-4 py-10 text-center text-text-mute text-sm">
+            Loading…
+          </p>
+        ) : tickets.length === 0 ? (
+          <div className="px-4 py-12 text-center">
+            <h3 className="text-base font-semibold text-text">
+              No tickets yet
+            </h3>
+            <p className="text-sm text-text-dim mt-1 mb-4">
+              Open a ticket and an agent will get back to you.
+            </p>
+            <Link href="/support/new" className={primaryBtn}>
+              + Open your first ticket
+            </Link>
+          </div>
+        ) : (
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-border">
+                <th className="px-4 py-3 text-left text-xs uppercase tracking-wider text-text-mute font-medium">
+                  Subject
+                </th>
+                <th className="px-4 py-3 text-left text-xs uppercase tracking-wider text-text-mute font-medium">
+                  Status
+                </th>
+                <th className="px-4 py-3 text-left text-xs uppercase tracking-wider text-text-mute font-medium">
+                  Updated
+                </th>
+                <th className="px-4 py-3" />
+              </tr>
+            </thead>
+            <tbody>
+              {tickets.map((t) => (
+                <tr
+                  key={t.id}
+                  className="border-b border-border-subtle last:border-0 hover:bg-bg-hover transition-colors"
+                >
+                  <td className="px-4 py-3 text-text">{t.subject}</td>
+                  <td
+                    className={`px-4 py-3 text-xs uppercase tracking-wider font-medium ${statusClass(t.status)}`}
+                  >
+                    {t.status}
+                  </td>
+                  <td className="px-4 py-3 font-mono text-xs text-text-mute">
+                    {new Date(t.updatedAt)
+                      .toISOString()
+                      .replace("T", " ")
+                      .slice(0, 19)}{" "}
+                    UTC
+                  </td>
+                  <td className="px-4 py-3 text-right">
+                    <Link
+                      href={`/support/tickets/${t.id}`}
+                      className="text-accent text-sm hover:underline"
+                    >
+                      Open →
+                    </Link>
+                  </td>
                 </tr>
-              </thead>
-              <tbody>
-                {tickets.map((t) => (
-                  <tr key={t.id} className="border-t border-navy-100">
-                    <td className="py-1">{t.subject}</td>
-                    <td>{t.status}</td>
-                    <td>{new Date(t.updatedAt).toLocaleString()}</td>
-                    <td className="text-right">
-                      <Link
-                        href={`/support/tickets/${t.id}`}
-                        className="text-sm text-navy-700 underline"
-                      >
-                        Open →
-                      </Link>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </CardContent>
-      </Card>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
     </Container>
   );
 }

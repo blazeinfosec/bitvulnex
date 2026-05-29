@@ -3,8 +3,6 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { Container } from "@/components/ui/container";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { authedFetch } from "@/lib/token-storage";
 
 type Message = {
@@ -23,6 +21,22 @@ type Detail = {
   };
   messages: Message[];
 };
+
+const primaryBtn =
+  "inline-flex items-center justify-center h-10 px-4 rounded-md bg-accent text-accent-fg hover:bg-accent-hover transition-colors font-semibold text-sm disabled:opacity-50 disabled:cursor-not-allowed";
+
+function statusClass(s: string) {
+  switch (s) {
+    case "open":
+      return "text-warn";
+    case "resolved":
+      return "text-buy";
+    case "closed":
+      return "text-text-mute";
+    default:
+      return "text-text-dim";
+  }
+}
 
 export default function UserTicketDetail() {
   const router = useRouter();
@@ -54,47 +68,90 @@ export default function UserTicketDetail() {
     await load();
   }
 
-  if (!data) return <Container className="py-12">Loading…</Container>;
+  if (!data) {
+    return (
+      <Container className="py-10">
+        <p className="text-text-dim">Loading…</p>
+      </Container>
+    );
+  }
 
   return (
-    <Container className="py-12 max-w-3xl space-y-4">
-      <h1 className="text-3xl font-semibold tracking-tight text-navy-900 mb-2">
-        {data.ticket.subject}
-      </h1>
-      <div className="text-sm text-navy-700">
-        {data.ticket.category} · {data.ticket.status}
+    <Container className="py-10 max-w-3xl space-y-6">
+      <div>
+        <h1 className="text-2xl font-semibold tracking-tight text-text">
+          {data.ticket.subject}
+        </h1>
+        <div className="text-sm text-text-dim mt-1 flex items-center gap-3">
+          <span className="inline-block px-2 py-0.5 text-[10px] uppercase tracking-wider rounded bg-bg border border-border text-text-dim font-mono">
+            {data.ticket.category}
+          </span>
+          <span
+            className={`text-xs uppercase tracking-wider font-medium ${statusClass(data.ticket.status)}`}
+          >
+            {data.ticket.status}
+          </span>
+        </div>
       </div>
+
       <div className="space-y-3">
         {data.messages.map((m) => (
-          <Card key={m.id}>
-            <CardHeader>
-              <CardTitle className="text-sm">
-                {m.isAgent ? "Agent" : "You"} ·{" "}
-                {new Date(m.createdAt).toLocaleString()}
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm whitespace-pre-wrap">{m.bodyHtml}</p>
-            </CardContent>
-          </Card>
+          <article
+            key={m.id}
+            className={
+              m.isAgent
+                ? "rounded-lg border border-accent/30 bg-bg-elevated p-4"
+                : "rounded-lg border border-border bg-bg-elevated p-4"
+            }
+          >
+            <header className="flex items-center justify-between mb-3 pb-3 border-b border-border-subtle">
+              <span
+                className={
+                  m.isAgent
+                    ? "text-xs uppercase tracking-wider text-accent font-semibold"
+                    : "text-xs uppercase tracking-wider text-text-dim font-semibold"
+                }
+              >
+                {m.isAgent ? "Agent" : "You"}
+              </span>
+              <span className="text-xs text-text-mute font-mono">
+                {new Date(m.createdAt)
+                  .toISOString()
+                  .replace("T", " ")
+                  .slice(0, 19)}{" "}
+                UTC
+              </span>
+            </header>
+            {/*
+              User-side renderer uses the server's sanitizeForUser output
+              (strict). bodyHtml is already escaped HTML safe to render here.
+              Rendering as text avoids the V-18 admin-side mXSS surface.
+            */}
+            <p className="text-sm text-text whitespace-pre-wrap">
+              {m.bodyHtml}
+            </p>
+          </article>
         ))}
       </div>
-      <Card>
-        <CardHeader>
-          <CardTitle>Reply</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <textarea
-            value={reply}
-            onChange={(e) => setReply(e.target.value)}
-            rows={4}
-            className="w-full border border-navy-200 rounded p-2 text-sm"
-          />
-          <Button size="sm" onClick={send} disabled={!reply}>
-            Send
-          </Button>
-        </CardContent>
-      </Card>
+
+      <section className="rounded-lg border border-border bg-bg-elevated p-5 space-y-3">
+        <h2 className="text-sm font-semibold text-text">Reply</h2>
+        <textarea
+          value={reply}
+          onChange={(e) => setReply(e.target.value)}
+          rows={4}
+          placeholder="Type your reply…"
+          className="w-full rounded-md bg-bg border border-border text-text placeholder:text-text-mute p-3 text-sm focus:outline-none focus:ring-2 focus:ring-accent focus:border-accent transition-colors"
+        />
+        <button
+          type="button"
+          className={primaryBtn}
+          onClick={send}
+          disabled={!reply}
+        >
+          Send reply
+        </button>
+      </section>
     </Container>
   );
 }

@@ -3,8 +3,6 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Container } from "@/components/ui/container";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { authedFetch } from "@/lib/token-storage";
 
 type CaseRow = {
@@ -14,6 +12,21 @@ type CaseRow = {
   createdAt: string;
   subject: { id: string; email: string; displayName: string | null };
 };
+
+function statusClass(s: string) {
+  switch (s) {
+    case "open":
+      return "text-warn";
+    case "investigating":
+      return "text-warn";
+    case "closed":
+      return "text-text-mute";
+    case "escalated":
+      return "text-sell";
+    default:
+      return "text-text-dim";
+  }
+}
 
 export default function AdminCompliancePage() {
   const router = useRouter();
@@ -32,59 +45,84 @@ export default function AdminCompliancePage() {
   }, [router]);
 
   return (
-    <Container className="py-12 max-w-5xl space-y-4">
-      <h1 className="text-3xl font-semibold tracking-tight text-navy-900 mb-2">
-        Compliance queue
-      </h1>
-      <p className="text-sm text-navy-700">
-        Beta:{" "}
+    <div className="space-y-6">
+      <div className="flex items-start justify-between">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight text-text">
+            Compliance queue
+          </h1>
+          <p className="text-sm text-text-dim mt-1">
+            Open investigations, sanctions screening, regulatory reporting.
+          </p>
+        </div>
         <Link
           href="/admin/compliance/sanctions-import"
-          className="underline"
+          className="inline-flex items-center justify-center h-9 px-3 rounded-md bg-bg border border-border text-text hover:bg-bg-hover transition-colors text-sm"
         >
           Import sanctions list
         </Link>
-      </p>
-      <Card>
-        <CardHeader>
-          <CardTitle>{cases?.length ?? 0} cases</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {!cases ? (
-            <p className="text-sm text-navy-700">Loading…</p>
-          ) : cases.length === 0 ? (
-            <p className="text-sm text-navy-700">No open cases.</p>
-          ) : (
-            <table className="w-full text-sm">
-              <thead className="text-left text-navy-500 text-xs uppercase">
-                <tr>
-                  <th className="py-1">Subject</th>
-                  <th>Status</th>
-                  <th>Opened</th>
-                  <th></th>
+      </div>
+
+      <div className="rounded-lg border border-border bg-bg-elevated overflow-hidden">
+        {!cases ? (
+          <p className="px-4 py-10 text-center text-text-mute text-sm">
+            Loading…
+          </p>
+        ) : cases.length === 0 ? (
+          <p className="px-4 py-10 text-center text-text-mute text-sm">
+            No open cases.
+          </p>
+        ) : (
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-border">
+                <th className="px-4 py-3 text-left text-xs uppercase tracking-wider text-text-mute font-medium">
+                  Subject
+                </th>
+                <th className="px-4 py-3 text-left text-xs uppercase tracking-wider text-text-mute font-medium">
+                  Status
+                </th>
+                <th className="px-4 py-3 text-left text-xs uppercase tracking-wider text-text-mute font-medium">
+                  Opened
+                </th>
+                <th className="px-4 py-3" />
+              </tr>
+            </thead>
+            <tbody>
+              {cases.map((c) => (
+                <tr
+                  key={c.id}
+                  className="border-b border-border-subtle last:border-0 hover:bg-bg-hover transition-colors"
+                >
+                  <td className="px-4 py-3 font-mono text-xs text-text">
+                    {c.subject.email}
+                  </td>
+                  <td
+                    className={`px-4 py-3 text-xs uppercase tracking-wider font-medium ${statusClass(c.status)}`}
+                  >
+                    {c.status}
+                  </td>
+                  <td className="px-4 py-3 font-mono text-xs text-text-mute">
+                    {new Date(c.createdAt)
+                      .toISOString()
+                      .replace("T", " ")
+                      .slice(0, 19)}{" "}
+                    UTC
+                  </td>
+                  <td className="px-4 py-3 text-right">
+                    <Link
+                      href={`/admin/compliance/cases/${c.id}`}
+                      className="text-accent text-sm hover:underline"
+                    >
+                      Open →
+                    </Link>
+                  </td>
                 </tr>
-              </thead>
-              <tbody>
-                {cases.map((c) => (
-                  <tr key={c.id} className="border-t border-navy-100">
-                    <td className="py-1">{c.subject.email}</td>
-                    <td>{c.status}</td>
-                    <td>{new Date(c.createdAt).toLocaleString()}</td>
-                    <td className="text-right">
-                      <Link
-                        href={`/admin/compliance/cases/${c.id}`}
-                        className="text-sm text-navy-700 underline"
-                      >
-                        Open →
-                      </Link>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </CardContent>
-      </Card>
-    </Container>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+    </div>
   );
 }

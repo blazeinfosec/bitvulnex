@@ -2,9 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { Container } from "@/components/ui/container";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { authedFetch } from "@/lib/token-storage";
+import { DataTable, type Column, EmptyState } from "@/components/exchange";
 
 type Offer = {
   id: string;
@@ -15,6 +14,14 @@ type Offer = {
   payMethod: string;
   maker: string | null;
 };
+
+const inputClass =
+  "w-full h-10 px-3 rounded-md bg-bg border border-border text-text placeholder:text-text-mute font-mono focus:outline-none focus:ring-2 focus:ring-accent focus:border-accent transition-colors";
+
+const primaryBtn =
+  "inline-flex items-center justify-center h-10 px-4 rounded-md bg-accent text-accent-fg hover:bg-accent-hover transition-colors font-semibold text-sm";
+const secondaryBtn =
+  "inline-flex items-center justify-center h-9 px-3 rounded-md bg-bg border border-border text-text hover:bg-bg-hover transition-colors text-sm";
 
 export default function P2PPage() {
   const [offers, setOffers] = useState<Offer[]>([]);
@@ -43,7 +50,7 @@ export default function P2PPage() {
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ side, asset, amount, price, payMethod }),
     });
-    setMessage(res.ok ? "offer posted" : `error: ${res.status}`);
+    setMessage(res.ok ? "Offer posted." : `Error: ${res.status}`);
     if (res.ok) await load();
   }
 
@@ -55,112 +62,177 @@ export default function P2PPage() {
     });
     if (res.ok) {
       const b = (await res.json()) as { tradeId: string };
-      setMessage(`trade ${b.tradeId} created`);
+      setMessage(`Trade ${b.tradeId} created.`);
       await load();
     } else {
-      setMessage(`error: ${res.status}`);
+      setMessage(`Error: ${res.status}`);
     }
   }
 
+  const cols: Column<Offer>[] = [
+    {
+      key: "maker",
+      header: "Maker",
+      // V-1: P2P side renders displayName as plain React text (escaped by default).
+      render: (o) => <span className="text-text">{o.maker ?? "—"}</span>,
+    },
+    {
+      key: "side",
+      header: "Side",
+      render: (o) => (
+        <span
+          className={
+            o.side === "buy"
+              ? "text-buy font-semibold uppercase text-xs"
+              : "text-sell font-semibold uppercase text-xs"
+          }
+        >
+          {o.side}
+        </span>
+      ),
+    },
+    {
+      key: "asset",
+      header: "Asset",
+      render: (o) => <span className="font-mono">{o.asset}</span>,
+    },
+    {
+      key: "amount",
+      header: "Amount",
+      align: "right",
+      render: (o) => (
+        <span className="font-mono tabular-nums">{o.amount}</span>
+      ),
+    },
+    {
+      key: "price",
+      header: "Price",
+      align: "right",
+      render: (o) => (
+        <span className="font-mono tabular-nums">{o.price}</span>
+      ),
+    },
+    {
+      key: "pay",
+      header: "Pay",
+      render: (o) => (
+        <span className="inline-block px-2 py-0.5 text-[10px] uppercase tracking-wider rounded bg-bg border border-border text-text-dim font-mono">
+          {o.payMethod}
+        </span>
+      ),
+    },
+    {
+      key: "action",
+      header: "",
+      align: "right",
+      render: (o) => (
+        <button
+          type="button"
+          className={secondaryBtn}
+          onClick={() => takeOffer(o.id, o.amount)}
+        >
+          Take
+        </button>
+      ),
+    },
+  ];
+
   return (
-    <Container className="py-10 max-w-5xl">
-      <h1 className="text-3xl font-semibold tracking-tight text-navy-900 mb-2">
-        P2P
-      </h1>
-      <p className="text-sm text-navy-600 mb-6">
-        Trade peer-to-peer with the platform as escrow. Sellers lock the asset
-        when they post; buyers mark fiat paid and sellers release.
-      </p>
+    <Container className="py-10 max-w-5xl space-y-6">
+      <div>
+        <h1 className="text-2xl font-semibold tracking-tight text-text">P2P</h1>
+        <p className="text-sm text-text-dim mt-1">
+          Trade peer-to-peer with BVBE as escrow. Sellers lock the asset when
+          they post; buyers mark fiat paid and sellers release.
+        </p>
+      </div>
 
-      <Card className="mb-6">
-        <CardHeader>
-          <CardTitle>Open offers</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {offers.length === 0 ? (
-            <p className="text-sm text-navy-600">No offers right now.</p>
-          ) : (
-            <table className="w-full text-sm">
-              <thead className="text-xs uppercase tracking-wider text-navy-500">
-                <tr>
-                  <th className="text-left py-2">Maker</th>
-                  <th>Side</th>
-                  <th>Asset</th>
-                  <th className="text-right">Amount</th>
-                  <th className="text-right">Price</th>
-                  <th>Pay</th>
-                  <th />
-                </tr>
-              </thead>
-              <tbody className="font-tabular">
-                {offers.map((o) => (
-                  <tr key={o.id} className="border-t border-navy-100">
-                    <td className="py-2">{o.maker ?? "—"}</td>
-                    <td className="text-center">{o.side}</td>
-                    <td className="text-center">{o.asset}</td>
-                    <td className="text-right">{o.amount}</td>
-                    <td className="text-right">{o.price}</td>
-                    <td className="text-center">{o.payMethod}</td>
-                    <td className="text-right">
-                      <Button
-                        size="sm"
-                        variant="secondary"
-                        onClick={() => takeOffer(o.id, o.amount)}
-                      >
-                        Take
-                      </Button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </CardContent>
-      </Card>
+      {message && (
+        <div className="rounded-md border border-border bg-bg-elevated text-text-dim px-3 py-2 text-sm">
+          {message}
+        </div>
+      )}
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Post offer</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <div className="flex gap-2 flex-wrap">
+      <section>
+        <h2 className="text-xs uppercase tracking-wider text-text-mute font-medium mb-2">
+          Open offers ({offers.length})
+        </h2>
+        <DataTable<Offer>
+          columns={cols}
+          rows={offers}
+          rowKey={(o) => o.id}
+          empty={
+            <EmptyState
+              title="No offers right now"
+              description="Be the first to post an offer below."
+            />
+          }
+        />
+      </section>
+
+      <section className="rounded-lg border border-border bg-bg-elevated p-6 space-y-4">
+        <h2 className="text-sm font-semibold text-text">Post a new offer</h2>
+        <div className="grid sm:grid-cols-2 lg:grid-cols-5 gap-3">
+          <div>
+            <label className="block text-xs uppercase tracking-wider text-text-mute mb-1 font-medium">
+              Side
+            </label>
             <select
-              className="border border-navy-200 rounded px-2 py-1"
               value={side}
               onChange={(e) => setSide(e.target.value as "buy" | "sell")}
+              className={inputClass}
             >
               <option value="buy">Buy</option>
               <option value="sell">Sell</option>
             </select>
+          </div>
+          <div>
+            <label className="block text-xs uppercase tracking-wider text-text-mute mb-1 font-medium">
+              Asset
+            </label>
             <input
-              className="border border-navy-200 rounded px-2 py-1 font-tabular w-24"
-              placeholder="asset"
               value={asset}
               onChange={(e) => setAsset(e.target.value.toUpperCase())}
+              className={inputClass}
             />
+          </div>
+          <div>
+            <label className="block text-xs uppercase tracking-wider text-text-mute mb-1 font-medium">
+              Amount
+            </label>
             <input
-              className="border border-navy-200 rounded px-2 py-1 font-tabular"
-              placeholder="amount"
               value={amount}
               onChange={(e) => setAmount(e.target.value)}
+              placeholder="0.0"
+              className={inputClass}
             />
+          </div>
+          <div>
+            <label className="block text-xs uppercase tracking-wider text-text-mute mb-1 font-medium">
+              Price
+            </label>
             <input
-              className="border border-navy-200 rounded px-2 py-1 font-tabular"
-              placeholder="price"
               value={price}
               onChange={(e) => setPrice(e.target.value)}
+              placeholder="0.00"
+              className={inputClass}
             />
+          </div>
+          <div>
+            <label className="block text-xs uppercase tracking-wider text-text-mute mb-1 font-medium">
+              Pay method
+            </label>
             <input
-              className="border border-navy-200 rounded px-2 py-1"
-              placeholder="pay method"
               value={payMethod}
               onChange={(e) => setPayMethod(e.target.value)}
+              className={inputClass + " font-sans"}
             />
-            <Button onClick={createOffer}>Post</Button>
           </div>
-          {message && <p className="text-sm text-navy-700">{message}</p>}
-        </CardContent>
-      </Card>
+        </div>
+        <button type="button" className={primaryBtn} onClick={createOffer}>
+          Post offer
+        </button>
+      </section>
     </Container>
   );
 }

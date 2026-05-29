@@ -1,12 +1,12 @@
 "use client";
 
 import { useState } from "react";
-import { Container } from "@/components/ui/container";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { authedFetch } from "@/lib/token-storage";
 
 type Entry = { name: string; source?: string; notes?: string };
+
+const primaryBtn =
+  "inline-flex items-center justify-center h-10 px-4 rounded-md bg-accent text-accent-fg hover:bg-accent-hover transition-colors font-semibold text-sm disabled:opacity-50 disabled:cursor-not-allowed";
 
 export default function SanctionsImportPage() {
   const [xml, setXml] = useState("");
@@ -32,9 +32,7 @@ export default function SanctionsImportPage() {
         | { entries: Entry[] }
         | { error: { message: string } };
       if (!res.ok) {
-        setError(
-          "error" in body ? body.error.message : `HTTP ${res.status}`,
-        );
+        setError("error" in body ? body.error.message : `HTTP ${res.status}`);
       } else if ("entries" in body) {
         setEntries(body.entries);
       }
@@ -46,60 +44,67 @@ export default function SanctionsImportPage() {
   }
 
   return (
-    <Container className="py-12 max-w-3xl space-y-4">
-      <h1 className="text-3xl font-semibold tracking-tight text-navy-900 mb-2">
-        Sanctions list import (beta)
-      </h1>
-      <p className="text-sm text-navy-700">
-        Paste an OFAC SDN XML export below. Parsed entries are previewed
-        so you can review before pushing to the sanctions table.
-      </p>
-      <Card>
-        <CardHeader>
-          <CardTitle>Source XML</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={onSubmit} className="space-y-3">
-            <textarea
-              className="w-full h-48 font-mono text-xs border border-navy-200 rounded p-2"
-              value={xml}
-              onChange={(e) => setXml(e.target.value)}
-              placeholder={`<sanctions>\n  <entry>\n    <name>Synthetic Subject</name>\n    <source>OFAC SDN</source>\n  </entry>\n</sanctions>`}
-            />
-            <Button type="submit" disabled={busy || !xml}>
-              {busy ? "Parsing…" : "Preview entries"}
-            </Button>
-          </form>
-        </CardContent>
-      </Card>
-      {error ? (
-        <Card>
-          <CardContent className="text-sm text-red-700">{error}</CardContent>
-        </Card>
-      ) : null}
-      {entries ? (
-        <Card>
-          <CardHeader>
-            <CardTitle>{entries.length} entries</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {entries.length === 0 ? (
-              <p className="text-sm text-navy-700">No entries parsed.</p>
-            ) : (
-              <ul className="text-sm space-y-1">
-                {entries.map((e, i) => (
-                  <li key={i} className="border-t border-navy-100 py-1">
-                    <span className="font-medium">{e.name}</span>
-                    {e.source ? (
-                      <span className="text-navy-500"> · {e.source}</span>
-                    ) : null}
-                  </li>
-                ))}
-              </ul>
-            )}
-          </CardContent>
-        </Card>
-      ) : null}
-    </Container>
+    <div className="space-y-6 max-w-3xl">
+      <div>
+        <h1 className="text-2xl font-semibold tracking-tight text-text">
+          Sanctions list import
+          <span className="ml-2 inline-block px-2 py-0.5 text-[10px] uppercase tracking-wider rounded bg-warn/20 text-warn font-semibold align-middle">
+            Beta
+          </span>
+        </h1>
+        <p className="text-sm text-text-dim mt-1">
+          Paste an OFAC SDN XML export. Parsed entries are previewed so you can
+          review before pushing.
+        </p>
+      </div>
+
+      <form
+        onSubmit={onSubmit}
+        className="rounded-lg border border-border bg-bg-elevated p-5 space-y-3"
+      >
+        <label className="block text-xs uppercase tracking-wider text-text-mute font-medium">
+          Source XML
+        </label>
+        <textarea
+          className="w-full h-64 rounded-md bg-bg border border-border text-text placeholder:text-text-mute font-mono text-xs p-3 focus:outline-none focus:ring-2 focus:ring-accent focus:border-accent transition-colors"
+          value={xml}
+          onChange={(e) => setXml(e.target.value)}
+          placeholder={`<sanctions>\n  <entry>\n    <name>Synthetic Subject</name>\n    <source>OFAC SDN</source>\n  </entry>\n</sanctions>`}
+        />
+        <button type="submit" className={primaryBtn} disabled={busy || !xml}>
+          {busy ? "Parsing…" : "Preview entries"}
+        </button>
+      </form>
+
+      {error && (
+        <div className="rounded-md border border-sell/40 bg-sell/10 text-sell px-3 py-2 text-sm">
+          {error}
+        </div>
+      )}
+
+      {entries && (
+        <div className="rounded-lg border border-border bg-bg-elevated p-5">
+          <h2 className="text-sm font-semibold text-text mb-3">
+            {entries.length} entries
+          </h2>
+          {entries.length === 0 ? (
+            <p className="text-sm text-text-mute">No entries parsed.</p>
+          ) : (
+            <ul className="text-sm divide-y divide-border-subtle">
+              {entries.map((e, i) => (
+                <li key={i} className="py-2 flex items-center justify-between">
+                  <span className="text-text font-medium">{e.name}</span>
+                  {e.source && (
+                    <span className="text-text-mute text-xs font-mono">
+                      {e.source}
+                    </span>
+                  )}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      )}
+    </div>
   );
 }

@@ -2,10 +2,17 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { Container } from "@/components/ui/container";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { authedFetch } from "@/lib/token-storage";
+
+const inputClass =
+  "w-full h-10 px-3 rounded-md bg-bg border border-border text-text placeholder:text-text-mute font-mono focus:outline-none focus:ring-2 focus:ring-accent focus:border-accent transition-colors";
+
+const primaryBtn =
+  "inline-flex items-center justify-center h-10 px-4 rounded-md bg-accent text-accent-fg hover:bg-accent-hover transition-colors font-semibold text-sm";
+const secondaryBtn =
+  "inline-flex items-center justify-center h-9 px-3 rounded-md bg-bg border border-border text-text hover:bg-bg-hover transition-colors text-sm";
 
 export default function SecurityPage() {
   const router = useRouter();
@@ -27,7 +34,9 @@ export default function SecurityPage() {
   }, [router]);
 
   async function enable() {
-    const res = await authedFetch("/api/v2/auth/2fa/enable", { method: "POST" });
+    const res = await authedFetch("/api/v2/auth/2fa/enable", {
+      method: "POST",
+    });
     const body = await res.json();
     setSecret(body.secret);
     setUri(body.uri);
@@ -51,49 +60,134 @@ export default function SecurityPage() {
   }
 
   return (
-    <Container className="py-12 max-w-2xl space-y-4">
-      <h1 className="text-3xl font-semibold tracking-tight text-navy-900 mb-2">
-        Security
-      </h1>
+    <Container className="py-10 max-w-3xl space-y-6">
+      <div>
+        <h1 className="text-2xl font-semibold tracking-tight text-text">
+          Security
+        </h1>
+        <p className="text-sm text-text-dim mt-1">
+          Manage authentication, two-factor, and API access for this account.
+        </p>
+      </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Two-factor authentication</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3 text-sm">
+      <nav className="flex gap-1 border-b border-border">
+        <a
+          href="/account/profile"
+          className="px-4 py-2 text-sm font-medium text-text-dim hover:text-text border-b-2 border-transparent hover:border-border -mb-px"
+        >
+          Profile
+        </a>
+        <a
+          href="/account/security"
+          className="px-4 py-2 text-sm font-medium text-text border-b-2 border-accent -mb-px"
+        >
+          Security
+        </a>
+        <a
+          href="/account/kyc"
+          className="px-4 py-2 text-sm font-medium text-text-dim hover:text-text border-b-2 border-transparent hover:border-border -mb-px"
+        >
+          KYC
+        </a>
+        <a
+          href="/account/api-keys"
+          className="px-4 py-2 text-sm font-medium text-text-dim hover:text-text border-b-2 border-transparent hover:border-border -mb-px"
+        >
+          API keys
+        </a>
+      </nav>
+
+      <section className="rounded-lg border border-border bg-bg-elevated p-6 space-y-4">
+        <div className="flex items-start justify-between">
+          <div>
+            <h2 className="text-sm font-semibold text-text">
+              Two-factor authentication
+            </h2>
+            <p className="text-xs text-text-dim mt-1">
+              Require a TOTP code at sign-in. Recommended.
+            </p>
+          </div>
           {me?.totpEnabled ? (
-            <p>2FA is enabled on this account.</p>
-          ) : secret ? (
-            <>
-              <p className="text-navy-700">
-                Scan this URI in your authenticator app and enter the resulting
-                6-digit code below.
-              </p>
-              <pre className="text-xs bg-navy-50 border border-navy-200 rounded p-2 overflow-x-auto">
-                {uri}
-              </pre>
-              <p className="text-xs text-navy-500">
-                Secret (for manual entry): <code>{secret}</code>
-              </p>
-              <form onSubmit={verify} className="flex gap-2">
-                <input
-                  inputMode="numeric"
-                  pattern="\d{6}"
-                  required
-                  placeholder="123456"
-                  value={code}
-                  onChange={(e) => setCode(e.target.value)}
-                  className="border border-navy-200 rounded-md h-10 px-3 font-mono"
-                />
-                <Button type="submit">Verify</Button>
-              </form>
-            </>
+            <span className="inline-block px-2 py-0.5 text-xs uppercase tracking-wider rounded bg-buy/20 text-buy font-semibold">
+              Enabled
+            </span>
           ) : (
-            <Button onClick={enable}>Enable 2FA</Button>
+            <span className="inline-block px-2 py-0.5 text-xs uppercase tracking-wider rounded bg-warn/20 text-warn font-semibold">
+              Disabled
+            </span>
           )}
-          {message && <p className="text-sm text-navy-700">{message}</p>}
-        </CardContent>
-      </Card>
+        </div>
+
+        {me?.totpEnabled ? (
+          <p className="text-sm text-text-dim">
+            Two-factor authentication is enabled on this account.
+          </p>
+        ) : secret ? (
+          <div className="space-y-3">
+            <p className="text-sm text-text-dim">
+              Scan this URI in your authenticator app, then enter the 6-digit
+              code to confirm.
+            </p>
+            <pre className="text-xs bg-bg border border-border rounded-md p-3 overflow-x-auto text-text font-mono">
+              {uri}
+            </pre>
+            <p className="text-xs text-text-mute">
+              Manual entry secret:{" "}
+              <code className="text-text font-mono">{secret}</code>
+            </p>
+            <form onSubmit={verify} className="flex flex-wrap gap-2">
+              <input
+                inputMode="numeric"
+                pattern="\d{6}"
+                required
+                placeholder="123456"
+                value={code}
+                onChange={(e) => setCode(e.target.value)}
+                className={inputClass + " w-32 tracking-widest text-center"}
+              />
+              <button type="submit" className={primaryBtn}>
+                Verify
+              </button>
+            </form>
+          </div>
+        ) : (
+          <button type="button" className={primaryBtn} onClick={enable}>
+            Enable 2FA
+          </button>
+        )}
+        {message && <p className="text-sm text-text-dim">{message}</p>}
+      </section>
+
+      <section className="rounded-lg border border-border bg-bg-elevated p-6 space-y-3">
+        <div className="flex items-start justify-between">
+          <div>
+            <h2 className="text-sm font-semibold text-text">Password</h2>
+            <p className="text-xs text-text-dim mt-1">
+              Reset via emailed link.
+            </p>
+          </div>
+          <Link
+            href="/forgot"
+            className={secondaryBtn}
+          >
+            Reset password
+          </Link>
+        </div>
+      </section>
+
+      <section className="rounded-lg border border-border bg-bg-elevated p-6 space-y-3">
+        <div className="flex items-start justify-between">
+          <div>
+            <h2 className="text-sm font-semibold text-text">API keys</h2>
+            <p className="text-xs text-text-dim mt-1">
+              Mint, rotate, and revoke programmatic credentials.
+            </p>
+          </div>
+          <Link href="/account/api-keys" className={secondaryBtn}>
+            Manage keys
+          </Link>
+        </div>
+      </section>
     </Container>
   );
 }

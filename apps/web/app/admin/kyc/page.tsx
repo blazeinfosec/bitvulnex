@@ -3,8 +3,6 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Container } from "@/components/ui/container";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { authedFetch } from "@/lib/token-storage";
 
 type QueueRow = {
@@ -31,50 +29,80 @@ export default function AdminKycQueue() {
     })();
   }, [router]);
 
-  if (!queue) return <Container className="py-12">Loading…</Container>;
+  if (!queue) return <p className="text-text-dim">Loading…</p>;
 
   return (
-    <Container className="py-12 max-w-4xl space-y-4">
-      <h1 className="text-3xl font-semibold tracking-tight text-navy-900 mb-2">
-        KYC review queue
-      </h1>
-      <Card>
-        <CardHeader>
-          <CardTitle>{queue.length} pending</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {queue.length === 0 ? (
-            <p className="text-sm text-navy-700">No pending reviews.</p>
-          ) : (
-            <table className="w-full text-sm">
-              <thead className="text-left text-navy-500 text-xs uppercase">
-                <tr>
-                  <th className="py-1">Email</th>
-                  <th>Legal name</th>
-                  <th>Country</th>
-                  <th>Submitted</th>
-                  <th></th>
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-2xl font-semibold tracking-tight text-text">
+          KYC review queue
+        </h1>
+        <p className="text-sm text-text-dim mt-1">
+          {queue.length} submission{queue.length === 1 ? "" : "s"} pending
+          review.
+        </p>
+      </div>
+
+      <div className="rounded-lg border border-border bg-bg-elevated overflow-hidden">
+        {queue.length === 0 ? (
+          <p className="px-4 py-10 text-center text-text-mute text-sm">
+            No pending reviews.
+          </p>
+        ) : (
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-border">
+                <th className="px-4 py-3 text-left text-xs uppercase tracking-wider text-text-mute font-medium">
+                  Email
+                </th>
+                <th className="px-4 py-3 text-left text-xs uppercase tracking-wider text-text-mute font-medium">
+                  Legal name
+                </th>
+                <th className="px-4 py-3 text-left text-xs uppercase tracking-wider text-text-mute font-medium">
+                  Country
+                </th>
+                <th className="px-4 py-3 text-left text-xs uppercase tracking-wider text-text-mute font-medium">
+                  Submitted
+                </th>
+                <th className="px-4 py-3" />
+              </tr>
+            </thead>
+            <tbody>
+              {queue.map((q) => (
+                <tr
+                  key={q.userId}
+                  className="border-b border-border-subtle last:border-0 hover:bg-bg-hover transition-colors"
+                >
+                  <td className="px-4 py-3 font-mono text-xs text-text">
+                    {q.user.email}
+                  </td>
+                  <td className="px-4 py-3 text-text">
+                    {q.legalName ?? "—"}
+                  </td>
+                  <td className="px-4 py-3 font-mono text-text-dim">
+                    {q.country ?? "—"}
+                  </td>
+                  <td className="px-4 py-3 font-mono text-xs text-text-mute">
+                    {new Date(q.submittedAt)
+                      .toISOString()
+                      .replace("T", " ")
+                      .slice(0, 19)}{" "}
+                    UTC
+                  </td>
+                  <td className="px-4 py-3 text-right">
+                    <Link
+                      href={`/admin/kyc/${q.userId}`}
+                      className="text-accent text-sm hover:underline"
+                    >
+                      Review →
+                    </Link>
+                  </td>
                 </tr>
-              </thead>
-              <tbody>
-                {queue.map((q) => (
-                  <tr key={q.userId} className="border-t border-navy-200">
-                    <td className="py-2 font-mono">{q.user.email}</td>
-                    <td>{q.legalName ?? "—"}</td>
-                    <td>{q.country ?? "—"}</td>
-                    <td className="font-tabular">
-                      {new Date(q.submittedAt).toLocaleString()}
-                    </td>
-                    <td>
-                      <Link href={`/admin/kyc/${q.userId}`}>review →</Link>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </CardContent>
-      </Card>
-    </Container>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+    </div>
   );
 }

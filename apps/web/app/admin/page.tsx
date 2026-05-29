@@ -3,13 +3,20 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Container } from "@/components/ui/container";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { authedFetch } from "@/lib/token-storage";
+import { StatCard } from "@/components/exchange";
+
+type QueueStats = {
+  kycPending: number;
+  ticketsOpen: number;
+  complianceOpen: number;
+  treasuryDrafts: number;
+};
 
 export default function AdminLanding() {
   const router = useRouter();
   const [ok, setOk] = useState(false);
+  const [stats, setStats] = useState<QueueStats | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -19,58 +26,125 @@ export default function AdminLanding() {
         return;
       }
       setOk(true);
+      // Best-effort stats: KYC queue count, ticket count, etc.
+      try {
+        const kyc = res.ok
+          ? ((await res.clone().json()) as { queue?: unknown[] })
+          : { queue: [] };
+        const [t, c, d] = await Promise.all([
+          authedFetch("/api/v2/admin/tickets"),
+          authedFetch("/api/v2/admin/compliance/cases"),
+          authedFetch("/api/v2/admin/treasury/drafts"),
+        ]);
+        const tickets = t.ok ? ((await t.json()) as { tickets?: unknown[] }) : { tickets: [] };
+        const cases = c.ok
+          ? ((await c.json()) as { cases?: unknown[] })
+          : { cases: [] };
+        const drafts = d.ok
+          ? ((await d.json()) as { drafts?: unknown[] })
+          : { drafts: [] };
+        setStats({
+          kycPending: kyc.queue?.length ?? 0,
+          ticketsOpen: tickets.tickets?.length ?? 0,
+          complianceOpen: cases.cases?.length ?? 0,
+          treasuryDrafts: drafts.drafts?.length ?? 0,
+        });
+      } catch {
+        // ignore — stats are best-effort
+      }
     })();
   }, [router]);
 
-  if (!ok) return <Container className="py-12">Loading…</Container>;
+  if (!ok) {
+    return <p className="text-text-dim">Loading…</p>;
+  }
 
   return (
-    <Container className="py-12 max-w-3xl space-y-4">
-      <h1 className="text-3xl font-semibold tracking-tight text-navy-900 mb-2">
-        Admin
-      </h1>
-      <div className="grid sm:grid-cols-2 gap-4">
-        <Card>
-          <CardHeader>
-            <CardTitle>Users</CardTitle>
-          </CardHeader>
-          <CardContent className="text-sm">
-            <Link href="/admin/users">Search users →</Link>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle>Support inbox</CardTitle>
-          </CardHeader>
-          <CardContent className="text-sm">
-            <Link href="/admin/tickets">Open the ticket inbox →</Link>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle>Compliance queue</CardTitle>
-          </CardHeader>
-          <CardContent className="text-sm">
-            <Link href="/admin/compliance">Open the compliance queue →</Link>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle>KYC review queue</CardTitle>
-          </CardHeader>
-          <CardContent className="text-sm">
-            <Link href="/admin/kyc">Open the pending-review queue →</Link>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardHeader>
-            <CardTitle>Treasury</CardTitle>
-          </CardHeader>
-          <CardContent className="text-sm">
-            <Link href="/admin/treasury">Open the treasury drafts →</Link>
-          </CardContent>
-        </Card>
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-2xl font-semibold tracking-tight text-text">
+          Admin dashboard
+        </h1>
+        <p className="text-sm text-text-dim mt-1">
+          Operational queues and platform tools.
+        </p>
       </div>
-    </Container>
+
+      <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <StatCard
+          label="KYC pending"
+          value={stats?.kycPending ?? "—"}
+          hint="Awaiting reviewer"
+        />
+        <StatCard
+          label="Open tickets"
+          value={stats?.ticketsOpen ?? "—"}
+          hint="Support inbox"
+        />
+        <StatCard
+          label="Compliance cases"
+          value={stats?.complianceOpen ?? "—"}
+          hint="Open investigations"
+        />
+        <StatCard
+          label="Treasury drafts"
+          value={stats?.treasuryDrafts ?? "—"}
+          hint="Awaiting signatures"
+        />
+      </div>
+
+      <div className="grid sm:grid-cols-2 gap-4">
+        <AdminTile
+          href="/admin/users"
+          title="Users"
+          description="Search, freeze, adjust balances, manage roles."
+        />
+        <AdminTile
+          href="/admin/tickets"
+          title="Support inbox"
+          description="Reply to user tickets, change status."
+        />
+        <AdminTile
+          href="/admin/kyc"
+          title="KYC review queue"
+          description="Approve or reject identity submissions."
+        />
+        <AdminTile
+          href="/admin/compliance"
+          title="Compliance"
+          description="Open cases, sanctions imports, exports."
+        />
+        <AdminTile
+          href="/admin/treasury"
+          title="Treasury"
+          description="Multi-sig coordinator: draft, sign, broadcast."
+        />
+      </div>
+    </div>
+  );
+}
+
+function AdminTile({
+  href,
+  title,
+  description,
+}: {
+  href: string;
+  title: string;
+  description: string;
+}) {
+  return (
+    <Link
+      href={href}
+      className="block rounded-lg border border-border bg-bg-elevated p-5 hover:bg-bg-hover hover:border-accent/40 transition-colors no-underline"
+    >
+      <div className="flex items-start justify-between">
+        <div>
+          <h3 className="text-sm font-semibold text-text">{title}</h3>
+          <p className="text-xs text-text-dim mt-1">{description}</p>
+        </div>
+        <span className="text-accent text-sm">→</span>
+      </div>
+    </Link>
   );
 }

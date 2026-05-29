@@ -1,9 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Container } from "@/components/ui/container";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { authedFetch } from "@/lib/token-storage";
 
 type DraftRow = {
@@ -17,12 +14,38 @@ type DraftRow = {
   signatures: Array<{ id: string; signerUserId: string; signedAt: string }>;
 };
 
+const inputClass =
+  "h-10 px-3 rounded-md bg-bg border border-border text-text placeholder:text-text-mute font-mono focus:outline-none focus:ring-2 focus:ring-accent focus:border-accent transition-colors";
+
+const primaryBtn =
+  "inline-flex items-center justify-center h-10 px-4 rounded-md bg-accent text-accent-fg hover:bg-accent-hover transition-colors font-semibold text-sm";
+const secondaryBtn =
+  "inline-flex items-center justify-center h-9 px-3 rounded-md bg-bg border border-border text-text hover:bg-bg-hover transition-colors text-sm";
+
+function statusClass(s: string) {
+  switch (s) {
+    case "drafted":
+    case "partial":
+      return "text-warn";
+    case "signed":
+      return "text-info";
+    case "broadcast":
+    case "confirmed":
+      return "text-buy";
+    case "rejected":
+      return "text-sell";
+    default:
+      return "text-text-dim";
+  }
+}
+
 export default function AdminTreasuryPage() {
   const [drafts, setDrafts] = useState<DraftRow[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [outputAddress, setOutputAddress] = useState("bcrt1qhotwallet");
   const [outputAmountSat, setOutputAmountSat] = useState("5000000");
   const [intentNote, setIntentNote] = useState("cold → hot top-up");
+  const [overridePsbt, setOverridePsbt] = useState<Record<string, string>>({});
 
   async function loadDrafts() {
     const res = await authedFetch("/api/v2/admin/treasury/drafts");
@@ -68,121 +91,172 @@ export default function AdminTreasuryPage() {
   }
 
   async function broadcast(id: string) {
+    // V-33 reach: optionally pass `overridePsbt` to broadcast endpoint.
+    const body: Record<string, string> = {};
+    if (overridePsbt[id]) body.overridePsbt = overridePsbt[id];
     const res = await authedFetch(
       `/api/v2/admin/treasury/drafts/${encodeURIComponent(id)}/broadcast`,
       {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({}),
+        body: JSON.stringify(body),
       },
     );
     if (res.ok) loadDrafts();
   }
 
   return (
-    <Container className="py-12 max-w-5xl space-y-4">
-      <h1 className="text-3xl font-semibold tracking-tight text-navy-900 mb-2">
-        Treasury — multi-sig coordinator
-      </h1>
-      {error && <p className="text-danger">{error}</p>}
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-2xl font-semibold tracking-tight text-text">
+          Treasury · multi-sig coordinator
+        </h1>
+        <p className="text-sm text-text-dim mt-1">
+          Create drafts, collect signatures, broadcast to the network.
+        </p>
+      </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>New cold → hot draft</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3 text-sm">
-          <div className="flex items-center gap-2">
-            <label className="w-32 text-navy-500">Output address</label>
+      {error && (
+        <div className="rounded-md border border-sell/40 bg-sell/10 text-sell px-3 py-2 text-sm">
+          {error}
+        </div>
+      )}
+
+      <section className="rounded-lg border border-border bg-bg-elevated p-5 space-y-3">
+        <h2 className="text-sm font-semibold text-text">
+          New cold → hot draft
+        </h2>
+        <div className="grid sm:grid-cols-2 gap-3">
+          <div>
+            <label className="block text-xs uppercase tracking-wider text-text-mute mb-1 font-medium">
+              Output address
+            </label>
             <input
               value={outputAddress}
               onChange={(e) => setOutputAddress(e.target.value)}
-              className="flex-1 border border-navy-200 rounded-md h-10 px-3 font-mono"
+              className={inputClass + " w-full"}
             />
           </div>
-          <div className="flex items-center gap-2">
-            <label className="w-32 text-navy-500">Amount (sat)</label>
+          <div>
+            <label className="block text-xs uppercase tracking-wider text-text-mute mb-1 font-medium">
+              Amount (sat)
+            </label>
             <input
               value={outputAmountSat}
               onChange={(e) => setOutputAmountSat(e.target.value)}
-              className="border border-navy-200 rounded-md h-10 px-3 font-mono w-40"
+              className={inputClass + " w-full"}
             />
           </div>
-          <div className="flex items-center gap-2">
-            <label className="w-32 text-navy-500">Intent</label>
+          <div className="sm:col-span-2">
+            <label className="block text-xs uppercase tracking-wider text-text-mute mb-1 font-medium">
+              Intent note
+            </label>
             <input
               value={intentNote}
               onChange={(e) => setIntentNote(e.target.value)}
-              className="flex-1 border border-navy-200 rounded-md h-10 px-3"
+              className={inputClass + " w-full font-sans"}
             />
           </div>
-          <Button onClick={createDraft} variant="primary">
-            Create draft
-          </Button>
-        </CardContent>
-      </Card>
+        </div>
+        <button type="button" className={primaryBtn} onClick={createDraft}>
+          Create draft
+        </button>
+      </section>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Drafts</CardTitle>
-        </CardHeader>
-        <CardContent className="text-sm space-y-3">
-          {drafts.length === 0 ? (
-            <p className="text-navy-700">No drafts yet.</p>
-          ) : (
-            drafts.map((d) => (
-              <div
-                key={d.id}
-                className="border border-navy-200 rounded-md p-3 space-y-2"
-              >
-                <div className="flex items-center justify-between">
-                  <span className="font-mono text-xs">{d.id}</span>
-                  <span className="uppercase text-xs tracking-wider">
-                    {d.status}
-                  </span>
+      <section className="space-y-3">
+        <h2 className="text-xs uppercase tracking-wider text-text-mute font-medium">
+          Drafts ({drafts.length})
+        </h2>
+        {drafts.length === 0 ? (
+          <div className="rounded-lg border border-border bg-bg-elevated p-10 text-center text-text-mute text-sm">
+            No drafts yet.
+          </div>
+        ) : (
+          drafts.map((d) => (
+            <article
+              key={d.id}
+              className="rounded-lg border border-border bg-bg-elevated p-5 space-y-3"
+            >
+              <header className="flex items-center justify-between">
+                <code className="font-mono text-xs text-text-dim">{d.id}</code>
+                <span
+                  className={`text-xs uppercase tracking-wider font-semibold ${statusClass(d.status)}`}
+                >
+                  {d.status}
+                </span>
+              </header>
+
+              <p className="text-sm text-text">{d.intentNote ?? "—"}</p>
+
+              <div className="text-xs font-mono text-text-dim space-y-1">
+                <div className="text-text-mute uppercase tracking-wider">
+                  Outputs
                 </div>
-                <div className="text-navy-700">{d.intentNote ?? "—"}</div>
-                <div className="font-mono text-xs">
-                  outputs:{" "}
-                  {d.intendedOutputs
-                    .map(
-                      (o) =>
-                        `${o.address.slice(0, 16)}… (${o.amountSat} sat)`,
-                    )
-                    .join(", ")}
-                </div>
-                <div className="text-navy-500 text-xs">
-                  signatures: {d.signatures?.length ?? 0}
-                </div>
-                {d.broadcastTxid && (
-                  <div className="text-navy-700 font-mono text-xs">
-                    broadcast txid: {d.broadcastTxid.slice(0, 24)}…
+                {d.intendedOutputs.map((o, i) => (
+                  <div key={i} className="flex items-center justify-between">
+                    <span>{o.address.slice(0, 24)}…</span>
+                    <span className="tabular-nums">{o.amountSat} sat</span>
                   </div>
-                )}
-                <div className="flex gap-2">
-                  {(d.status === "drafted" || d.status === "partial") && (
-                    <Button
-                      size="sm"
-                      variant="secondary"
-                      onClick={() => sign(d.id)}
-                    >
-                      Sign
-                    </Button>
-                  )}
-                  {d.status === "signed" && (
-                    <Button
-                      size="sm"
-                      variant="primary"
-                      onClick={() => broadcast(d.id)}
-                    >
-                      Broadcast
-                    </Button>
-                  )}
-                </div>
+                ))}
               </div>
-            ))
-          )}
-        </CardContent>
-      </Card>
-    </Container>
+
+              <div className="flex items-center justify-between text-xs text-text-mute pt-2 border-t border-border-subtle">
+                <span>
+                  Signatures:{" "}
+                  <span className="text-text font-mono">
+                    {d.signatures?.length ?? 0}
+                  </span>
+                </span>
+                {d.broadcastTxid && (
+                  <span className="font-mono">
+                    txid {d.broadcastTxid.slice(0, 16)}…
+                  </span>
+                )}
+              </div>
+
+              {d.status === "signed" && (
+                <details className="text-xs">
+                  <summary className="cursor-pointer text-text-dim hover:text-text uppercase tracking-wider font-medium">
+                    Advanced: override PSBT
+                  </summary>
+                  <textarea
+                    placeholder="Paste BVBE_PSBT_V1:… payload to override the stored PSBT before broadcast"
+                    value={overridePsbt[d.id] ?? ""}
+                    onChange={(e) =>
+                      setOverridePsbt((curr) => ({
+                        ...curr,
+                        [d.id]: e.target.value,
+                      }))
+                    }
+                    className="w-full mt-2 rounded-md bg-bg border border-border text-text placeholder:text-text-mute font-mono text-xs p-2 h-20 focus:outline-none focus:ring-2 focus:ring-accent focus:border-accent transition-colors"
+                  />
+                </details>
+              )}
+
+              <div className="flex gap-2">
+                {(d.status === "drafted" || d.status === "partial") && (
+                  <button
+                    type="button"
+                    className={secondaryBtn}
+                    onClick={() => sign(d.id)}
+                  >
+                    Sign
+                  </button>
+                )}
+                {d.status === "signed" && (
+                  <button
+                    type="button"
+                    className={primaryBtn}
+                    onClick={() => broadcast(d.id)}
+                  >
+                    Broadcast
+                  </button>
+                )}
+              </div>
+            </article>
+          ))
+        )}
+      </section>
+    </div>
   );
 }

@@ -3,9 +3,8 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Container } from "@/components/ui/container";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { authedFetch } from "@/lib/token-storage";
+import { DataTable, type Column, EmptyState, Modal } from "@/components/exchange";
 
 type ApiKeyListItem = {
   id: string;
@@ -17,12 +16,24 @@ type ApiKeyListItem = {
 
 const SCOPES = ["read", "trade", "withdraw"] as const;
 
+const inputClass =
+  "w-full h-10 px-3 rounded-md bg-bg border border-border text-text placeholder:text-text-mute focus:outline-none focus:ring-2 focus:ring-accent focus:border-accent transition-colors";
+
+const primaryBtn =
+  "inline-flex items-center justify-center h-10 px-4 rounded-md bg-accent text-accent-fg hover:bg-accent-hover transition-colors font-semibold text-sm";
+const secondaryBtn =
+  "inline-flex items-center justify-center h-9 px-3 rounded-md bg-bg border border-border text-text hover:bg-bg-hover transition-colors text-sm";
+const dangerBtn =
+  "inline-flex items-center justify-center h-9 px-3 rounded-md bg-sell/20 border border-sell/40 text-sell hover:bg-sell/30 transition-colors text-sm";
+
 export default function ApiKeysPage() {
   const router = useRouter();
   const [keys, setKeys] = useState<ApiKeyListItem[]>([]);
   const [name, setName] = useState("");
   const [scopes, setScopes] = useState<string[]>(["read"]);
+  const [ipAllowlist, setIpAllowlist] = useState("");
   const [created, setCreated] = useState<string | null>(null);
+  const [open, setOpen] = useState(false);
 
   async function load() {
     const res = await authedFetch("/api/v2/me/api-keys");
@@ -63,94 +74,228 @@ export default function ApiKeysPage() {
     );
   }
 
-  return (
-    <Container className="py-12 max-w-3xl space-y-4">
-      <h1 className="text-3xl font-semibold tracking-tight text-navy-900 mb-2">
-        API keys
-      </h1>
+  const cols: Column<ApiKeyListItem>[] = [
+    {
+      key: "name",
+      header: "Name",
+      render: (k) => <span className="text-text">{k.name}</span>,
+    },
+    {
+      key: "scopes",
+      header: "Scopes",
+      render: (k) => (
+        <div className="flex flex-wrap gap-1">
+          {k.scopes.map((s) => (
+            <span
+              key={s}
+              className="inline-block px-2 py-0.5 text-[10px] uppercase tracking-wider rounded bg-bg border border-border text-text-dim font-mono"
+            >
+              {s}
+            </span>
+          ))}
+        </div>
+      ),
+    },
+    {
+      key: "created",
+      header: "Created",
+      render: (k) => (
+        <span className="font-mono text-xs text-text-mute">
+          {new Date(k.createdAt).toISOString().replace("T", " ").slice(0, 19)} UTC
+        </span>
+      ),
+    },
+    {
+      key: "lastUsed",
+      header: "Last used",
+      render: (k) => (
+        <span className="font-mono text-xs text-text-mute">
+          {k.lastUsedAt
+            ? new Date(k.lastUsedAt)
+                .toISOString()
+                .replace("T", " ")
+                .slice(0, 19) + " UTC"
+            : "never"}
+        </span>
+      ),
+    },
+    {
+      key: "action",
+      header: "",
+      align: "right",
+      render: (k) => (
+        <button
+          type="button"
+          className={dangerBtn}
+          onClick={() => revoke(k.id)}
+        >
+          Revoke
+        </button>
+      ),
+    },
+  ];
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Mint a new key</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={create} className="space-y-3">
+  return (
+    <Container className="py-10 max-w-4xl space-y-6">
+      <div className="flex items-start justify-between">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight text-text">
+            API keys
+          </h1>
+          <p className="text-sm text-text-dim mt-1">
+            Mint scoped credentials for programmatic access. Treat them like
+            passwords — they grant the listed permissions on your account.
+          </p>
+        </div>
+        <button type="button" className={primaryBtn} onClick={() => setOpen(true)}>
+          + Create key
+        </button>
+      </div>
+
+      <nav className="flex gap-1 border-b border-border">
+        <a
+          href="/account/profile"
+          className="px-4 py-2 text-sm font-medium text-text-dim hover:text-text border-b-2 border-transparent hover:border-border -mb-px"
+        >
+          Profile
+        </a>
+        <a
+          href="/account/security"
+          className="px-4 py-2 text-sm font-medium text-text-dim hover:text-text border-b-2 border-transparent hover:border-border -mb-px"
+        >
+          Security
+        </a>
+        <a
+          href="/account/kyc"
+          className="px-4 py-2 text-sm font-medium text-text-dim hover:text-text border-b-2 border-transparent hover:border-border -mb-px"
+        >
+          KYC
+        </a>
+        <a
+          href="/account/api-keys"
+          className="px-4 py-2 text-sm font-medium text-text border-b-2 border-accent -mb-px"
+        >
+          API keys
+        </a>
+      </nav>
+
+      {created && (
+        <div className="rounded-lg border border-warn/40 bg-warn/10 p-4 space-y-2">
+          <p className="text-sm text-warn font-semibold">
+            Store this key now. It will not be shown again.
+          </p>
+          <pre className="text-xs bg-bg border border-border rounded-md p-3 overflow-x-auto font-mono text-text">
+            {created}
+          </pre>
+          <button
+            type="button"
+            className={secondaryBtn}
+            onClick={() => setCreated(null)}
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
+
+      <DataTable<ApiKeyListItem>
+        columns={cols}
+        rows={keys}
+        rowKey={(k) => k.id}
+        empty={
+          <EmptyState
+            title="No API keys yet"
+            description="Mint a key to access the API programmatically."
+            action={{
+              label: "+ Create your first key",
+              onClick: () => setOpen(true),
+            }}
+          />
+        }
+      />
+
+      <Modal
+        open={open}
+        onClose={() => setOpen(false)}
+        title="Create API key"
+        description="Pick a clear name and the minimum scopes you need."
+        footer={
+          <>
+            <button
+              type="button"
+              className={secondaryBtn}
+              onClick={() => setOpen(false)}
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              className={primaryBtn}
+              onClick={(e) => {
+                create(e as unknown as React.FormEvent);
+                setOpen(false);
+              }}
+              disabled={!name || scopes.length === 0}
+            >
+              Create key
+            </button>
+          </>
+        }
+      >
+        <div className="space-y-4">
+          <div>
+            <label className="block text-xs uppercase tracking-wider text-text-mute mb-1.5 font-medium">
+              Name
+            </label>
             <input
-              type="text"
               required
-              placeholder="key name"
+              placeholder="e.g. trading-bot-prod"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="w-full border border-navy-200 rounded-md h-10 px-3"
+              className={inputClass}
             />
-            <div className="flex gap-3 text-sm">
+          </div>
+          <div>
+            <label className="block text-xs uppercase tracking-wider text-text-mute mb-1.5 font-medium">
+              Scopes
+            </label>
+            <div className="flex flex-wrap gap-2">
               {SCOPES.map((s) => (
-                <label key={s} className="flex items-center gap-1">
+                <label
+                  key={s}
+                  className={
+                    "inline-flex items-center gap-2 px-3 py-1.5 rounded-md border cursor-pointer text-sm transition-colors " +
+                    (scopes.includes(s)
+                      ? "bg-accent/10 border-accent text-text"
+                      : "border-border text-text-dim hover:bg-bg-hover")
+                  }
+                >
                   <input
                     type="checkbox"
                     checked={scopes.includes(s)}
                     onChange={() => toggleScope(s)}
+                    className="accent-accent"
                   />
-                  {s}
+                  <span className="font-mono uppercase text-xs">{s}</span>
                 </label>
               ))}
             </div>
-            <Button type="submit">Create key</Button>
-          </form>
-          {created && (
-            <div className="mt-3 text-sm">
-              <p className="text-navy-700">
-                Store this now — it won't be shown again:
-              </p>
-              <pre className="bg-navy-50 border border-navy-200 rounded p-2 mt-1 font-mono">
-                {created}
-              </pre>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Existing keys</CardTitle>
-        </CardHeader>
-        <CardContent className="text-sm">
-          {keys.length === 0 ? (
-            <p className="text-navy-700">No API keys yet.</p>
-          ) : (
-            <table className="w-full">
-              <thead className="text-left text-navy-500 text-xs uppercase">
-                <tr>
-                  <th className="py-1">Name</th>
-                  <th>Scopes</th>
-                  <th>Created</th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody>
-                {keys.map((k) => (
-                  <tr key={k.id} className="border-t border-navy-200">
-                    <td className="py-2">{k.name}</td>
-                    <td>{k.scopes.join(", ")}</td>
-                    <td className="font-tabular">
-                      {new Date(k.createdAt).toLocaleString()}
-                    </td>
-                    <td>
-                      <Button
-                        size="sm"
-                        variant="secondary"
-                        onClick={() => revoke(k.id)}
-                      >
-                        Revoke
-                      </Button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
-        </CardContent>
-      </Card>
+          </div>
+          <div>
+            <label className="block text-xs uppercase tracking-wider text-text-mute mb-1.5 font-medium">
+              IP allowlist (optional)
+            </label>
+            <input
+              placeholder="e.g. 198.51.100.0/24, comma-separated"
+              value={ipAllowlist}
+              onChange={(e) => setIpAllowlist(e.target.value)}
+              className={inputClass + " font-mono text-xs"}
+            />
+            <p className="mt-1 text-xs text-text-mute">
+              Restrict where this key can be used from.
+            </p>
+          </div>
+        </div>
+      </Modal>
     </Container>
   );
 }

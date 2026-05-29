@@ -3,9 +3,6 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Container } from "@/components/ui/container";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { authedFetch } from "@/lib/token-storage";
 
 type UserRow = {
@@ -22,6 +19,12 @@ function nameCell(u: UserRow): string {
   const label = u.displayName ?? "";
   return u.kycTier >= 1 ? `<strong>${label}</strong>` : label;
 }
+
+const inputClass =
+  "h-10 px-3 rounded-md bg-bg border border-border text-text placeholder:text-text-mute focus:outline-none focus:ring-2 focus:ring-accent focus:border-accent transition-colors";
+
+const primaryBtn =
+  "inline-flex items-center justify-center h-10 px-4 rounded-md bg-accent text-accent-fg hover:bg-accent-hover transition-colors font-semibold text-sm";
 
 export default function AdminUsersPage() {
   const router = useRouter();
@@ -49,73 +52,108 @@ export default function AdminUsersPage() {
   }, []);
 
   return (
-    <Container className="py-12 max-w-5xl space-y-4">
-      <h1 className="text-3xl font-semibold tracking-tight text-navy-900 mb-2">
-        Users
-      </h1>
-      <Card>
-        <CardHeader>
-          <CardTitle>Search</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex items-center gap-2">
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-2xl font-semibold tracking-tight text-text">
+          Users
+        </h1>
+        <p className="text-sm text-text-dim mt-1">
+          Search by email or display name. Open a row to manage balances and
+          freeze status.
+        </p>
+      </div>
+
+      <section className="rounded-lg border border-border bg-bg-elevated p-5">
+        <div className="flex flex-wrap items-end gap-3">
+          <div className="flex-1 min-w-[200px]">
+            <label className="block text-xs uppercase tracking-wider text-text-mute mb-1.5 font-medium">
+              Search
+            </label>
             <input
               type="text"
               value={q}
               onChange={(e) => setQ(e.target.value)}
               placeholder="email or display name"
-              className="border border-navy-200 rounded px-2 py-1 text-sm flex-1"
+              className={inputClass + " w-full"}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") search();
+              }}
             />
-            <label className="text-xs flex items-center gap-1">
-              <input
-                type="checkbox"
-                checked={perf}
-                onChange={(e) => setPerf(e.target.checked)}
-              />
-              perf mode
-            </label>
-            <Button size="sm" onClick={search}>
-              Search
-            </Button>
           </div>
-        </CardContent>
-      </Card>
-      <Card>
-        <CardHeader>
-          <CardTitle>{rows?.length ?? 0} results</CardTitle>
-        </CardHeader>
-        <CardContent>
+          <label className="text-sm flex items-center gap-2 h-10 self-end text-text-dim">
+            <input
+              type="checkbox"
+              checked={perf}
+              onChange={(e) => setPerf(e.target.checked)}
+              className="accent-accent"
+            />
+            <span className="font-mono uppercase text-xs tracking-wider">
+              perf mode
+            </span>
+          </label>
+          <button type="button" className={primaryBtn} onClick={search}>
+            Search
+          </button>
+        </div>
+      </section>
+
+      <section>
+        <div className="text-xs uppercase tracking-wider text-text-mute font-medium mb-2">
+          {rows?.length ?? 0} results
+        </div>
+        <div className="rounded-lg border border-border bg-bg-elevated overflow-hidden">
           {!rows ? (
-            <p className="text-sm text-navy-700">Loading…</p>
+            <p className="px-4 py-10 text-center text-text-mute text-sm">
+              Loading…
+            </p>
           ) : rows.length === 0 ? (
-            <p className="text-sm text-navy-700">No matches.</p>
+            <p className="px-4 py-10 text-center text-text-mute text-sm">
+              No matches.
+            </p>
           ) : (
             <table className="w-full text-sm">
-              <thead className="text-left text-navy-500 text-xs uppercase">
-                <tr>
-                  <th className="py-1">Email</th>
-                  <th>Display name</th>
-                  <th>Role</th>
-                  <th>Tier</th>
-                  <th></th>
+              <thead>
+                <tr className="border-b border-border">
+                  <th className="px-4 py-3 text-left text-xs uppercase tracking-wider text-text-mute font-medium">
+                    Email
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs uppercase tracking-wider text-text-mute font-medium">
+                    Display name
+                  </th>
+                  <th className="px-4 py-3 text-left text-xs uppercase tracking-wider text-text-mute font-medium">
+                    Role
+                  </th>
+                  <th className="px-4 py-3 text-right text-xs uppercase tracking-wider text-text-mute font-medium">
+                    Tier
+                  </th>
+                  <th className="px-4 py-3" />
                 </tr>
               </thead>
               <tbody>
                 {rows.map((u) => (
                   <tr
                     key={u.id}
-                    className="border-t border-navy-100 hover:bg-navy-50"
+                    className="border-b border-border-subtle last:border-0 hover:bg-bg-hover transition-colors"
                   >
-                    <td className="py-1">{u.email}</td>
+                    <td className="px-4 py-3 text-text font-mono text-xs">
+                      {u.email}
+                    </td>
                     <td
+                      className="px-4 py-3 text-text"
                       dangerouslySetInnerHTML={{ __html: nameCell(u) }}
                     />
-                    <td>{u.role}</td>
-                    <td>{u.kycTier}</td>
-                    <td className="text-right">
+                    <td className="px-4 py-3">
+                      <span className="inline-block px-2 py-0.5 text-[10px] uppercase tracking-wider rounded bg-bg border border-border text-text-dim font-medium">
+                        {u.role}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-right font-mono tabular-nums text-text">
+                      {u.kycTier}
+                    </td>
+                    <td className="px-4 py-3 text-right">
                       <Link
                         href={`/admin/users/${u.id}`}
-                        className="text-sm text-navy-700 underline"
+                        className="text-accent text-sm hover:underline"
                       >
                         Open →
                       </Link>
@@ -125,8 +163,8 @@ export default function AdminUsersPage() {
               </tbody>
             </table>
           )}
-        </CardContent>
-      </Card>
-    </Container>
+        </div>
+      </section>
+    </div>
   );
 }

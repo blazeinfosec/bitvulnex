@@ -3,8 +3,6 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Container } from "@/components/ui/container";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { authedFetch } from "@/lib/token-storage";
 
 const CATEGORIES = [
@@ -17,9 +15,16 @@ const CATEGORIES = [
   "security",
 ] as const;
 
+const inputClass =
+  "w-full h-10 px-3 rounded-md bg-bg border border-border text-text placeholder:text-text-mute focus:outline-none focus:ring-2 focus:ring-accent focus:border-accent transition-colors";
+
+const primaryBtn =
+  "inline-flex items-center justify-center h-10 px-4 rounded-md bg-accent text-accent-fg hover:bg-accent-hover transition-colors font-semibold text-sm disabled:opacity-50 disabled:cursor-not-allowed";
+
 export default function NewTicketPage() {
   const router = useRouter();
-  const [category, setCategory] = useState<(typeof CATEGORIES)[number]>("general");
+  const [category, setCategory] =
+    useState<(typeof CATEGORIES)[number]>("general");
   const [subject, setSubject] = useState("");
   const [body, setBody] = useState("");
   const [busy, setBusy] = useState(false);
@@ -39,56 +44,70 @@ export default function NewTicketPage() {
   }
 
   return (
-    <Container className="py-12 max-w-2xl space-y-4">
-      <h1 className="text-3xl font-semibold tracking-tight text-navy-900 mb-2">
-        New support ticket
-      </h1>
-      <Card>
-        <CardHeader>
-          <CardTitle>Tell us what's going on</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3 text-sm">
-          <label className="block">
-            <span className="text-xs uppercase text-navy-500">Category</span>
-            <select
-              value={category}
-              onChange={(e) =>
-                setCategory(e.target.value as (typeof CATEGORIES)[number])
-              }
-              className="w-full border border-navy-200 rounded px-2 py-1"
-            >
-              {CATEGORIES.map((c) => (
-                <option key={c} value={c}>
-                  {c}
-                </option>
-              ))}
-            </select>
+    <Container className="py-10 max-w-2xl space-y-6">
+      <div>
+        <h1 className="text-2xl font-semibold tracking-tight text-text">
+          New support ticket
+        </h1>
+        <p className="text-sm text-text-dim mt-1">
+          A clear subject and reproducible details help us help you faster.
+        </p>
+      </div>
+
+      <section className="rounded-lg border border-border bg-bg-elevated p-6 space-y-4">
+        <div>
+          <label className="block text-xs uppercase tracking-wider text-text-mute mb-1.5 font-medium">
+            Category
           </label>
-          <label className="block">
-            <span className="text-xs uppercase text-navy-500">Subject</span>
-            <input
-              type="text"
-              value={subject}
-              onChange={(e) => setSubject(e.target.value)}
-              className="w-full border border-navy-200 rounded px-2 py-1"
-            />
+          <select
+            value={category}
+            onChange={(e) =>
+              setCategory(e.target.value as (typeof CATEGORIES)[number])
+            }
+            className={inputClass}
+          >
+            {CATEGORIES.map((c) => (
+              <option key={c} value={c}>
+                {c}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div>
+          <label className="block text-xs uppercase tracking-wider text-text-mute mb-1.5 font-medium">
+            Subject
           </label>
-          <label className="block">
-            <span className="text-xs uppercase text-navy-500">
-              Details (markdown)
-            </span>
-            <textarea
-              value={body}
-              onChange={(e) => setBody(e.target.value)}
-              rows={8}
-              className="w-full border border-navy-200 rounded p-2"
-            />
+          <input
+            type="text"
+            value={subject}
+            onChange={(e) => setSubject(e.target.value)}
+            className={inputClass}
+          />
+        </div>
+
+        <div>
+          <label className="block text-xs uppercase tracking-wider text-text-mute mb-1.5 font-medium">
+            Details (markdown)
           </label>
-          <Button size="sm" onClick={submit} disabled={busy || !subject || !body}>
-            {busy ? "Sending…" : "Open ticket"}
-          </Button>
-        </CardContent>
-      </Card>
+          <textarea
+            value={body}
+            onChange={(e) => setBody(e.target.value)}
+            rows={8}
+            className="w-full rounded-md bg-bg border border-border text-text placeholder:text-text-mute p-3 text-sm focus:outline-none focus:ring-2 focus:ring-accent focus:border-accent transition-colors"
+            placeholder="What's going on? Steps to reproduce, error messages, screenshots…"
+          />
+        </div>
+
+        <button
+          type="button"
+          className={primaryBtn}
+          onClick={submit}
+          disabled={busy || !subject || !body}
+        >
+          {busy ? "Sending…" : "Open ticket"}
+        </button>
+      </section>
     </Container>
   );
 }
