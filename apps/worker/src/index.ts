@@ -15,6 +15,7 @@ import {
   type BitcoinClient,
 } from "./withdrawal-processor.js";
 import { runMarketMakerTick, makeRedisPubSub } from "./market-maker.js";
+import { snapshotOnce } from "./equity-snapshot.js";
 
 const redisUrl = process.env.REDIS_URL ?? "redis://redis:6379";
 const mockUrl = process.env.BITCOIN_MOCK_URL ?? "http://bitcoin-mock:18443";
@@ -48,6 +49,7 @@ const YIELD_QUEUE = "yield-accrual";
 const STAKING_QUEUE = "staking-rewards";
 const WITHDRAWAL_QUEUE = "withdrawal-process";
 const MARKET_MAKER_QUEUE = "market-maker";
+const EQUITY_SNAPSHOT_QUEUE = "equity-snapshot";
 
 async function rpcCall<T>(method: string, params: unknown[]): Promise<T> {
   const res = await fetch(mockUrl, {
@@ -81,12 +83,16 @@ async function main() {
   const stakingQueue = new Queue(STAKING_QUEUE, { connection });
   const withdrawalQueue = new Queue(WITHDRAWAL_QUEUE, { connection });
   const marketMakerQueue = new Queue(MARKET_MAKER_QUEUE, { connection });
+  const equitySnapshotQueue = new Queue(EQUITY_SNAPSHOT_QUEUE, { connection });
   const depositEvents = new QueueEvents(DEPOSIT_QUEUE, { connection });
   const liquidationEvents = new QueueEvents(LIQUIDATION_QUEUE, { connection });
   const yieldEvents = new QueueEvents(YIELD_QUEUE, { connection });
   const stakingEvents = new QueueEvents(STAKING_QUEUE, { connection });
   const withdrawalEvents = new QueueEvents(WITHDRAWAL_QUEUE, { connection });
   const marketMakerEvents = new QueueEvents(MARKET_MAKER_QUEUE, { connection });
+  const equitySnapshotEvents = new QueueEvents(EQUITY_SNAPSHOT_QUEUE, {
+    connection,
+  });
 
   await depositQueue.upsertJobScheduler(
     "deposit-poll-scheduler",
@@ -117,6 +123,17 @@ async function main() {
     "market-maker-scheduler",
     { every: 2_000 },
     { name: "tick", data: {}, opts: { removeOnComplete: true, removeOnFail: 50 } },
+  );
+  // Equity snapshots — runs every 5 minutes so demos see the curve
+  // move. Production would run nightly at 00:05 UTC.
+  await equitySnapshotQueue.upsertJobScheduler(
+    "equity-snapshot-scheduler",
+    { every: 300_000 },
+    {
+      name: "snapshot",
+      data: {},
+      opts: { removeOnComplete: true, removeOnFail: 50 },
+    },
   );
 
   const depositWorker = new Worker(
@@ -201,6 +218,20 @@ async function main() {
     console.error("[worker] market-maker error:", err),
   );
 
+  const equitySnapshotWorker = new Worker(
+    EQUITY_SNAPSHOT_QUEUE,
+    async () => {
+      await snapshotOnce();
+    },
+    { connection, concurrency: 1 },
+  );
+  equitySnapshotWorker.on("ready", () =>
+    console.log("[worker] equity-snapshot ready"),
+  );
+  equitySnapshotWorker.on("error", (err) =>
+    console.error("[worker] equity-snapshot error:", err),
+  );
+
   const shutdown = async (sig: string) => {
     console.log(`[worker] received ${sig}, shutting down...`);
     await Promise.all([
@@ -210,18 +241,21 @@ async function main() {
       stakingWorker.close(),
       withdrawalWorker.close(),
       marketMakerWorker.close(),
+      equitySnapshotWorker.close(),
       depositQueue.close(),
       liquidationQueue.close(),
       yieldQueue.close(),
       stakingQueue.close(),
       withdrawalQueue.close(),
       marketMakerQueue.close(),
+      equitySnapshotQueue.close(),
       depositEvents.close(),
       liquidationEvents.close(),
       yieldEvents.close(),
       stakingEvents.close(),
       withdrawalEvents.close(),
       marketMakerEvents.close(),
+      equitySnapshotEvents.close(),
     ]);
     await mmPub.quit();
     await connection.quit();

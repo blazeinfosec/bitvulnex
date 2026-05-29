@@ -37,6 +37,11 @@ export function NavBar() {
           <Link href="/earn" className={linkClass}>
             Earn
           </Link>
+          {isAuthed ? (
+            <Link href="/portfolio" className={linkClass}>
+              Portfolio
+            </Link>
+          ) : null}
           <Link href="/otc" className={linkClass}>
             OTC
           </Link>

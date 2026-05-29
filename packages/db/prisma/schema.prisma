@@ -220,6 +220,7 @@ model User {
   complianceCasesAsSubject  ComplianceCase[]       @relation("compliance_subject")
   complianceCasesAsOpener   ComplianceCase[]       @relation("compliance_opener")
   adminAuditLogs            AdminAuditLog[]
+  equitySnapshots           EquitySnapshot[]
 
   @@map("users")
 }
@@ -770,4 +771,25 @@ model AdminAuditLog {
   @@index([actorUserId])
   @@index([targetType, targetId])
   @@map("admin_audit_logs")
+}
+
+// Phase 10 slice 5 — daily USD-equivalent equity snapshots, used to draw
+// the dashboard equity curve and compute 24h P&L. One row per
+// (user, UTC date). The snapshot worker upserts so a re-run for the same
+// day is idempotent.
+//
+// Lab cadence: the worker runs every 5 minutes instead of nightly so
+// trainee demos see a live-moving curve. See apps/worker/src/equity-snapshot.ts.
+model EquitySnapshot {
+  id         String   @id @default(cuid())
+  userId     String
+  date       DateTime @db.Date
+  totalUsd   Decimal  @db.Decimal(38, 8)
+  computedAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, date])
+  @@index([userId, date])
+  @@map("equity_snapshots")
 }

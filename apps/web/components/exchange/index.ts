@@ -14,3 +14,4 @@ export { TickerHost } from "./TickerHost";
 export { Wordmark } from "./Wordmark";
 export { WsStatusPill, type WsStatus } from "./WsStatusPill";
 export * from "./trade";
+export * from "./portfolio";
