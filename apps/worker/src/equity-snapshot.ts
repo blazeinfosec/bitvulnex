@@ -22,6 +22,10 @@
 // move. Real exchanges typically snapshot end-of-day UTC.
 
 import { Prisma, prisma } from "@bvbe/db";
+import {
+  computeUserEquityUsd,
+  type EquityInputMargin,
+} from "@bvbe/shared";
 
 const D = (s: string | number | Prisma.Decimal) => new Prisma.Decimal(s);
 
@@ -75,90 +79,80 @@ export async function computeUserEquity(
   db: EquitySnapshotDb,
 ): Promise<Prisma.Decimal> {
   const { priceFor } = await priceCache(db);
-  let total = D("0");
 
-  // Spot + margin sub-account
-  const balances = await db.balance.findMany({
-    where: { userId },
-    select: {
-      asset: true,
-      amount: true,
-      marginAvailable: true,
-    },
-  });
-  for (const b of balances) {
-    const px = await priceFor(b.asset);
-    if (px.lte(0)) continue;
-    total = total.add(D(b.amount).mul(px));
-    total = total.add(D(b.marginAvailable).mul(px));
-  }
+  // Fetch the four input collections in parallel.
+  const [balances, lending, stakes, positions] = await Promise.all([
+    db.balance.findMany({
+      where: { userId },
+      select: { asset: true, amount: true, marginAvailable: true },
+    }),
+    db.lendingPosition.findMany({
+      where: { userId, status: "open" },
+      select: { pool: true, side: true, principal: true, accrued: true },
+    }),
+    db.stakingPosition.findMany({
+      where: { userId, status: "active" },
+      select: { asset: true, principal: true },
+    }),
+    db.marginPosition.findMany({
+      where: { userId, status: "open" },
+      select: {
+        side: true,
+        size: true,
+        entryPrice: true,
+        pair: true,
+        collateral: true,
+        collateralAsset: true,
+      },
+    }),
+  ]);
 
-  // Lending positions: supply credits, borrow debits
-  const lending = await db.lendingPosition.findMany({
-    where: { userId, status: "open" },
-    select: { pool: true, side: true, principal: true, accrued: true },
-  });
-  for (const lp of lending) {
-    const px = await priceFor(lp.pool);
-    if (px.lte(0)) continue;
-    const value = D(lp.principal).add(D(lp.accrued)).mul(px);
-    total = lp.side === "supply" ? total.add(value) : total.sub(value);
-  }
-
-  // Staking positions — principal sits inside the staking sub-account.
-  // Rewards have already been credited to Balance.available by the
-  // staking-rewards worker so they're counted via the balance loop.
-  const stakes = await db.stakingPosition.findMany({
-    where: { userId, status: "active" },
-    select: { asset: true, principal: true },
-  });
-  for (const sp of stakes) {
-    const px = await priceFor(sp.asset);
-    if (px.lte(0)) continue;
-    total = total.add(D(sp.principal).mul(px));
-  }
-
-  // Margin positions — re-add collateral (which left marginAvailable
-  // when the position opened) and the unrealized P&L on the position.
-  const positions = await db.marginPosition.findMany({
-    where: { userId, status: "open" },
-    select: {
-      side: true,
-      size: true,
-      entryPrice: true,
-      pair: true,
-      collateral: true,
-      collateralAsset: true,
-    },
-  });
+  // Mark price per open margin pair.
+  const markByPair = new Map<string, Prisma.Decimal | null>();
   for (const p of positions) {
-    // Re-add the collateral (which lives in the position, not in
-    // marginAvailable).
-    const collPx = await priceFor(p.collateralAsset);
-    if (collPx.gt(0)) {
-      total = total.add(D(p.collateral).mul(collPx));
-    }
-    // Mark price from the latest trade on the pair.
-    const lastTrade = await db.trade.findFirst({
+    if (markByPair.has(p.pair)) continue;
+    const t = await db.trade.findFirst({
       where: { pair: p.pair },
       orderBy: { executedAt: "desc" },
       select: { price: true },
     });
-    if (!lastTrade) continue;
-    const mark = D(lastTrade.price);
-    const entry = D(p.entryPrice);
-    const size = D(p.size);
-    const diff = p.side === "long" ? mark.sub(entry) : entry.sub(mark);
-    // P&L is denominated in the quote asset of the pair; for
-    // `BTC/USDT` etc. that's USD-equivalent already. For exotic pairs
-    // we approximate by converting via the quote's USD price.
-    const quote = p.pair.split("/")[1] ?? "USDT";
-    const quotePx = await priceFor(quote);
-    if (quotePx.lte(0)) continue;
-    total = total.add(size.mul(diff).mul(quotePx));
+    markByPair.set(p.pair, t ? D(t.price) : null);
   }
 
-  return total;
+  // Resolve all asset USD prices up-front so the pure helper has a
+  // synchronous lookup (asset -> Decimal). Stablecoins are handled
+  // inside priceCache.
+  const usdAssets = new Set<string>();
+  for (const b of balances) usdAssets.add(b.asset);
+  for (const lp of lending) usdAssets.add(lp.pool);
+  for (const sp of stakes) usdAssets.add(sp.asset);
+  for (const p of positions) {
+    usdAssets.add(p.collateralAsset);
+    const quote = p.pair.split("/")[1];
+    if (quote) usdAssets.add(quote);
+  }
+  const priceMap = new Map<string, Prisma.Decimal>();
+  for (const asset of usdAssets) {
+    priceMap.set(asset, await priceFor(asset));
+  }
+
+  const margin: EquityInputMargin[] = positions.map((p) => ({
+    pair: p.pair,
+    side: p.side,
+    size: p.size,
+    entryPrice: p.entryPrice,
+    collateral: p.collateral,
+    collateralAsset: p.collateralAsset,
+    markPrice: markByPair.get(p.pair) ?? null,
+  }));
+
+  return computeUserEquityUsd({
+    balances,
+    lending,
+    staking: stakes,
+    margin,
+    priceUsd: (asset) => priceMap.get(asset) ?? D("0"),
+  });
 }
 
 export async function snapshotOnce(

@@ -9,3 +9,4 @@ export * from "./margin";
 export * from "./yield";
 export * from "./psbt-envelope";
 export * from "./markdown";
+export * from "./equity";

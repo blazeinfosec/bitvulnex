@@ -5,6 +5,10 @@
 
 import { NextResponse } from "next/server";
 import { Prisma, prisma } from "@bvbe/db";
+import {
+  computeUserEquityUsd,
+  type EquityInputMargin,
+} from "@bvbe/shared";
 import { userFromAuthorization } from "@/lib/auth";
 import { jsonError } from "@/lib/api";
 import { registerEndpoint } from "@/lib/openapi-registry";
@@ -144,7 +148,15 @@ export async function GET(req: Request) {
     }),
     prisma.marginPosition.findMany({
       where: { userId, status: "open" },
-      select: { id: true },
+      select: {
+        id: true,
+        pair: true,
+        side: true,
+        size: true,
+        entryPrice: true,
+        collateral: true,
+        collateralAsset: true,
+      },
     }),
     prisma.lendingPosition.findMany({
       where: { userId, status: "open" },
@@ -153,6 +165,7 @@ export async function GET(req: Request) {
         pool: true,
         side: true,
         principal: true,
+        accrued: true,
         openedAt: true,
         closedAt: true,
       },
@@ -298,12 +311,10 @@ export async function GET(req: Request) {
     marginBorrowed: string;
     usdValue: string;
   }> = [];
-  let liveEquity = D("0");
+  // Per-balance USD row (display only).
   for (const b of balances) {
     const px = await priceFor(b.asset);
     const usd = D(b.amount).mul(px);
-    const marginUsd = D(b.marginAvailable).mul(px);
-    liveEquity = liveEquity.add(usd).add(marginUsd);
     balanceRows.push({
       asset: b.asset,
       amount: b.amount.toString(),
@@ -314,20 +325,50 @@ export async function GET(req: Request) {
       usdValue: usd.toFixed(2),
     });
   }
-  // Fold in lending / staking / margin position contributions for the
-  // live equity number so it agrees with the snapshot worker.
-  for (const lp of lendingPositions) {
-    const px = await priceFor(lp.pool);
-    if (px.lte(0)) continue;
-    const value = D(lp.principal).mul(px);
-    liveEquity =
-      lp.side === "supply" ? liveEquity.add(value) : liveEquity.sub(value);
+
+  // Live equity uses the SAME formula as the snapshot worker so the
+  // 24h delta math agrees. Mark prices for open margin pairs come
+  // from the latest trade per pair.
+  const markByPair = new Map<string, Prisma.Decimal | null>();
+  for (const p of openMargin) {
+    if (markByPair.has(p.pair)) continue;
+    const t = await prisma.trade.findFirst({
+      where: { pair: p.pair },
+      orderBy: { executedAt: "desc" },
+      select: { price: true },
+    });
+    markByPair.set(p.pair, t ? D(t.price) : null);
   }
-  for (const sp of stakingPositions) {
-    const px = await priceFor(sp.asset);
-    if (px.lte(0)) continue;
-    liveEquity = liveEquity.add(D(sp.principal).mul(px));
+  // Pre-resolve all asset USD prices the helper will need.
+  const usdAssets = new Set<string>();
+  for (const b of balances) usdAssets.add(b.asset);
+  for (const lp of lendingPositions) usdAssets.add(lp.pool);
+  for (const sp of stakingPositions) usdAssets.add(sp.asset);
+  for (const p of openMargin) {
+    usdAssets.add(p.collateralAsset);
+    const quote = p.pair.split("/")[1];
+    if (quote) usdAssets.add(quote);
   }
+  const priceMap = new Map<string, Prisma.Decimal>();
+  for (const asset of usdAssets) {
+    priceMap.set(asset, await priceFor(asset));
+  }
+  const marginInputs: EquityInputMargin[] = openMargin.map((p) => ({
+    pair: p.pair,
+    side: p.side,
+    size: p.size,
+    entryPrice: p.entryPrice,
+    collateral: p.collateral,
+    collateralAsset: p.collateralAsset,
+    markPrice: markByPair.get(p.pair) ?? null,
+  }));
+  const liveEquity = computeUserEquityUsd({
+    balances,
+    lending: lendingPositions,
+    staking: stakingPositions,
+    margin: marginInputs,
+    priceUsd: (asset) => priceMap.get(asset) ?? D("0"),
+  });
 
   // 24h delta from snapshot history (use the most recent snapshot
   // older than ~24h, else fall back to the oldest available).
