@@ -23,7 +23,9 @@ import { createHash } from "node:crypto";
 // New Pattern C plants land here as their wiring ships in slice 2.
 const PATTERN_C_SECRETS: Record<string, string> = {
   "V-9": "changeme",
+  "V-15": "CVE-2023-0842",
   "V-48": "devsecret-do-not-use-in-prod-bvbe-2026",
+  "V-49": "@bvbe-internal/observability",
 };
 
 export function derivableFlag(vulnId: string, secret: string): string {

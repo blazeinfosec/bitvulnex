@@ -9,6 +9,7 @@ import {
   NotFoundError,
   bumpWithdrawalFee,
 } from "@/lib/withdrawal/rbf";
+import { maybeEmitFlag } from "@/lib/ctf/emit";
 
 registerEndpoint({
   method: "post",
@@ -50,7 +51,9 @@ export async function POST(
       newFeeSat: parsed.data.newFeeSat,
       operatorUserId: claims.sub,
     });
-    return NextResponse.json(out);
+    const body =
+      Number(out.refundBtc) > 0 ? maybeEmitFlag(out, "V-47") : out;
+    return NextResponse.json(body);
   } catch (e) {
     if (e instanceof NotFoundError) return jsonError(e.status, e.message);
     if (e instanceof BumpValidationError)

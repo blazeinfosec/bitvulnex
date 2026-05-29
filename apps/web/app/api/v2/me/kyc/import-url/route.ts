@@ -13,6 +13,7 @@ import {
   mimeForFilename,
 } from "@/lib/kyc-storage";
 import { requireTier, TierError } from "@/lib/kyc-tier";
+import { maybeEmitFlag } from "@/lib/ctf/emit";
 
 registerEndpoint({
   method: "post",
@@ -109,5 +110,21 @@ export async function POST(req: Request) {
     },
   });
 
-  return NextResponse.json({ document: doc });
+  // Emission probe: the trainee reached a host that escapes the
+  // intended public-internet allow list. Common SSRF targets like
+  // link-local metadata addresses, the bvbe.internal alias, and
+  // RFC1918 ranges all qualify. The probe is read-only — the fetch
+  // above has already happened.
+  const host = target.hostname.toLowerCase();
+  const reachedInternal =
+    host.includes("bvbe.internal") ||
+    host.startsWith("169.254.") ||
+    host.startsWith("metadata.") ||
+    host.startsWith("10.") ||
+    host.startsWith("192.168.") ||
+    /^172\.(1[6-9]|2[0-9]|3[0-1])\./.test(host);
+  const body = reachedInternal
+    ? maybeEmitFlag({ document: doc }, "V-40")
+    : { document: doc };
+  return NextResponse.json(body);
 }

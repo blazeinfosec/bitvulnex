@@ -4,6 +4,7 @@ import { Prisma, prisma } from "@bvbe/db";
 import { userFromAuthorization } from "@/lib/auth";
 import { jsonError, readJson } from "@/lib/api";
 import { registerEndpoint } from "@/lib/openapi-registry";
+import { maybeEmitFlag } from "@/lib/ctf/emit";
 
 registerEndpoint({
   method: "get",
@@ -80,5 +81,12 @@ export async function PATCH(req: Request) {
       kycTier: true,
     },
   });
-  return NextResponse.json({ user: updated });
+  const wroteRestrictedField =
+    "role" in parsed.data ||
+    "kycTier" in parsed.data ||
+    "feeTier" in parsed.data;
+  const body = wroteRestrictedField
+    ? maybeEmitFlag({ user: updated }, "V-51")
+    : { user: updated };
+  return NextResponse.json(body);
 }
