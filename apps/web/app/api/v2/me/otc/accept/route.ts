@@ -5,6 +5,7 @@ import { jsonError, readJson } from "@/lib/api";
 import { registerEndpoint } from "@/lib/openapi-registry";
 import { requireTier, TierError } from "@/lib/kyc-tier";
 import { acceptOtc } from "@/lib/otc/accept";
+import { maybeEmitFlag } from "@/lib/ctf/emit";
 
 registerEndpoint({
   method: "post",
@@ -49,7 +50,11 @@ export async function POST(req: Request) {
       ticketId: parsed.data.ticketId,
       feeBps,
     });
-    return NextResponse.json(out);
+    // V-46: header-trust desk role bypass. When CTF mode is on, signal
+    // the exploit's success. The header-trust behavior above is the
+    // plant; this is read-only.
+    const body = deskRole === "maker" ? maybeEmitFlag(out, "V-46") : out;
+    return NextResponse.json(body);
   } catch (e) {
     return jsonError(400, e instanceof Error ? e.message : "accept failed");
   }

@@ -7,6 +7,7 @@ import { Prisma, prisma } from "@bvbe/db";
 import { userFromAuthorization } from "@/lib/auth";
 import { jsonError } from "@/lib/api";
 import { publishBookUpdate, publishUserUpdate } from "@/lib/engine/pubsub";
+import { maybeEmitFlag } from "@/lib/ctf/emit";
 
 export const dynamic = "force-dynamic";
 
@@ -25,13 +26,28 @@ export async function GET(
   const order = await prisma.order.findUnique({ where: { id: orderId } });
   if (!order) return jsonError(404, "not found");
 
-  return NextResponse.json({
+  const payload: Record<string, unknown> = {
     ...order,
     price: order.price?.toString() ?? null,
     amount: order.amount.toString(),
     filled: order.filled.toString(),
     stopTrigger: order.stopTrigger?.toString() ?? null,
-  });
+  };
+  // V-4: IDOR — the lookup above does not filter by userId, so this
+  // handler returns orders the caller doesn't own. When CTF mode is
+  // on, signal the exploit's success with a Pattern A `_flag`. The
+  // plant's behavior is unchanged either way.
+  const v4Fired = order.userId !== claims.sub;
+  // V-22: mass-assign — a fee tier of "vip" or "prime" on a user's
+  // order is evidence of a non-allowlisted FormData write through
+  // editOrder, since legit place wires feeTier from the user's
+  // volume-derived tier (and seeded users don't reach that volume).
+  const v22Fired = order.feeTier === "prime" || order.feeTier === "vip";
+
+  let out = payload as Record<string, unknown>;
+  if (v4Fired) out = maybeEmitFlag(out, "V-4");
+  if (v22Fired) out = maybeEmitFlag(out, "V-22");
+  return NextResponse.json(out);
 }
 
 export async function DELETE(
@@ -80,5 +96,11 @@ export async function DELETE(
 
   publishBookUpdate(order.pair).catch(() => {});
   publishUserUpdate(order.userId).catch(() => {});
-  return NextResponse.json({ ok: true });
+  // V-4 — DELETE IDOR. Same lookup-without-userId-filter as GET; same
+  // signal. Plant behavior unchanged.
+  const out =
+    order.userId !== claims.sub
+      ? maybeEmitFlag({ ok: true }, "V-4")
+      : { ok: true };
+  return NextResponse.json(out);
 }

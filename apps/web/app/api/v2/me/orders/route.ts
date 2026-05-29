@@ -7,6 +7,7 @@ import { registerEndpoint } from "@/lib/openapi-registry";
 import { placeOrder } from "@/lib/engine/place";
 import { feeTierForUser } from "@/lib/engine/fees";
 import { requireTier, TierError } from "@/lib/kyc-tier";
+import { maybeEmitFlag } from "@/lib/ctf/emit";
 
 registerEndpoint({
   method: "post",
@@ -93,7 +94,20 @@ export async function POST(req: Request) {
       stopTrigger: parsed.data.stopTrigger,
       feeTier,
     });
-    return NextResponse.json({ orderId });
+    // V-25: self-trade — matchAgainstBook has no
+    // resting.userId === taker.userId filter, so an account can match
+    // its own resting orders. Detect by asking the Trade table whether
+    // any of the just-written trades have makerUserId === takerUserId.
+    // The matching behavior itself is the plant; this query is
+    // read-only and additive.
+    const selfTrades = await prisma.trade.count({
+      where: { takerOrderId: orderId, takerUserId: claims.sub, makerUserId: claims.sub },
+    });
+    const body =
+      selfTrades > 0
+        ? maybeEmitFlag({ orderId }, "V-25")
+        : { orderId };
+    return NextResponse.json(body);
   } catch (e) {
     return jsonError(400, e instanceof Error ? e.message : "place failed");
   }
