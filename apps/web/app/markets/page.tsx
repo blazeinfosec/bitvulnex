@@ -11,6 +11,8 @@ import {
   PercentChangeCell,
   PriceCell,
   Skeleton,
+  WsStatusPill,
+  type WsStatus,
 } from "@/components/exchange";
 import { cn } from "@/lib/utils";
 
@@ -30,22 +32,6 @@ type TickerRow = {
   last: string;
   change24h: number;
   vol24h: string;
-};
-
-type WsStatus = "live" | "reconnecting" | "disconnected" | "connecting";
-
-const STATUS_LABEL: Record<WsStatus, string> = {
-  live: "Live",
-  reconnecting: "Reconnecting…",
-  disconnected: "Disconnected",
-  connecting: "Connecting…",
-};
-
-const STATUS_COLOR: Record<WsStatus, string> = {
-  live: "bg-buy",
-  reconnecting: "bg-warn",
-  disconnected: "bg-sell",
-  connecting: "bg-warn",
 };
 
 function pairSlug(pair: string): string {
@@ -268,7 +254,7 @@ function MarketsPageInner() {
         align: "right",
         render: (r) => (
           <Link
-            href={`/account/trading/${pairSlug(r.pair)}`}
+            href={`/trade/${pairSlug(r.pair)}`}
             className="inline-flex items-center gap-1 text-accent hover:text-accent-hover text-sm font-medium no-underline"
           >
             Trade →
@@ -290,17 +276,7 @@ function MarketsPageInner() {
             Real-time spot prices across all listed pairs.
           </p>
         </div>
-        <div className="flex items-center gap-2 text-xs text-text-dim">
-          <span
-            className={cn(
-              "inline-block w-2 h-2 rounded-full",
-              STATUS_COLOR[status],
-              status === "live" ? "animate-pulse" : "",
-            )}
-            aria-hidden
-          />
-          <span aria-live="polite">{STATUS_LABEL[status]}</span>
-        </div>
+        <WsStatusPill status={status} />
       </div>
 
       <div className="mb-4 flex items-center gap-2 text-xs">

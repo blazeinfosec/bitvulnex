@@ -43,7 +43,7 @@ export function TickerChyron({ markets, className }: TickerChyronProps) {
         {items.map((m, idx) => (
           <Link
             key={`${m.pair}-${idx}`}
-            href={`/account/trading/${m.pair.replace("/", "-")}`}
+            href={`/trade/${m.pair.replace("/", "-")}`}
             className="inline-flex items-center gap-2 px-6 text-sm no-underline hover:text-accent"
           >
             <span className="text-text-dim font-medium">{m.pair}</span>

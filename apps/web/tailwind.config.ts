@@ -55,10 +55,15 @@ const config: Config = {
           "0%": { backgroundColor: "rgba(246, 70, 93, 0.3)" },
           "100%": { backgroundColor: "transparent" },
         },
+        slideUp: {
+          "0%": { transform: "translateY(100%)" },
+          "100%": { transform: "translateY(0)" },
+        },
       },
       animation: {
         "flash-buy": "flashBuy 250ms ease-out",
         "flash-sell": "flashSell 250ms ease-out",
+        "slide-up": "slideUp 200ms ease-out",
       },
     },
   },

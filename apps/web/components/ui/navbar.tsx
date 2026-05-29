@@ -30,7 +30,7 @@ export function NavBar() {
             Markets
           </Link>
           {isAuthed ? (
-            <Link href="/account/trading/BTC-USDT" className={linkClass}>
+            <Link href="/trade/BTC-USDT" className={linkClass}>
               Trade
             </Link>
           ) : null}

@@ -20,6 +20,7 @@
     "clsx": "^2.1.1",
     "ioredis": "^5.4.1",
     "jose": "^5.9.3",
+    "lightweight-charts": "^5.0.0",
     "lucide-react": "^0.451.0",
     "next": "^15.0.0",
     "react": "^19.0.0",
