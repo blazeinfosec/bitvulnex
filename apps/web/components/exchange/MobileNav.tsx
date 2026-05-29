@@ -12,10 +12,9 @@ interface MobileNavProps {
   open: boolean;
   onClose: () => void;
   isAuthed: boolean;
-  isAdmin: boolean;
 }
 
-export function MobileNav({ open, onClose, isAuthed, isAdmin }: MobileNavProps) {
+export function MobileNav({ open, onClose, isAuthed }: MobileNavProps) {
   const panelRef = useRef<HTMLDivElement | null>(null);
   const previouslyFocused = useRef<HTMLElement | null>(null);
 
@@ -103,13 +102,6 @@ export function MobileNav({ open, onClose, isAuthed, isAdmin }: MobileNavProps) 
       ],
     });
   }
-  if (isAuthed && isAdmin) {
-    sections.push({
-      label: "Admin",
-      items: [{ href: "/admin", label: "Admin dashboard" }],
-    });
-  }
-
   return (
     <div
       className="fixed inset-0 z-40 md:hidden"

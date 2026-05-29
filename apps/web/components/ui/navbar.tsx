@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import { Container } from "./container";
 import { Wordmark } from "@/components/exchange/Wordmark";
 import { MobileNav } from "@/components/exchange/MobileNav";
-import { authedFetch, getAccessToken } from "@/lib/token-storage";
+import { getAccessToken } from "@/lib/token-storage";
 
 const linkClass =
   "px-3 py-2 text-sm font-medium text-text-dim hover:text-text transition-colors rounded-md no-underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent";
@@ -60,7 +60,6 @@ function NavDropdown({
 
 export function NavBar() {
   const [isAuthed, setIsAuthed] = useState(false);
-  const [role, setRole] = useState<string | null>(null);
   const [mobileOpen, setMobileOpen] = useState(false);
 
   useEffect(() => {
@@ -69,24 +68,6 @@ export function NavBar() {
     window.addEventListener("storage", onStorage);
     return () => window.removeEventListener("storage", onStorage);
   }, []);
-
-  useEffect(() => {
-    if (!isAuthed) {
-      setRole(null);
-      return;
-    }
-    (async () => {
-      try {
-        const res = await authedFetch("/api/v2/me");
-        if (res.ok) {
-          const body = (await res.json()) as { role?: string };
-          setRole(body.role ?? null);
-        }
-      } catch {
-        // ignore
-      }
-    })();
-  }, [isAuthed]);
 
   return (
     <header className="border-b border-border bg-bg-elevated relative z-20">
@@ -153,11 +134,6 @@ export function NavBar() {
               ]}
             />
           ) : null}
-          {isAuthed && role === "admin" ? (
-            <Link href="/admin" className={linkClass}>
-              Admin
-            </Link>
-          ) : null}
           {!isAuthed ? (
             <>
               <Link
@@ -207,7 +183,6 @@ export function NavBar() {
           open={mobileOpen}
           onClose={() => setMobileOpen(false)}
           isAuthed={isAuthed}
-          isAdmin={role === "admin"}
         />
       </div>
     </header>

@@ -20,16 +20,7 @@ export function DoNotDeployBanner({
           DO NOT DEPLOY — Blaze Vulnerable Bitcoin Exchange is an
           intentionally vulnerable lab.{" "}
           {variant === "top" ? (
-            <>
-              See{" "}
-              <a
-                href="/about/changelog"
-                className="underline text-warn hover:text-accent"
-              >
-                /about/changelog
-              </a>{" "}
-              and the LICENSE for terms of use.
-            </>
+            <>See the LICENSE for terms of use.</>
           ) : (
             <>Authorized security training only. No real funds. No public networks.</>
           )}

@@ -23,12 +23,6 @@ export function Footer() {
             <Link href="/docs" className="hover:text-accent no-underline">
               API docs
             </Link>
-            <Link
-              href="/about/changelog"
-              className="hover:text-accent no-underline"
-            >
-              Changelog
-            </Link>
             <Link href="/status" className="hover:text-accent no-underline">
               Status
             </Link>
