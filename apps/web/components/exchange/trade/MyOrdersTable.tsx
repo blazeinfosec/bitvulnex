@@ -74,10 +74,6 @@ const TAB_LABEL: Record<TabKey, string> = {
  * Bottom-area tabs on the trading page: open orders, order history,
  * trade history, positions. Each tab uses DataTable. Open orders has a
  * cancel button per row that calls DELETE /api/v2/me/orders/:id.
- *
- * NOTE: the DELETE handler currently has a planted IDOR (V-4). The UI
- * doesn't introduce any new exploit and doesn't try to filter on the
- * client; cancellation flows through the server route unchanged.
  */
 export function MyOrdersTable({
   pair,
@@ -178,8 +174,6 @@ export function MyOrdersTable({
   async function cancel(id: number) {
     setBusyIds((prev) => new Set(prev).add(id));
     try {
-      // NB: V-4 IDOR planted in the DELETE handler. We call it as
-      // designed; the lab's product is the planted hole.
       await authedFetch(`/api/v2/me/orders/${id}`, { method: "DELETE" });
       localRefresh();
       onChange?.();

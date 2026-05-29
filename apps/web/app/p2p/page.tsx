@@ -73,7 +73,6 @@ export default function P2PPage() {
     {
       key: "maker",
       header: "Maker",
-      // V-1: P2P side renders displayName as plain React text (escaped by default).
       render: (o) => <span className="text-text">{o.maker ?? "—"}</span>,
     },
     {

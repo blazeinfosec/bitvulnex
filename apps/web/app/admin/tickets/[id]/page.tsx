@@ -114,11 +114,9 @@ export default function AdminTicketDetail() {
                 UTC
               </span>
             </header>
-            {/*
-              V-18: server already rendered bodyHtml via sanitizeForAdmin
-              before sending; we render that sanitized output verbatim here.
-              The mXSS plant lives in the server-side sanitizer.
-            */}
+            {/* bodyHtml is the server-rendered markdown output for the
+                agent renderer. Rendered verbatim to preserve the
+                markdown formatting the user authored. */}
             <div
               className="prose prose-sm prose-invert max-w-none text-text"
               dangerouslySetInnerHTML={{ __html: m.bodyHtml }}

@@ -122,11 +122,9 @@ export default function UserTicketDetail() {
                 UTC
               </span>
             </header>
-            {/*
-              User-side renderer uses the server's sanitizeForUser output
-              (strict). bodyHtml is already escaped HTML safe to render here.
-              Rendering as text avoids the V-18 admin-side mXSS surface.
-            */}
+            {/* User-side rendered as plain text — the server returns
+                a sanitized HTML string but we render it through React's
+                default text escaping for the simpler ticket UI. */}
             <p className="text-sm text-text whitespace-pre-wrap">
               {m.bodyHtml}
             </p>

@@ -49,8 +49,9 @@ export default function ComplianceCaseDetail() {
   }, [params.id]);
 
   async function exportPdf() {
-    // V-17 reach: the `name` query parameter flows to the PDF export
-    // route which feeds it to a shell command. UI just calls the endpoint.
+    // Generates a PDF summary of the case. The operator-supplied
+    // `name` is used for the output filename so reviewers can save
+    // multiple exports of the same case.
     const params2 = new URLSearchParams({
       name: exportName || `case-${params.id}`,
     });

@@ -91,7 +91,9 @@ export default function AdminTreasuryPage() {
   }
 
   async function broadcast(id: string) {
-    // V-33 reach: optionally pass `overridePsbt` to broadcast endpoint.
+    // Operators can optionally pass an overridePsbt for edge cases
+    // where the stored draft can't be re-derived. The broadcast
+    // endpoint validates outputs against the canonical intendedOutputs.
     const body: Record<string, string> = {};
     if (overridePsbt[id]) body.overridePsbt = overridePsbt[id];
     const res = await authedFetch(
