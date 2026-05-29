@@ -50,9 +50,6 @@ export async function POST(req: Request) {
       ticketId: parsed.data.ticketId,
       feeBps,
     });
-    // V-46: header-trust desk role bypass. When CTF mode is on, signal
-    // the exploit's success. The header-trust behavior above is the
-    // plant; this is read-only.
     const body = deskRole === "maker" ? maybeEmitFlag(out, "V-46") : out;
     return NextResponse.json(body);
   } catch (e) {
