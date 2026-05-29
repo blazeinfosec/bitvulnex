@@ -26,10 +26,13 @@ export interface BorrowModalProps {
   apyBps: number;
   /** All non-zero spot balances the user could pledge as collateral. */
   collateralOptions: BorrowAvailableAsset[];
+  /** USD price lookup for FX conversion in the LTV preview. */
+  priceInUsd: (asset: string) => number | null;
 }
 
-// 150% LTV: collateralAmount must equal 1.5x notional. Borrow lib expects
-// collateral in the same units as the asset, computed off-line by client.
+// 150% LTV: collateralValueUsd must equal 1.5x borrowValueUsd. The server
+// (lib/lending/borrow.ts) values both legs in USDT before comparing; the
+// modal mirrors that math so the preview matches what submission accepts.
 const LTV_RATIO = 1.5;
 
 export function BorrowModal({
@@ -39,6 +42,7 @@ export function BorrowModal({
   asset,
   apyBps,
   collateralOptions,
+  priceInUsd,
 }: BorrowModalProps) {
   const [amount, setAmount] = useState("");
   const [collateralAsset, setCollateralAsset] = useState<string>(
@@ -60,12 +64,24 @@ export function BorrowModal({
   const amountNum = Number(amount);
   const amountValid =
     amount !== "" && Number.isFinite(amountNum) && amountNum > 0;
-  const collateralNeeded = amountValid ? amountNum * LTV_RATIO : 0;
+
+  // Cross-asset LTV math: value both legs in USD, then convert the required
+  // collateral USD back into collateralAsset units. Falls back to null when
+  // a price is missing — the submit button stays disabled and we surface
+  // why so the user isn't left guessing.
+  const borrowPrice = priceInUsd(asset);
+  const collateralPrice = collateralAsset ? priceInUsd(collateralAsset) : null;
+  const pricesOk = borrowPrice !== null && collateralPrice !== null;
+  const collateralNeeded =
+    amountValid && pricesOk && collateralPrice! > 0
+      ? (amountNum * borrowPrice!) / collateralPrice! * LTV_RATIO
+      : 0;
   const collateralAvail = Number(
     collateralOptions.find((c) => c.asset === collateralAsset)?.available ?? "0",
   );
-  const collateralOk = amountValid && collateralNeeded <= collateralAvail;
-  const canSubmit = amountValid && collateralOk && collateralAsset && !busy;
+  const collateralOk = amountValid && pricesOk && collateralNeeded <= collateralAvail;
+  const canSubmit =
+    amountValid && pricesOk && collateralOk && collateralAsset && !busy;
 
   async function submit() {
     if (!canSubmit) return;
@@ -158,10 +174,20 @@ export function BorrowModal({
               ))}
             </select>
           )}
+          {/* Pills are in BORROW-asset units. Max borrow = collateral
+              value / LTV / borrow price. */}
           <PercentPills
-            available={(collateralAvail / LTV_RATIO).toString()}
+            available={
+              pricesOk && borrowPrice! > 0
+                ? (
+                    (collateralAvail * collateralPrice!) /
+                    borrowPrice! /
+                    LTV_RATIO
+                  ).toFixed(8)
+                : "0"
+            }
             onPick={setAmount}
-            disabled={busy}
+            disabled={busy || !pricesOk}
           />
         </ModalField>
 
@@ -184,7 +210,14 @@ export function BorrowModal({
           </div>
         </div>
 
-        {amountValid && !collateralOk && (
+        {!pricesOk && amountValid && (
+          <p className="text-xs text-warn">
+            Price feed not ready for {borrowPrice === null ? asset : collateralAsset}.
+            Try again in a moment.
+          </p>
+        )}
+
+        {pricesOk && amountValid && !collateralOk && (
           <p className="text-xs text-sell">
             Insufficient {collateralAsset}. Need {formatDecimal(collateralNeeded)},
             available {formatDecimal(collateralAvail.toString())}.

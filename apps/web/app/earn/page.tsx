@@ -630,6 +630,7 @@ function EarnPageInner() {
         collateralOptions={
           modal.kind === "borrow" ? modal.collateralOptions : []
         }
+        priceInUsd={(a) => priceInUsd(a, markets)}
       />
       <RepayModal
         open={modal.kind === "repay"}
