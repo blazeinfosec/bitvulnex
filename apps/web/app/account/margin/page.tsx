@@ -76,7 +76,7 @@ export default function MarginPage() {
 
   return (
     <Container className="py-12 max-w-4xl space-y-4">
-      <h1 className="text-3xl font-semibold tracking-tight text-navy-900 mb-2">
+      <h1 className="text-3xl font-semibold tracking-tight text-text mb-2">
         Margin trading
       </h1>
 
@@ -89,7 +89,7 @@ export default function MarginPage() {
             <select
               value={pair}
               onChange={(e) => setPair(e.target.value)}
-              className="border border-navy-200 rounded-md h-10 px-3"
+              className="border border-border rounded-md h-10 px-3"
             >
               <option value="BTC/USDT">BTC/USDT</option>
               <option value="ETH/USDT">ETH/USDT</option>
@@ -117,12 +117,12 @@ export default function MarginPage() {
               placeholder="size (base units)"
               value={size}
               onChange={(e) => setSize(e.target.value)}
-              className="border border-navy-200 rounded-md h-10 px-3 font-mono"
+              className="border border-border rounded-md h-10 px-3 font-mono"
             />
             <select
               value={leverage}
               onChange={(e) => setLeverage(Number(e.target.value))}
-              className="border border-navy-200 rounded-md h-10 px-3"
+              className="border border-border rounded-md h-10 px-3"
             >
               <option value={2}>2× (tier 1+)</option>
               <option value={3}>3× (tier 2+)</option>
@@ -133,7 +133,7 @@ export default function MarginPage() {
               <Button type="submit">
                 Open {side} {leverage}×
               </Button>
-              {message && <p className="text-navy-700 mt-2">{message}</p>}
+              {message && <p className="text-text-dim mt-2">{message}</p>}
             </div>
           </form>
         </CardContent>
@@ -145,10 +145,10 @@ export default function MarginPage() {
         </CardHeader>
         <CardContent className="text-sm">
           {open_positions.length === 0 ? (
-            <p className="text-navy-700">No open positions.</p>
+            <p className="text-text-dim">No open positions.</p>
           ) : (
             <table className="w-full">
-              <thead className="text-left text-navy-500 text-xs uppercase">
+              <thead className="text-left text-text-mute text-xs uppercase">
                 <tr>
                   <th>Pair</th>
                   <th>Side</th>
@@ -161,7 +161,7 @@ export default function MarginPage() {
               </thead>
               <tbody className="font-tabular">
                 {open_positions.map((p) => (
-                  <tr key={p.id} className="border-t border-navy-200">
+                  <tr key={p.id} className="border-t border-border">
                     <td className="py-2">{p.pair}</td>
                     <td>{p.side}</td>
                     <td>{p.size}</td>
@@ -192,7 +192,7 @@ export default function MarginPage() {
           </CardHeader>
           <CardContent className="text-sm">
             <table className="w-full">
-              <thead className="text-left text-navy-500 text-xs uppercase">
+              <thead className="text-left text-text-mute text-xs uppercase">
                 <tr>
                   <th>Pair</th>
                   <th>Side</th>
@@ -202,7 +202,7 @@ export default function MarginPage() {
               </thead>
               <tbody className="font-tabular">
                 {history.slice(0, 20).map((p) => (
-                  <tr key={p.id} className="border-t border-navy-200">
+                  <tr key={p.id} className="border-t border-border">
                     <td className="py-2">{p.pair}</td>
                     <td>{p.side}</td>
                     <td>{p.status}</td>

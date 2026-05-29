@@ -28,7 +28,7 @@ export default function ForgotPage() {
         </CardHeader>
         <CardContent>
           {sent ? (
-            <p className="text-sm text-navy-700">
+            <p className="text-sm text-text-dim">
               If an account exists for that email, a reset link has been issued.
               In this lab, the reset URL is printed to the server console.
             </p>
@@ -40,12 +40,12 @@ export default function ForgotPage() {
                 placeholder="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full border border-navy-200 rounded-md h-10 px-3"
+                className="w-full border border-border rounded-md h-10 px-3"
               />
               <Button type="submit" className="w-full">
                 Send reset link
               </Button>
-              <p className="text-sm text-navy-700">
+              <p className="text-sm text-text-dim">
                 Remembered it? <Link href="/login">Sign in</Link>
               </p>
             </form>

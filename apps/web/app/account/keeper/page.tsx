@@ -67,10 +67,10 @@ export default function KeeperPage() {
 
   return (
     <Container className="py-12 max-w-4xl space-y-4">
-      <h1 className="text-3xl font-semibold tracking-tight text-navy-900 mb-2">
+      <h1 className="text-3xl font-semibold tracking-tight text-text mb-2">
         Liquidation keeper
       </h1>
-      <p className="text-sm text-navy-700">
+      <p className="text-sm text-text-dim">
         Anyone can claim a flagged liquidation. Rebate is paid from
         the closed position&apos;s collateral.
       </p>
@@ -81,10 +81,10 @@ export default function KeeperPage() {
         </CardHeader>
         <CardContent className="text-sm">
           {queue.length === 0 ? (
-            <p className="text-navy-700">No flagged positions.</p>
+            <p className="text-text-dim">No flagged positions.</p>
           ) : (
             <table className="w-full">
-              <thead className="text-left text-navy-500 text-xs uppercase">
+              <thead className="text-left text-text-mute text-xs uppercase">
                 <tr>
                   <th>Pos</th>
                   <th>Pair</th>
@@ -98,7 +98,7 @@ export default function KeeperPage() {
               </thead>
               <tbody className="font-tabular">
                 {queue.map((l) => (
-                  <tr key={l.id} className="border-t border-navy-200">
+                  <tr key={l.id} className="border-t border-border">
                     <td className="py-2">{l.position.id}</td>
                     <td>{l.position.pair}</td>
                     <td>{l.position.side}</td>
@@ -116,7 +116,7 @@ export default function KeeperPage() {
               </tbody>
             </table>
           )}
-          {message && <p className="text-navy-700 mt-2">{message}</p>}
+          {message && <p className="text-text-dim mt-2">{message}</p>}
         </CardContent>
       </Card>
     </Container>

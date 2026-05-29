@@ -267,8 +267,8 @@ function MarketsPageInner() {
 
   return (
     <Container className="py-8 max-w-7xl">
-      <div className="flex items-center justify-between mb-2">
-        <div>
+      <div className="flex items-start justify-between gap-3 mb-2">
+        <div className="min-w-0">
           <h1 className="text-2xl font-semibold tracking-tight text-text">
             Markets
           </h1>
@@ -276,10 +276,12 @@ function MarketsPageInner() {
             Real-time spot prices across all listed pairs.
           </p>
         </div>
-        <WsStatusPill status={status} />
+        <div className="shrink-0">
+          <WsStatusPill status={status} />
+        </div>
       </div>
 
-      <div className="mb-4 flex items-center gap-2 text-xs">
+      <div className="mb-4 flex flex-wrap items-center gap-2 text-xs">
         <span className="text-text-mute">Sort:</span>
         {(["volume", "change", "last"] as const).map((k) => (
           <Link

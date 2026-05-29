@@ -6,7 +6,7 @@ import { DataTable, type Column } from "../DataTable";
 import { EmptyState } from "../EmptyState";
 import { Skeleton } from "../Skeleton";
 import { NumberCell } from "../NumberCell";
-import { authedFetch } from "@/lib/token-storage";
+import { authedFetch, getAccessToken } from "@/lib/token-storage";
 import { baseDp, quoteDp } from "@/lib/trade/pair";
 
 type TabKey = "open" | "history" | "trades" | "positions";
@@ -90,12 +90,30 @@ export function MyOrdersTable({
   const [positions, setPositions] = useState<PositionRow[] | null>(null);
   const [bumpKey, setBumpKey] = useState(0);
   const [busyIds, setBusyIds] = useState<Set<number>>(new Set());
+  // Tracked in state so a sign-in flow flips this without a reload.
+  const [authed, setAuthed] = useState<boolean>(() =>
+    typeof window === "undefined" ? false : Boolean(getAccessToken()),
+  );
+  useEffect(() => {
+    const update = () => setAuthed(Boolean(getAccessToken()));
+    update();
+    window.addEventListener("storage", update);
+    return () => window.removeEventListener("storage", update);
+  }, []);
 
   const localRefresh = useCallback(() => setBumpKey((k) => k + 1), []);
 
-  // Lazy load per active tab.
+  // Lazy load per active tab. Gate on auth state — calling authed
+  // endpoints anonymously produces 401 noise we'd rather avoid.
   useEffect(() => {
     let cancelled = false;
+    if (!authed) {
+      setOpen([]);
+      setHistory([]);
+      setTrades([]);
+      setPositions([]);
+      return;
+    }
     async function load() {
       try {
         if (tab === "open") {
@@ -169,7 +187,7 @@ export function MyOrdersTable({
     return () => {
       cancelled = true;
     };
-  }, [tab, pair, base, quote, refreshKey, bumpKey]);
+  }, [tab, pair, base, quote, refreshKey, bumpKey, authed]);
 
   async function cancel(id: number) {
     setBusyIds((prev) => new Set(prev).add(id));
@@ -441,16 +459,20 @@ export function MyOrdersTable({
         className,
       )}
     >
-      <div role="tablist" aria-label="My orders" className="flex gap-1">
+      <div role="tablist" aria-label="My orders" className="flex gap-1 flex-wrap">
         {(Object.keys(TAB_LABEL) as TabKey[]).map((k) => (
           <button
             key={k}
             type="button"
             role="tab"
+            id={`my-orders-tab-${k}`}
             aria-selected={tab === k}
+            aria-controls={`my-orders-panel-${k}`}
+            tabIndex={tab === k ? 0 : -1}
             onClick={() => setTab(k)}
             className={cn(
               "text-xs px-3 h-8 rounded-md border border-border",
+              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent",
               tab === k
                 ? "bg-bg-hover text-text"
                 : "text-text-dim hover:bg-bg-hover hover:text-text",
@@ -461,7 +483,20 @@ export function MyOrdersTable({
         ))}
       </div>
 
-      {tab === "open" &&
+      <div
+        role="tabpanel"
+        id={`my-orders-panel-${tab}`}
+        aria-labelledby={`my-orders-tab-${tab}`}
+      >
+      {!authed ? (
+        <EmptyState
+          title="Sign in to see your orders"
+          description="Your open orders, history, and positions appear here once you sign in."
+          action={{ label: "Sign in", href: "/login" }}
+        />
+      ) : null}
+
+      {authed && tab === "open" &&
         (open === null ? (
           <Skeleton className="h-32 w-full" />
         ) : open.length === 0 ? (
@@ -477,7 +512,7 @@ export function MyOrdersTable({
           />
         ))}
 
-      {tab === "history" &&
+      {authed && tab === "history" &&
         (history === null ? (
           <Skeleton className="h-32 w-full" />
         ) : history.length === 0 ? (
@@ -493,7 +528,7 @@ export function MyOrdersTable({
           />
         ))}
 
-      {tab === "trades" &&
+      {authed && tab === "trades" &&
         (trades === null ? (
           <Skeleton className="h-32 w-full" />
         ) : trades.length === 0 ? (
@@ -509,7 +544,7 @@ export function MyOrdersTable({
           />
         ))}
 
-      {tab === "positions" &&
+      {authed && tab === "positions" &&
         (positions === null ? (
           <Skeleton className="h-32 w-full" />
         ) : positions.length === 0 ? (
@@ -524,6 +559,7 @@ export function MyOrdersTable({
             rowKey={(r) => String(r.id)}
           />
         ))}
+      </div>
     </div>
   );
 }

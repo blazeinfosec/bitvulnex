@@ -103,4 +103,67 @@ describe("shouldConfirm", () => {
     });
     expect(t).toEqual([]);
   });
+
+  // Fence-post tests: the rule is strict greater-than for both
+  // thresholds. A debit exactly at 10% of available must NOT trigger;
+  // any whisker over 10% must. Same for $1000 on market notionals.
+  it("does NOT flag large-fraction-of-balance at exactly 10% of available", () => {
+    // buy 0.1 BTC at 1 USDT each → 0.1 USDT notional, available 1 → 10.0% exactly.
+    const t = shouldConfirm({
+      type: "limit",
+      side: "buy",
+      amount: 0.1,
+      price: 1,
+      lastPrice: 1,
+      available: 1,
+      quoteIsUsdStable: true,
+      quoteToUsdRate: null,
+    });
+    expect(t).not.toContain("large-fraction-of-balance");
+  });
+
+  it("flags large-fraction-of-balance just over 10% of available", () => {
+    // buy 0.1000001 BTC at 1 USDT → 0.1000001 / 1 = 10.00001% > 10%.
+    const t = shouldConfirm({
+      type: "limit",
+      side: "buy",
+      amount: 0.1000001,
+      price: 1,
+      lastPrice: 1,
+      available: 1,
+      quoteIsUsdStable: true,
+      quoteToUsdRate: null,
+    });
+    expect(t).toContain("large-fraction-of-balance");
+  });
+
+  it("does NOT flag large-market-notional at exactly $1000", () => {
+    // market 0.01 BTC at 100_000 = exactly 1000 USDT (stable).
+    const t = shouldConfirm({
+      type: "market",
+      side: "buy",
+      amount: 0.01,
+      price: null,
+      lastPrice: 100_000,
+      available: 1_000_000,
+      quoteIsUsdStable: true,
+      quoteToUsdRate: null,
+    });
+    expect(t).not.toContain("large-market-notional");
+  });
+
+  it("flags large-market-notional just over $1000", () => {
+    // 0.010001 BTC * 100_000 = 1000.10 USDT.
+    const t = shouldConfirm({
+      type: "market",
+      side: "buy",
+      amount: 0.010001,
+      price: null,
+      lastPrice: 100_000,
+      available: 1_000_000,
+      quoteIsUsdStable: true,
+      quoteToUsdRate: null,
+    });
+    expect(t).toContain("large-market-notional");
+  });
 });

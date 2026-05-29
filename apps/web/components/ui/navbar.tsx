@@ -4,10 +4,11 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Container } from "./container";
 import { Wordmark } from "@/components/exchange/Wordmark";
+import { MobileNav } from "@/components/exchange/MobileNav";
 import { authedFetch, getAccessToken } from "@/lib/token-storage";
 
 const linkClass =
-  "px-3 py-2 text-sm font-medium text-text-dim hover:text-text transition-colors rounded-md no-underline";
+  "px-3 py-2 text-sm font-medium text-text-dim hover:text-text transition-colors rounded-md no-underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent";
 
 type DropItem = { href: string; label: string };
 
@@ -37,6 +38,7 @@ function NavDropdown({
           viewBox="0 0 20 20"
           fill="currentColor"
           className="text-text-mute"
+          aria-hidden="true"
         >
           <path d="M5.5 7.5L10 12l4.5-4.5z" />
         </svg>
@@ -46,7 +48,7 @@ function NavDropdown({
           <Link
             key={it.href}
             href={it.href}
-            className="block px-3 py-2 text-sm text-text-dim hover:text-text hover:bg-bg-hover transition-colors no-underline"
+            className="block px-3 py-2 text-sm text-text-dim hover:text-text hover:bg-bg-hover transition-colors no-underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
           >
             {it.label}
           </Link>
@@ -59,6 +61,7 @@ function NavDropdown({
 export function NavBar() {
   const [isAuthed, setIsAuthed] = useState(false);
   const [role, setRole] = useState<string | null>(null);
+  const [mobileOpen, setMobileOpen] = useState(false);
 
   useEffect(() => {
     setIsAuthed(Boolean(getAccessToken()));
@@ -87,11 +90,19 @@ export function NavBar() {
 
   return (
     <header className="border-b border-border bg-bg-elevated relative z-20">
-      <Container className="flex items-center justify-between h-16">
-        <Link href="/" className="no-underline">
+      <Container className="flex items-center justify-between h-16 gap-3">
+        <Link
+          href="/"
+          className="no-underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent rounded-md"
+          aria-label="BVBE home"
+        >
           <Wordmark />
         </Link>
-        <nav className="flex items-center gap-1">
+        {/* Desktop nav */}
+        <nav
+          className="hidden md:flex items-center gap-1"
+          aria-label="Primary"
+        >
           <Link href="/markets" className={linkClass}>
             Markets
           </Link>
@@ -151,20 +162,54 @@ export function NavBar() {
             <>
               <Link
                 href="/login"
-                className="ml-2 inline-flex items-center justify-center h-9 px-4 text-sm font-medium text-text border border-border rounded-md hover:bg-bg-hover transition-colors no-underline"
+                className="ml-2 inline-flex items-center justify-center h-9 px-4 text-sm font-medium text-text border border-border rounded-md hover:bg-bg-hover transition-colors no-underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
               >
                 Sign in
               </Link>
               <Link
                 href="/signup"
-                className="inline-flex items-center justify-center h-9 px-4 text-sm font-semibold rounded-md bg-accent text-accent-fg hover:bg-accent-hover transition-colors no-underline"
+                className="inline-flex items-center justify-center h-9 px-4 text-sm font-semibold rounded-md bg-accent text-accent-fg hover:bg-accent-hover transition-colors no-underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
               >
                 Create account
               </Link>
             </>
           ) : null}
         </nav>
+
+        {/* Mobile hamburger */}
+        <button
+          type="button"
+          className="md:hidden inline-flex items-center justify-center h-10 w-10 rounded-md text-text-dim hover:text-text hover:bg-bg-hover transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+          aria-label="Open navigation menu"
+          aria-expanded={mobileOpen}
+          aria-controls="mobile-nav"
+          onClick={() => setMobileOpen(true)}
+        >
+          <svg
+            width="22"
+            height="22"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            aria-hidden="true"
+          >
+            <line x1="3" y1="6" x2="21" y2="6" />
+            <line x1="3" y1="12" x2="21" y2="12" />
+            <line x1="3" y1="18" x2="21" y2="18" />
+          </svg>
+        </button>
       </Container>
+      <div id="mobile-nav">
+        <MobileNav
+          open={mobileOpen}
+          onClose={() => setMobileOpen(false)}
+          isAuthed={isAuthed}
+          isAdmin={role === "admin"}
+        />
+      </div>
     </header>
   );
 }

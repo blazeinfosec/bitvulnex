@@ -20,10 +20,18 @@ export default function RootLayout({
   return (
     <html lang="en" className="dark">
       <body className="min-h-screen flex flex-col font-sans bg-bg text-text">
+        <a
+          href="#main"
+          className="sr-only focus:not-sr-only focus:absolute focus:left-3 focus:top-3 focus:z-50 focus:px-3 focus:py-2 focus:rounded-md focus:bg-accent focus:text-accent-fg focus:text-sm focus:font-medium focus:no-underline"
+        >
+          Skip to main content
+        </a>
         <DoNotDeployBanner variant="top" />
         <NavBar />
         <TickerHost />
-        <main className="flex-1">{children}</main>
+        <main id="main" className="flex-1">
+          {children}
+        </main>
         <Footer />
         <DoNotDeployBanner variant="footer" />
       </body>

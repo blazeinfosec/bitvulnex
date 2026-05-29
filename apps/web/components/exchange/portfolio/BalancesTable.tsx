@@ -23,7 +23,18 @@ export function BalancesTable({
   showZero = false,
 }: BalancesTableProps) {
   const rows = balances
-    .filter((b) => showZero || Number(b.amount) > 0)
+    .filter((b) => {
+      if (showZero) return true;
+      // Include an asset if the user holds anything on any leg —
+      // spot, margin-available, or locked. Filtering on `amount`
+      // alone hid assets users had moved entirely into the margin
+      // sub-account.
+      return (
+        Number(b.amount) > 0 ||
+        Number(b.marginAvailable) > 0 ||
+        Number(b.locked) > 0
+      );
+    })
     .sort((a, b) => Number(b.usdValue) - Number(a.usdValue));
 
   const columns: Column<BalanceRow>[] = [

@@ -25,15 +25,15 @@ export default function ChangelogPage() {
   const raw = loadChangelog();
   return (
     <Container className="py-12">
-      <h1 className="text-3xl font-semibold tracking-tight text-navy-900 mb-2">
+      <h1 className="text-3xl font-semibold tracking-tight text-text mb-2">
         Changelog
       </h1>
-      <p className="text-sm text-navy-600 mb-8">
+      <p className="text-sm text-text-dim mb-8">
         Mirror of <code>CHANGELOG.md</code> in the repository. Some entries in
         later phases may reference fixed bugs that have adjacent unfixed
         siblings — read carefully.
       </p>
-      <pre className="whitespace-pre-wrap font-mono text-sm bg-navy-50 border border-navy-200 rounded-md p-5 text-navy-900">
+      <pre className="whitespace-pre-wrap font-mono text-sm bg-bg-elevated border border-border rounded-md p-5 text-text">
         {raw}
       </pre>
     </Container>

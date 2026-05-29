@@ -126,10 +126,13 @@ export function OrderForm({
     [type, side, amountNum, priceNum, lastPrice, availableNum, quoteIsUsdStable, quoteToUsdRate],
   );
 
-  const tierOkBasic = (kycTier ?? -1) >= TIER_REQUIRED_FOR_TRADE;
+  // `kycTier === null` means anonymous — show a sign-in CTA rather
+  // than tier-gate copy. An authed user always has a numeric tier.
+  const isAnonymous = kycTier === null || kycTier === undefined;
+  const tierOkBasic = !isAnonymous && (kycTier ?? -1) >= TIER_REQUIRED_FOR_TRADE;
   const tierOkAdvanced =
     type === "stop_limit" || type === "oco"
-      ? (kycTier ?? -1) >= TIER_REQUIRED_FOR_ADVANCED
+      ? !isAnonymous && (kycTier ?? -1) >= TIER_REQUIRED_FOR_ADVANCED
       : true;
 
   const amountValid = amount !== "" && Number.isFinite(amountNum) && amountNum > 0;
@@ -229,11 +232,13 @@ export function OrderForm({
 
   const submitLabel = busy
     ? "Placing…"
-    : !tierOkBasic
-      ? "KYC Tier 1 required"
-      : !tierOkAdvanced
-        ? `KYC Tier ${TIER_REQUIRED_FOR_ADVANCED} required`
-        : `${side === "buy" ? "Buy" : "Sell"} ${base}`;
+    : isAnonymous
+      ? "Sign in to trade"
+      : !tierOkBasic
+        ? "KYC Tier 1 required"
+        : !tierOkAdvanced
+          ? `KYC Tier ${TIER_REQUIRED_FOR_ADVANCED} required`
+          : `${side === "buy" ? "Buy" : "Sell"} ${base}`;
 
   return (
     <div
@@ -344,13 +349,38 @@ export function OrderForm({
           </span>
         </div>
 
-        {!tierOkBasic && (
+        {isAnonymous ? (
+          <div
+            role="status"
+            className="rounded-md border border-border bg-bg p-3 text-xs text-text-dim"
+          >
+            <p className="mb-2">
+              You're browsing as a guest. Sign in or create an account to
+              place orders on this pair.
+            </p>
+            <div className="flex gap-2">
+              <a
+                href="/login"
+                className="inline-flex items-center justify-center h-8 px-3 text-xs font-medium rounded-md bg-accent text-accent-fg hover:bg-accent-hover transition-colors no-underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+              >
+                Sign in
+              </a>
+              <a
+                href="/signup"
+                className="inline-flex items-center justify-center h-8 px-3 text-xs font-medium rounded-md border border-border text-text hover:bg-bg-hover transition-colors no-underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+              >
+                Create account
+              </a>
+            </div>
+          </div>
+        ) : null}
+        {!isAnonymous && !tierOkBasic && (
           <InlineMessage
             kind="err"
             text="KYC Tier 1 required to trade. Complete identity verification to enable orders."
           />
         )}
-        {tierOkBasic && !tierOkAdvanced && (
+        {!isAnonymous && tierOkBasic && !tierOkAdvanced && (
           <InlineMessage
             kind="err"
             text={`KYC Tier ${TIER_REQUIRED_FOR_ADVANCED} required for ${TYPE_LABEL[type]} orders.`}

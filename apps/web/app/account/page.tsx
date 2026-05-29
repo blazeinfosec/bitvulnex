@@ -55,14 +55,14 @@ export default function AccountPage() {
   if (loading || !me) {
     return (
       <Container className="py-12">
-        <p className="text-navy-700">Loading…</p>
+        <p className="text-text-dim">Loading…</p>
       </Container>
     );
   }
 
   return (
     <Container className="py-12 max-w-3xl">
-      <h1 className="text-3xl font-semibold tracking-tight text-navy-900 mb-6">
+      <h1 className="text-3xl font-semibold tracking-tight text-text mb-6">
         Account
       </h1>
       <div className="grid sm:grid-cols-2 gap-4">
@@ -70,23 +70,23 @@ export default function AccountPage() {
           <CardHeader>
             <CardTitle>Profile</CardTitle>
           </CardHeader>
-          <CardContent className="text-sm space-y-1 text-navy-700">
+          <CardContent className="text-sm space-y-1 text-text-dim">
             <div>
-              <span className="text-navy-500">Email:</span> {me.email}
+              <span className="text-text-mute">Email:</span> {me.email}
               {me.emailVerified ? " (verified)" : " (unverified)"}
             </div>
             <div>
-              <span className="text-navy-500">Name:</span>{" "}
+              <span className="text-text-mute">Name:</span>{" "}
               {me.displayName ?? "—"}
             </div>
             <div>
-              <span className="text-navy-500">Role:</span> {me.role}
+              <span className="text-text-mute">Role:</span> {me.role}
             </div>
             <div>
-              <span className="text-navy-500">KYC tier:</span> {me.kycTier}
+              <span className="text-text-mute">KYC tier:</span> {me.kycTier}
             </div>
             <div>
-              <span className="text-navy-500">2FA:</span>{" "}
+              <span className="text-text-mute">2FA:</span>{" "}
               {me.totpEnabled ? "enabled" : "disabled"}
             </div>
           </CardContent>

@@ -4,6 +4,7 @@ import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import type { Route } from "next";
 import { Container } from "@/components/ui/container";
 import {
   ActivityFeed,
@@ -151,7 +152,9 @@ function PortfolioInner() {
     setTab(next);
     const params = new URLSearchParams(searchParams.toString());
     params.set("tab", next);
-    router.replace(`${pathname}?${params.toString()}` as never);
+    // See earn/page.tsx — Route<string> is the documented escape for
+    // querystring-only navigations under typedRoutes.
+    router.replace(`${pathname}?${params.toString()}` as Route);
   }
 
   const load = useCallback(async () => {

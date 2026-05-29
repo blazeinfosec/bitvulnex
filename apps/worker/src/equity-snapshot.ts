@@ -164,6 +164,19 @@ export async function snapshotOnce(
   let touched = 0;
   for (const u of users) {
     const total = await computeUserEquity(u.id, db);
+
+    // Skip writing a $0 row when the user has no prior snapshot. This
+    // avoids flooding the table with rows for never-funded accounts on
+    // every tick. Once they have a snapshot, we keep updating it (even
+    // back to 0) so a real drawdown to zero is recorded.
+    if (total.equals(0)) {
+      const prior = await db.equitySnapshot.findFirst({
+        where: { userId: u.id },
+        select: { id: true },
+      });
+      if (!prior) continue;
+    }
+
     await db.equitySnapshot.upsert({
       where: { userId_date: { userId: u.id, date: day } },
       create: {

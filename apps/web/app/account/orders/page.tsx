@@ -50,7 +50,7 @@ export default function OrdersPage() {
 
   return (
     <Container className="py-12 max-w-4xl space-y-4">
-      <h1 className="text-3xl font-semibold tracking-tight text-navy-900 mb-2">
+      <h1 className="text-3xl font-semibold tracking-tight text-text mb-2">
         Open orders
       </h1>
       <Card>
@@ -59,10 +59,10 @@ export default function OrdersPage() {
         </CardHeader>
         <CardContent className="text-sm">
           {orders.length === 0 ? (
-            <p className="text-navy-700">No open orders.</p>
+            <p className="text-text-dim">No open orders.</p>
           ) : (
             <table className="w-full">
-              <thead className="text-left text-navy-500 text-xs uppercase">
+              <thead className="text-left text-text-mute text-xs uppercase">
                 <tr>
                   <th>Pair</th>
                   <th>Side</th>
@@ -73,7 +73,7 @@ export default function OrdersPage() {
               </thead>
               <tbody>
                 {orders.map((o) => (
-                  <tr key={o.id} className="border-t border-navy-200">
+                  <tr key={o.id} className="border-t border-border">
                     <td className="py-2">{o.pair}</td>
                     <td>{o.side}</td>
                     <td className="font-tabular">
@@ -82,12 +82,12 @@ export default function OrdersPage() {
                         <input
                           name="price"
                           defaultValue={o.price ?? ""}
-                          className="w-24 border border-navy-200 rounded h-8 px-2 font-mono"
+                          className="w-24 border border-border rounded h-8 px-2 font-mono"
                         />
                         <input
                           name="amount"
                           defaultValue={o.amount}
-                          className="w-24 border border-navy-200 rounded h-8 px-2 font-mono"
+                          className="w-24 border border-border rounded h-8 px-2 font-mono"
                         />
                         <Button type="submit" size="sm" variant="secondary">
                           Save
@@ -103,7 +103,7 @@ export default function OrdersPage() {
               </tbody>
             </table>
           )}
-          {message && <p className="text-navy-700 mt-2">{message}</p>}
+          {message && <p className="text-text-dim mt-2">{message}</p>}
         </CardContent>
       </Card>
     </Container>

@@ -41,7 +41,7 @@ export function ResetForm() {
             placeholder="new password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            className="w-full border border-navy-200 rounded-md h-10 px-3"
+            className="w-full border border-border rounded-md h-10 px-3"
           />
           {error && <p className="text-sm text-danger">{error}</p>}
           <Button type="submit" className="w-full">

@@ -119,6 +119,12 @@ function makeFake(seed: Seed) {
         ),
     },
     equitySnapshot: {
+      findFirst: async ({
+        where,
+      }: {
+        where: { userId: string };
+      }) =>
+        snapshots.find((s) => s.userId === where.userId) ?? null,
       upsert: async ({
         where,
         create,
@@ -332,5 +338,57 @@ describe("snapshotOnce", () => {
     // Re-running for the same day updates instead of inserting.
     await snapshotOnce(db, now);
     expect(snapshots.length).toBe(2);
+  });
+
+  it("skips zero-equity users that have no prior snapshot", async () => {
+    const now = new Date("2026-05-29T14:23:45Z");
+    const { db, snapshots } = makeFake({
+      users: [{ id: "u1" }, { id: "u2" }],
+      balances: [
+        // u1 has funds; u2 has nothing.
+        {
+          userId: "u1",
+          asset: "USDT",
+          amount: D("100"),
+          marginAvailable: D("0"),
+        },
+      ],
+      lending: [],
+      staking: [],
+      margin: [],
+      trades: [],
+    });
+    const res = await snapshotOnce(db, now);
+    expect(res.users).toBe(1);
+    expect(snapshots.length).toBe(1);
+    expect(snapshots[0].userId).toBe("u1");
+  });
+
+  it("keeps writing a zero-equity row once the user has a prior snapshot", async () => {
+    const now1 = new Date("2026-05-29T14:23:45Z");
+    const now2 = new Date("2026-05-30T14:23:45Z");
+    const balances: BalanceRow[] = [
+      {
+        userId: "u1",
+        asset: "USDT",
+        amount: D("100"),
+        marginAvailable: D("0"),
+      },
+    ];
+    const { db, snapshots } = makeFake({
+      users: [{ id: "u1" }],
+      balances,
+      lending: [],
+      staking: [],
+      margin: [],
+      trades: [],
+    });
+    await snapshotOnce(db, now1);
+    expect(snapshots.length).toBe(1);
+    // u1 now has $0 — but a prior snapshot exists, so we keep recording.
+    balances.length = 0;
+    await snapshotOnce(db, now2);
+    expect(snapshots.length).toBe(2);
+    expect(snapshots[1].totalUsd.toString()).toBe("0");
   });
 });

@@ -16,12 +16,16 @@ export interface ModalProps {
   disableBackdropClose?: boolean;
 }
 
+const FOCUSABLE =
+  'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+
 /**
  * Hand-rolled modal shell — no dialog dep (we only have @radix-ui/react-slot).
  * Renders into a portal on document.body for proper z-index isolation.
  * - Backdrop click + ESC closes
  * - Body scroll locked while open
  * - Focus moves to first focusable element on open, restores on close
+ * - Tab / Shift+Tab cycle focus within the modal
  */
 export function Modal({
   open,
@@ -45,9 +49,7 @@ export function Modal({
     document.body.style.overflow = "hidden";
 
     // Focus first focusable element in modal
-    const focusables = cardRef.current?.querySelectorAll<HTMLElement>(
-      'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])',
-    );
+    const focusables = cardRef.current?.querySelectorAll<HTMLElement>(FOCUSABLE);
     const first = focusables?.[0];
     if (first) first.focus();
 
@@ -55,6 +57,31 @@ export function Modal({
       if (e.key === "Escape") {
         e.stopPropagation();
         onClose();
+        return;
+      }
+      if (e.key !== "Tab" || !cardRef.current) return;
+      const items = cardRef.current.querySelectorAll<HTMLElement>(FOCUSABLE);
+      if (items.length === 0) {
+        // Nothing to focus inside; keep focus on the card itself.
+        e.preventDefault();
+        cardRef.current.focus();
+        return;
+      }
+      const firstItem = items[0]!;
+      const lastItem = items[items.length - 1]!;
+      const active = document.activeElement as HTMLElement | null;
+      // If focus has somehow escaped the modal, snap it back.
+      if (!cardRef.current.contains(active)) {
+        e.preventDefault();
+        firstItem.focus();
+        return;
+      }
+      if (e.shiftKey && active === firstItem) {
+        e.preventDefault();
+        lastItem.focus();
+      } else if (!e.shiftKey && active === lastItem) {
+        e.preventDefault();
+        firstItem.focus();
       }
     }
     window.addEventListener("keydown", handleKey);
@@ -88,9 +115,11 @@ export function Modal({
       {/* Card */}
       <div
         ref={cardRef}
+        tabIndex={-1}
         className={cn(
           "relative w-full max-w-md rounded-lg border border-border bg-bg-elevated shadow-elevated",
           "max-h-[90vh] overflow-y-auto",
+          "focus:outline-none",
           className,
         )}
         onClick={(e) => e.stopPropagation()}
@@ -107,7 +136,7 @@ export function Modal({
           <button
             type="button"
             onClick={onClose}
-            className="text-text-mute hover:text-text transition-colors -mt-1 -mr-1 p-1 rounded"
+            className="text-text-mute hover:text-text transition-colors -mt-1 -mr-1 p-1 rounded focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
             aria-label="Close"
           >
             <svg
@@ -120,6 +149,7 @@ export function Modal({
               strokeWidth="2"
               strokeLinecap="round"
               strokeLinejoin="round"
+              aria-hidden="true"
             >
               <path d="M18 6 6 18" />
               <path d="m6 6 12 12" />

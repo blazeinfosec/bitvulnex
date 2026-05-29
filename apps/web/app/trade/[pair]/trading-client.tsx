@@ -170,17 +170,32 @@ export function TradingClient({ base, quote }: TradingClientProps) {
     let closed = false;
     let backoff = 1000;
     let reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+    let statusDebounceTimer: ReturnType<typeof setTimeout> | null = null;
     const token = getAccessToken();
+
+    function setStatusDebounced(next: WsStatus, delayMs = 0) {
+      if (statusDebounceTimer) {
+        clearTimeout(statusDebounceTimer);
+        statusDebounceTimer = null;
+      }
+      if (delayMs <= 0) {
+        setWsStatus(next);
+        return;
+      }
+      statusDebounceTimer = setTimeout(() => {
+        if (!closed) setWsStatus(next);
+      }, delayMs);
+    }
 
     const connect = () => {
       if (closed) return;
-      setWsStatus((s) => (s === "live" ? "reconnecting" : "connecting"));
+      setStatusDebounced("connecting");
       const proto = window.location.protocol === "https:" ? "wss" : "ws";
       const url = `${proto}://${window.location.host}/ws${token ? `?token=${token}` : ""}`;
       ws = new WebSocket(url);
       ws.addEventListener("open", () => {
         backoff = 1000;
-        setWsStatus("live");
+        setStatusDebounced("live");
         ws?.send(JSON.stringify({ kind: "subscribe", channel: `book:${pair}` }));
         ws?.send(JSON.stringify({ kind: "subscribe", channel: `trades:${pair}` }));
         ws?.send(JSON.stringify({ kind: "subscribe", channel: "ticker:all" }));
@@ -223,15 +238,15 @@ export function TradingClient({ base, quote }: TradingClientProps) {
             }
           } else if (msg.kind === "ticker" && Array.isArray(msg.rows)) {
             // Update the pair header live
-            const me = msg.rows.find((r) => r.pair === pair);
-            if (me) {
+            const currentPairRow = msg.rows.find((r) => r.pair === pair);
+            if (currentPairRow) {
               setMarket((prev) =>
                 prev
                   ? {
                       ...prev,
-                      last: me.last,
-                      change24h: me.change24h,
-                      vol24h: me.vol24h,
+                      last: currentPairRow.last,
+                      change24h: currentPairRow.change24h,
+                      vol24h: currentPairRow.vol24h,
                     }
                   : prev,
               );
@@ -260,7 +275,9 @@ export function TradingClient({ base, quote }: TradingClientProps) {
       });
       ws.addEventListener("close", () => {
         if (closed) return;
-        setWsStatus("reconnecting");
+        // Debounce the "reconnecting" badge so a fast bounce doesn't
+        // flicker live → reconnecting → connecting → live in the UI.
+        setStatusDebounced("reconnecting", 500);
         reconnectTimer = setTimeout(connect, backoff);
         backoff = Math.min(backoff * 2, 10_000);
       });
@@ -272,6 +289,7 @@ export function TradingClient({ base, quote }: TradingClientProps) {
     return () => {
       closed = true;
       if (reconnectTimer) clearTimeout(reconnectTimer);
+      if (statusDebounceTimer) clearTimeout(statusDebounceTimer);
       ws?.close();
       setWsStatus("disconnected");
     };
@@ -340,9 +358,11 @@ export function TradingClient({ base, quote }: TradingClientProps) {
           high24h={market?.high24h ?? null}
           low24h={market?.low24h ?? null}
           vol24h={market?.vol24h ?? "0"}
-          className="flex-1 min-w-0"
+          className="flex-1 min-w-0 w-full md:w-auto"
         />
-        <WsStatusPill status={wsStatus} />
+        <div className="shrink-0">
+          <WsStatusPill status={wsStatus} />
+        </div>
       </div>
 
       {/* md+: book + chart + form in a 3-col grid (xl) or 2-col grid
@@ -454,16 +474,20 @@ function MobileSecondary({
   const [tab, setTab] = useState<"book" | "trades">("book");
   return (
     <div className="flex flex-col gap-2">
-      <div role="tablist" className="flex gap-1">
+      <div role="tablist" aria-label="Order book or recent trades" className="flex gap-1">
         {(["book", "trades"] as const).map((k) => (
           <button
             key={k}
             type="button"
             role="tab"
+            id={`mobile-secondary-tab-${k}`}
             aria-selected={tab === k}
+            aria-controls={`mobile-secondary-panel-${k}`}
+            tabIndex={tab === k ? 0 : -1}
             onClick={() => setTab(k)}
             className={cn(
               "flex-1 text-xs h-8 rounded-md border border-border",
+              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent",
               tab === k
                 ? "bg-bg-hover text-text"
                 : "text-text-dim hover:bg-bg-hover hover:text-text",
@@ -473,22 +497,28 @@ function MobileSecondary({
           </button>
         ))}
       </div>
-      {tab === "book" ? (
-        <OrderBook
-          bids={book?.bids ?? []}
-          asks={book?.asks ?? []}
-          last={last}
-          priceDp={priceDp}
-          sizeDp={sizeDp}
-          aggPresets={presets}
-          aggregation={aggregation}
-          onAggregationChange={setAggregation}
-          onPickPrice={onPickPrice}
-          rowCount={10}
-        />
-      ) : (
-        <RecentTradesFeed trades={recent} priceDp={priceDp} sizeDp={sizeDp} />
-      )}
+      <div
+        role="tabpanel"
+        id={`mobile-secondary-panel-${tab}`}
+        aria-labelledby={`mobile-secondary-tab-${tab}`}
+      >
+        {tab === "book" ? (
+          <OrderBook
+            bids={book?.bids ?? []}
+            asks={book?.asks ?? []}
+            last={last}
+            priceDp={priceDp}
+            sizeDp={sizeDp}
+            aggPresets={presets}
+            aggregation={aggregation}
+            onAggregationChange={setAggregation}
+            onPickPrice={onPickPrice}
+            rowCount={10}
+          />
+        ) : (
+          <RecentTradesFeed trades={recent} priceDp={priceDp} sizeDp={sizeDp} />
+        )}
+      </div>
     </div>
   );
 }

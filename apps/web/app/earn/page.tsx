@@ -3,6 +3,7 @@
 import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import type { Route } from "next";
 import { Container } from "@/components/ui/container";
 import { Button } from "@/components/ui/button";
 import {
@@ -205,7 +206,10 @@ function EarnPageInner() {
     setTab(next);
     const params = new URLSearchParams(searchParams.toString());
     params.set("tab", next);
-    router.replace(`${pathname}?${params.toString()}` as never);
+    // Typed routes can't statically verify a runtime-built querystring,
+    // so we narrow through Route<string>. This is the documented escape
+    // for known-safe dynamic URLs.
+    router.replace(`${pathname}?${params.toString()}` as Route);
   }
 
   const [me, setMe] = useState<Me | null>(null);
