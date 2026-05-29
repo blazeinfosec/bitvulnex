@@ -43,15 +43,20 @@ type Me = {
 
 const STAKE_TIER_REQUIRED = 1;
 
-function formatAmount(value: string, asset: string): string {
-  const trimmed = value.replace(/\.?0+$/, "");
+// Trim trailing zeros from the fractional part of a decimal string,
+// then drop a dangling decimal point. Leaves integer strings ("50",
+// "100") completely alone. "50.00" -> "50"; "0.50" -> "0.5"; "50" -> "50".
+function formatAmount(value: string, _asset: string): string {
+  if (!value || value === "-") return "0";
+  if (!value.includes(".")) return value;
+  const trimmed = value.replace(/0+$/, "").replace(/\.$/, "");
   return trimmed === "" || trimmed === "-" ? "0" : trimmed;
 }
 
 function pctOf(value: string, fraction: number): string {
   const n = Number(value);
   if (!Number.isFinite(n) || n <= 0) return "0";
-  return (n * fraction).toFixed(8).replace(/\.?0+$/, "");
+  return formatAmount((n * fraction).toFixed(8), "");
 }
 
 export default function StakingPage() {
