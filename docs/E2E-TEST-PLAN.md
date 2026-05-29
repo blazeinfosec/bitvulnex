@@ -83,14 +83,23 @@ For external use, instructors mint additional accounts as needed.
 | Account            | Email                              | Role     | KYC tier | Purpose                        |
 |--------------------|------------------------------------|----------|----------|--------------------------------|
 | `anon`             | —                                  | —        | —        | Unauthenticated browse / 401   |
-| `alice@bvbe.lab`   | alice@bvbe.lab                     | user     | 0        | Tier-0 ("just signed up")      |
-| `bob@bvbe.lab`     | bob@bvbe.lab                       | user     | 1        | Tier-1 (basic info, can trade) |
-| `carol@bvbe.lab`   | carol@bvbe.lab                     | user     | 2        | Tier-2 (KYC docs, can withdraw above limit) |
-| `dave@bvbe.lab`    | dave@bvbe.lab                      | user     | 3        | Tier-3 (full KYC, OTC desk)    |
-| `mallory@bvbe.lab` | mallory@bvbe.lab                   | user     | 0        | Hostile-user fixture (for negative tests) |
-| `admin@bvbe.lab`   | admin@bvbe.lab                     | admin    | n/a      | Admin surfaces                 |
-| `treasury@bvbe.lab`| treasury@bvbe.lab                  | treasury | n/a      | Treasury draft sign/broadcast  |
-| `mm.alpha / mm.beta`| seeded                            | user     | 2        | Market-maker accounts (don't touch in tests) |
+| `T0` (just-signed-up)  | `linus.stroustrup.0@example.test`      | user     | 0        | Tier-0; password `lab-password-0` |
+| `T1` (alan, in plan)   | `alan.hopper.14@example.test`          | user     | 1        | Tier-1; password `lab-password-14` |
+| `T2`                   | (synth user at index 25)               | user     | 2        | Tier-2; password `lab-password-25` |
+| `T3 whale`             | `whale1@example.test`                  | user     | 3        | Tier-3; password `Sup3rLong-Whale-Pass-001` |
+| `admin`                | `admin@bvbe.local`                     | admin    | 3        | `change-me-after-first-login` |
+| `treasury`             | `treasury@bvbe.local`                  | treasury | 3        | `change-me-after-first-login` |
+| `compliance`           | `compliance@bvbe.local`                | compliance | 3      | `change-me-after-first-login` |
+| `support`              | `support1@bvbe.local`                  | support  | 3        | `change-me-after-first-login` |
+| `mm.alpha / mm.beta`   | `mm.alpha@bvbe.local`, `mm.beta@bvbe.local` | user | 3   | Market-maker accounts. **Do not touch** — destabilizes the seed market. |
+
+**Whale accounts are not pre-funded with balance** — only `mm.alpha` /
+`mm.beta` get seeded balances. To run trade/lend/stake cases, either:
+
+1. **Admin-credit**: log in as admin, POST `/api/v2/admin/users/[id]/balance-adjust`
+   with `{ asset, delta, reason }`. This is the fastest setup for tests.
+2. **Deposit flow**: use `/api/v2/dev/btc/send` + `/api/v2/dev/btc/mine`
+   to fund via a real (regtest) deposit. Slower but exercises C.2.
 
 Common test credentials are in `packages/db/prisma/seed.ts`. Mint
 additional accounts via `/signup` if a clean per-test fixture is
@@ -182,7 +191,7 @@ surface. If anything here fails, ship is blocked.
 | C.4  | P0  | **Withdraw cancel.** Click "Cancel" on the just-submitted pending withdrawal → status flips to `cancelled`, locked balance returns to available. |
 | C.5  | P1  | **Withdraw confirm + broadcast (treasury).** As `treasury`: `/admin/treasury` → see the draft → sign → broadcast → status walks through `signed → broadcasted → confirmed`. |
 | C.6  | P1  | **Withdraw — over limit.** Tier-1 attempts withdraw > $1k/day → InlineMessage "Daily limit exceeded" or "Tier 2 required." |
-| C.7  | P1  | **Internal transfer.** As `bob`: `/wallet/transfer` → send 0.001 BTC to `carol@bvbe.lab` → balance debited, recipient balance credited; transfer row in both users' ActivityFeed. |
+| C.7  | P1  | **Internal transfer.** As `bob`: `/wallet/transfer` → send 0.001 BTC to `carol@example.test` → balance debited, recipient balance credited; transfer row in both users' ActivityFeed. |
 | C.8  | P2  | **RBF bump.** As `bob`: trigger a pending withdrawal that supports RBF (or `/api/v2/dev/btc/rbf` for the lab affordance) → fee bump path completes. |
 | C.9  | P2  | **Withdraw address validation.** Submitting an obviously malformed address (random letters) → frontend rejects before submit, or backend rejects with clear copy. |
 
@@ -429,7 +438,7 @@ This plan deliberately does NOT cover:
 
 ## Appendix: test data conventions
 
-- **All emails end in `@bvbe.lab`** — never use real-looking
+- **All emails end in `@example.test`** — never use real-looking
   domains in tests. The lab will not send mail; reset codes print
   to the server console.
 - **All Bitcoin addresses are regtest / testnet.** The
