@@ -23,7 +23,18 @@ type ClientState = {
 const clients = new Set<ClientState>();
 const sub = new Redis(redisUrl, { maxRetriesPerRequest: null });
 
-const PUBSUB_PATTERNS = ["book:*", "trades:*", "private:*"];
+// Phase 10 slice 2 adds `ticker:all` (compact 24h-summary feed used by
+// the chyron and Markets page) and `chart:<pair>:<tf>` (candle feed
+// the trading view consumes in slice 4). Both are public broadcast
+// channels — same fanout shape as `book:*` and `trades:*`. The
+// connection handshake (lines 50-79) is intentionally unchanged.
+const PUBSUB_PATTERNS = [
+  "book:*",
+  "trades:*",
+  "private:*",
+  "ticker:*",
+  "chart:*",
+];
 
 async function startRedisListener() {
   await sub.psubscribe(...PUBSUB_PATTERNS);

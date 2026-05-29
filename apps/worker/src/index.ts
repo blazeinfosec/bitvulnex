@@ -14,6 +14,7 @@ import {
   processWithdrawalOnce,
   type BitcoinClient,
 } from "./withdrawal-processor.js";
+import { runMarketMakerTick, makeRedisPubSub } from "./market-maker.js";
 
 const redisUrl = process.env.REDIS_URL ?? "redis://redis:6379";
 const mockUrl = process.env.BITCOIN_MOCK_URL ?? "http://bitcoin-mock:18443";
@@ -46,6 +47,7 @@ const LIQUIDATION_QUEUE = "liquidation-poll";
 const YIELD_QUEUE = "yield-accrual";
 const STAKING_QUEUE = "staking-rewards";
 const WITHDRAWAL_QUEUE = "withdrawal-process";
+const MARKET_MAKER_QUEUE = "market-maker";
 
 async function rpcCall<T>(method: string, params: unknown[]): Promise<T> {
   const res = await fetch(mockUrl, {
@@ -71,16 +73,20 @@ const bitcoin: BitcoinClient = {
 };
 
 async function main() {
+  const mmPub = makeRedisPubSub(redisUrl);
+
   const depositQueue = new Queue(DEPOSIT_QUEUE, { connection });
   const liquidationQueue = new Queue(LIQUIDATION_QUEUE, { connection });
   const yieldQueue = new Queue(YIELD_QUEUE, { connection });
   const stakingQueue = new Queue(STAKING_QUEUE, { connection });
   const withdrawalQueue = new Queue(WITHDRAWAL_QUEUE, { connection });
+  const marketMakerQueue = new Queue(MARKET_MAKER_QUEUE, { connection });
   const depositEvents = new QueueEvents(DEPOSIT_QUEUE, { connection });
   const liquidationEvents = new QueueEvents(LIQUIDATION_QUEUE, { connection });
   const yieldEvents = new QueueEvents(YIELD_QUEUE, { connection });
   const stakingEvents = new QueueEvents(STAKING_QUEUE, { connection });
   const withdrawalEvents = new QueueEvents(WITHDRAWAL_QUEUE, { connection });
+  const marketMakerEvents = new QueueEvents(MARKET_MAKER_QUEUE, { connection });
 
   await depositQueue.upsertJobScheduler(
     "deposit-poll-scheduler",
@@ -106,6 +112,11 @@ async function main() {
     "withdrawal-process-scheduler",
     { every: 5_000 },
     { name: "process", data: {}, opts: { removeOnComplete: true, removeOnFail: 50 } },
+  );
+  await marketMakerQueue.upsertJobScheduler(
+    "market-maker-scheduler",
+    { every: 2_000 },
+    { name: "tick", data: {}, opts: { removeOnComplete: true, removeOnFail: 50 } },
   );
 
   const depositWorker = new Worker(
@@ -176,6 +187,20 @@ async function main() {
     console.error("[worker] withdrawal-process error:", err),
   );
 
+  const marketMakerWorker = new Worker(
+    MARKET_MAKER_QUEUE,
+    async () => {
+      await runMarketMakerTick(undefined, mmPub);
+    },
+    { connection, concurrency: 1 },
+  );
+  marketMakerWorker.on("ready", () =>
+    console.log("[worker] market-maker ready"),
+  );
+  marketMakerWorker.on("error", (err) =>
+    console.error("[worker] market-maker error:", err),
+  );
+
   const shutdown = async (sig: string) => {
     console.log(`[worker] received ${sig}, shutting down...`);
     await Promise.all([
@@ -184,17 +209,21 @@ async function main() {
       yieldWorker.close(),
       stakingWorker.close(),
       withdrawalWorker.close(),
+      marketMakerWorker.close(),
       depositQueue.close(),
       liquidationQueue.close(),
       yieldQueue.close(),
       stakingQueue.close(),
       withdrawalQueue.close(),
+      marketMakerQueue.close(),
       depositEvents.close(),
       liquidationEvents.close(),
       yieldEvents.close(),
       stakingEvents.close(),
       withdrawalEvents.close(),
+      marketMakerEvents.close(),
     ]);
+    await mmPub.quit();
     await connection.quit();
     process.exit(0);
   };

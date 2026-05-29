@@ -67,10 +67,10 @@ export default function LendingPage() {
 
   return (
     <Container className="py-10 max-w-5xl">
-      <h1 className="text-3xl font-semibold tracking-tight text-navy-900 mb-2">
+      <h1 className="text-3xl font-semibold tracking-tight text-text mb-2">
         Lending
       </h1>
-      <p className="text-sm text-navy-600 mb-6">
+      <p className="text-sm text-text-dim mb-6">
         Supply assets to a pool to earn variable APY. Interest accrues every 60
         seconds against borrowed liquidity.
       </p>
@@ -81,7 +81,7 @@ export default function LendingPage() {
         </CardHeader>
         <CardContent>
           <table className="w-full text-sm">
-            <thead className="text-xs uppercase tracking-wider text-navy-500">
+            <thead className="text-xs uppercase tracking-wider text-text-mute">
               <tr>
                 <th className="text-left py-2">Asset</th>
                 <th className="text-right">Supplied</th>
@@ -92,7 +92,7 @@ export default function LendingPage() {
             </thead>
             <tbody className="font-tabular">
               {pools.map((p) => (
-                <tr key={p.asset} className="border-t border-navy-100">
+                <tr key={p.asset} className="border-t border-border-subtle">
                   <td className="py-2">{p.asset}</td>
                   <td className="text-right">{p.supplied}</td>
                   <td className="text-right">{p.borrowed}</td>
@@ -116,7 +116,7 @@ export default function LendingPage() {
         <CardContent className="space-y-3">
           <div className="flex gap-2">
             <select
-              className="border border-navy-200 rounded px-2 py-1"
+              className="border border-border rounded px-2 py-1"
               value={asset}
               onChange={(e) => setAsset(e.target.value)}
             >
@@ -125,14 +125,14 @@ export default function LendingPage() {
               ))}
             </select>
             <input
-              className="border border-navy-200 rounded px-2 py-1 font-tabular"
+              className="border border-border rounded px-2 py-1 font-tabular"
               placeholder="amount"
               value={amount}
               onChange={(e) => setAmount(e.target.value)}
             />
             <Button onClick={supply}>Supply</Button>
           </div>
-          {message && <p className="text-sm text-navy-700">{message}</p>}
+          {message && <p className="text-sm text-text-dim">{message}</p>}
         </CardContent>
       </Card>
 
@@ -142,10 +142,10 @@ export default function LendingPage() {
         </CardHeader>
         <CardContent>
           {positions.length === 0 ? (
-            <p className="text-sm text-navy-600">No open positions.</p>
+            <p className="text-sm text-text-dim">No open positions.</p>
           ) : (
             <table className="w-full text-sm">
-              <thead className="text-xs uppercase tracking-wider text-navy-500">
+              <thead className="text-xs uppercase tracking-wider text-text-mute">
                 <tr>
                   <th className="text-left py-2">Pool</th>
                   <th>Side</th>
@@ -156,7 +156,7 @@ export default function LendingPage() {
               </thead>
               <tbody className="font-tabular">
                 {positions.map((p) => (
-                  <tr key={p.id} className="border-t border-navy-100">
+                  <tr key={p.id} className="border-t border-border-subtle">
                     <td className="py-2">{p.pool}</td>
                     <td className="text-center">{p.side}</td>
                     <td className="text-right">{p.principal}</td>

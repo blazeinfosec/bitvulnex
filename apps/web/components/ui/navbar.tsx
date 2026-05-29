@@ -26,6 +26,9 @@ export function NavBar() {
           <Wordmark />
         </Link>
         <nav className="flex items-center gap-1">
+          <Link href="/markets" className={linkClass}>
+            Markets
+          </Link>
           {isAuthed ? (
             <Link href="/account/trading/BTC-USDT" className={linkClass}>
               Trade

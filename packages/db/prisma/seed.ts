@@ -99,6 +99,22 @@ function buildUsers(): SeedUser[] {
       emailVerified: true,
     },
     {
+      email: "mm.alpha@bvbe.local",
+      displayName: "MM Alpha",
+      password: "change-me-after-first-login",
+      role: "user",
+      kycTier: 3,
+      emailVerified: true,
+    },
+    {
+      email: "mm.beta@bvbe.local",
+      displayName: "MM Beta",
+      password: "change-me-after-first-login",
+      role: "user",
+      kycTier: 3,
+      emailVerified: true,
+    },
+    {
       email: "whale1@example.test",
       displayName: "High Roller Holdings",
       password: "Sup3rLong-Whale-Pass-001",
@@ -142,6 +158,40 @@ function buildUsers(): SeedUser[] {
   return users;
 }
 
+// Pre-funded spot balances for the market-maker bot. Phase-10 slice 2
+// uses these two accounts to write synthetic trades against each other
+// every 2s; the worker job needs both sides of every supported pair to
+// have plenty of headroom for the lab session.
+const MM_BALANCES: Record<string, string> = {
+  BTC: "10000",
+  ETH: "100000",
+  LTC: "100000",
+  DOGE: "10000000",
+  USDT: "1000000000",
+  USDC: "1000000000",
+};
+
+async function seedMarketMakerBalances() {
+  const mmEmails = ["mm.alpha@bvbe.local", "mm.beta@bvbe.local"];
+  for (const email of mmEmails) {
+    const u = await prisma.user.findUnique({ where: { email } });
+    if (!u) continue;
+    for (const [asset, amt] of Object.entries(MM_BALANCES)) {
+      await prisma.balance.upsert({
+        where: { userId_asset: { userId: u.id, asset } },
+        update: {},
+        create: {
+          userId: u.id,
+          asset,
+          amount: amt,
+          available: amt,
+          locked: "0",
+        },
+      });
+    }
+  }
+}
+
 async function main() {
   const users = buildUsers();
   for (const u of users) {
@@ -158,7 +208,8 @@ async function main() {
       },
     });
   }
-  console.log(`seeded ${users.length} users`);
+  await seedMarketMakerBalances();
+  console.log(`seeded ${users.length} users (incl. mm.alpha / mm.beta)`);
 }
 
 main()

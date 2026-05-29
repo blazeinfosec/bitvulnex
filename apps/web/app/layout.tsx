@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import { DoNotDeployBanner } from "@/components/banner/do-not-deploy";
 import { NavBar } from "@/components/ui/navbar";
 import { Footer } from "@/components/ui/footer";
+import { TickerHost } from "@/components/exchange/TickerHost";
 
 export const metadata: Metadata = {
   title: "BVBE — Blaze Vulnerable Bitcoin Exchange",
@@ -21,6 +22,7 @@ export default function RootLayout({
       <body className="min-h-screen flex flex-col font-sans bg-bg text-text">
         <DoNotDeployBanner variant="top" />
         <NavBar />
+        <TickerHost />
         <main className="flex-1">{children}</main>
         <Footer />
         <DoNotDeployBanner variant="footer" />
