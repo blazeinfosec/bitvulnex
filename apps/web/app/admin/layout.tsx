@@ -15,6 +15,7 @@ const sections: { href: string; label: string; matchPrefix?: string }[] = [
     matchPrefix: "/admin/compliance",
   },
   { href: "/admin/treasury", label: "Treasury", matchPrefix: "/admin/treasury" },
+  { href: "/admin/ctf", label: "CTF", matchPrefix: "/admin/ctf" },
 ];
 
 export default function AdminLayout({

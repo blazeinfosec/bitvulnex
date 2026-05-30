@@ -29,20 +29,18 @@ type Me = {
   interactions: Array<{ targetKey: string; firstAt: string }>;
 };
 
-const PLANT_KEYS = Array.from({ length: 51 }, (_, i) => `V-${i + 1}`).filter(
-  // Match the V-NNNs that actually have flags in this lab.
-  (k) =>
-    [
-      "V-1","V-4","V-6","V-8","V-9","V-10","V-11","V-12","V-13","V-14",
-      "V-15","V-17","V-18","V-19","V-20","V-21","V-22","V-23","V-24","V-25",
-      "V-26","V-27","V-28","V-30","V-32","V-33","V-34","V-35","V-40","V-41",
-      "V-42","V-43","V-44","V-45","V-46","V-47","V-48","V-49","V-50","V-51",
-    ].includes(k),
-);
+// PLANT_KEYS and CHAINS are populated from /api/v2/ctf/targets at
+// mount; this keeps the trainee surface in sync with the canonical
+// catalog (apps/web/lib/ctf/catalog.ts).
+type CatalogEntry = {
+  key: string;
+  kind: "plant" | "chain";
+  pattern: "A" | "B" | "C";
+  category: string;
+  difficulty: "easy" | "medium" | "hard" | "expert";
+};
 
-const CHAINS = ["CHAIN-A", "CHAIN-B", "CHAIN-C", "CHAIN-D"] as const;
-
-const CHAIN_TITLES: Record<(typeof CHAINS)[number], string> = {
+const CHAIN_TITLES: Record<string, string> = {
   "CHAIN-A": "Drain the hot wallet",
   "CHAIN-B": "Become admin and persist",
   "CHAIN-C": "Mass takeover via oracle",
@@ -51,11 +49,24 @@ const CHAIN_TITLES: Record<(typeof CHAINS)[number], string> = {
 
 export default function CtfPage() {
   const [me, setMe] = useState<Me | null>(null);
+  const [catalog, setCatalog] = useState<CatalogEntry[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [submitInput, setSubmitInput] = useState("");
   const [targetInput, setTargetInput] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [submitMsg, setSubmitMsg] = useState<string | null>(null);
+
+  // One-shot load of the canonical catalog so we don't duplicate the
+  // 44-entry list in this file.
+  useEffect(() => {
+    void (async () => {
+      const r = await authedFetch("/api/v2/ctf/targets");
+      if (r.ok) {
+        const body = (await r.json()) as { targets: CatalogEntry[] };
+        setCatalog(body.targets);
+      }
+    })();
+  }, []);
 
   const refresh = useCallback(async () => {
     setError(null);
@@ -130,7 +141,7 @@ export default function CtfPage() {
       </Container>
     );
   }
-  if (!me) {
+  if (!me || !catalog) {
     return (
       <Container className="py-10">
         <h1 className="text-2xl font-semibold text-text mb-2">CTF</h1>
@@ -138,6 +149,9 @@ export default function CtfPage() {
       </Container>
     );
   }
+
+  const plantKeys = catalog.filter((c) => c.kind === "plant").map((c) => c.key);
+  const chainKeys = catalog.filter((c) => c.kind === "chain").map((c) => c.key);
 
   const targetByKey = new Map(me.targets.map((t) => [t.targetKey, t]));
   const revealsByKey = new Map<string, { basic: boolean; verbose: boolean }>();
@@ -247,7 +261,7 @@ export default function CtfPage() {
           Plant targets ({me.score.plantTotal})
         </h2>
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-2">
-          {PLANT_KEYS.map((k) => (
+          {plantKeys.map((k) => (
             <TargetCard
               key={k}
               targetKey={k}
@@ -266,7 +280,7 @@ export default function CtfPage() {
           Killer chains ({me.score.chainTotal})
         </h2>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-          {CHAINS.map((c) => (
+          {chainKeys.map((c) => (
             <TargetCard
               key={c}
               targetKey={c}
@@ -344,6 +358,14 @@ function TargetCard({
   const [verboseMsg, setVerboseMsg] = useState<string | null>(null);
 
   async function loadBasic() {
+    // Fire the interaction record alongside the basic hint so the
+    // verbose-unlock countdown starts from the trainee's first read.
+    // The endpoint is idempotent — calling it twice is a no-op.
+    void authedFetch("/api/v2/ctf/interaction", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ targetKey }),
+    });
     const r = await authedFetch(`/api/v2/ctf/hints/${targetKey}?tier=basic`);
     if (r.ok) setBasicHint(await r.json());
   }

@@ -55,9 +55,9 @@ export class HintValidationError extends Error {
 // so prose verbs like "get through" / "post a message" don't trip the
 // regex meant to catch literal `GET /api/v2/me` style payloads.
 const FORBIDDEN_BASIC =
-  /apps\/|packages\/|nginx\/|CVE-|__proto__|prisma\.|\$queryRaw|\bcurl |\bline\s+\d+|\bGET \/|\bPOST \/|\bPATCH \/|\bDELETE \/|:\d+\b/;
+  /apps\/|packages\/|nginx\/|CVE-|__proto__|prisma\.|\$queryRaw|\bcurl |\bline\s+\d+|\bGET \/|\bPOST \/|\bPATCH \/|\bDELETE \//;
 const FORBIDDEN_VERBOSE =
-  /apps\/|packages\/|nginx\/|\bcurl |\bline\s+\d+|\bGET \/|\bPOST \/|\bPATCH \/|\bDELETE \/|:\d+\b/;
+  /apps\/|packages\/|nginx\/|\bcurl |\bline\s+\d+|\bGET \/|\bPOST \/|\bPATCH \/|\bDELETE \//;
 // Note: verbose can mention CVE-… (V-15 specifically), zod schemas,
 // dangerouslySetInnerHTML, etc. — those are "lens" cues. Explicit
 // file paths and line numbers are still forbidden.
