@@ -45,6 +45,7 @@ services:
       - ./apps/web:/repo/apps/web
       - ./packages:/repo/packages
       - ./CHANGELOG.md:/repo/CHANGELOG.md:ro
+      - ./docs/hints:/repo/docs/hints:ro
       - /repo/apps/web/node_modules
       - /repo/apps/web/.next
       - /repo/packages/shared/node_modules

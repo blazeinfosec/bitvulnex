@@ -222,6 +222,14 @@ model User {
   adminAuditLogs            AdminAuditLog[]
   equitySnapshots           EquitySnapshot[]
 
+  // Phase 11 — CTF cohort membership + per-user hints opt-out.
+  cohortId       String?
+  hintsOverride  HintsOverride @default(follow)
+  cohort         Cohort?       @relation(fields: [cohortId], references: [id], onDelete: SetNull)
+  ctfSubmissions CtfSubmission[]
+  ctfHintReveals CtfHintReveal[]
+  ctfInteractions CtfInteraction[]
+
   @@map("users")
 }
 
@@ -792,4 +800,102 @@ model EquitySnapshot {
   @@unique([userId, date])
   @@index([userId, date])
   @@map("equity_snapshots")
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// Phase 11 — CTF flag and hint subsystem.
+//
+// Models below back the trainee-visible /ctf page (flag submissions,
+// score) and the per-cohort hint engine (interaction timer, reveal
+// log). The hint subsystem is logged-only — reveal events DO NOT
+// affect a trainee's score in the spec-locked design. Instructors see
+// the reveal counts in /admin/ctf for cohort post-mortems.
+//
+// SEE ALSO: docs/phases/phase-11/spec.md
+// ─────────────────────────────────────────────────────────────────────
+
+enum HintsOverride {
+  follow
+  enable
+  disable
+}
+
+model Cohort {
+  id                    String   @id @default(cuid())
+  name                  String   @unique
+  // First 16 hex of sha256(CTF_SALT). Lets the server reject submissions
+  // from a stale cohort-salt without exposing the salt itself.
+  saltFingerprint       String
+  // OFF by default per phase-11 spec — fresh cohort = CTF first.
+  hintsDefault          Boolean  @default(false)
+  // 15 minutes default; per-cohort tunable from /admin/ctf.
+  verboseUnlockSeconds  Int      @default(900)
+  startedAt             DateTime @default(now())
+  archivedAt            DateTime?
+
+  members       User[]
+  submissions   CtfSubmission[]
+  hintReveals   CtfHintReveal[]
+  interactions  CtfInteraction[]
+
+  @@map("cohorts")
+}
+
+// A trainee's submitted flag attempt. NEVER stores raw CTF_SALT or any
+// pre-image; we record only the flag's first 8 hex (fast-reject) plus
+// the validity verdict computed at submit time. Re-validation always
+// re-runs flagFor(vulnId, env.CTF_SALT).
+model CtfSubmission {
+  id           String   @id @default(cuid())
+  cohortId     String
+  userId       String
+  targetKey    String   // "V-22" or "CHAIN-A"
+  flagPrefix   String   // first 8 hex of submitted BVBE{...}
+  valid        Boolean
+  submittedAt  DateTime @default(now())
+
+  cohort       Cohort   @relation(fields: [cohortId], references: [id], onDelete: Cascade)
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // A trainee scores each target at most once.
+  @@unique([cohortId, userId, targetKey, valid])
+  @@index([cohortId, submittedAt])
+  @@map("ctf_submissions")
+}
+
+// First-interaction timer source of truth. The trainee's verbose-hint
+// unlock counts elapsed seconds from this row's firstAt — never updated
+// after creation (architect Gate-1-addendum condition #9: atomic create).
+model CtfInteraction {
+  id              String   @id @default(cuid())
+  cohortId        String
+  userId          String
+  targetKey       String        // V-NNN or CHAIN-X-STEP-N
+  firstAt         DateTime @default(now())
+
+  cohort          Cohort   @relation(fields: [cohortId], references: [id], onDelete: Cascade)
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([cohortId, userId, targetKey])
+  @@map("ctf_interactions")
+}
+
+// Logged-only hint-reveal events. The /ctf trainee page renders the
+// trainee's own reveals so the UI can show "Hint shown ✓" state.
+// Aggregates are admin-only — never exposed on a trainee surface.
+// Architect addendum condition #8.
+model CtfHintReveal {
+  id           String   @id @default(cuid())
+  cohortId     String
+  userId       String
+  targetKey    String
+  tier         Int      // 1 = basic, 2 = verbose
+  revealedAt   DateTime @default(now())
+
+  cohort       Cohort   @relation(fields: [cohortId], references: [id], onDelete: Cascade)
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([cohortId, userId, targetKey, tier])
+  @@index([cohortId])
+  @@map("ctf_hint_reveals")
 }
