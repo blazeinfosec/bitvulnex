@@ -135,6 +135,43 @@ const PATTERN_B_VALIDATORS: Record<string, Validator> = {
   // Proof = the rendered HTML from the polyglot doc.
   "V-41": (proof) => /<script|<img\s+src|onerror=|onload=/i.test(proof),
 
+  // ─── Pattern B fan-out completing the catalog (L7 slice-4 M-1) ──
+
+  // V-6 — middleware bypass via x-bvbe-internal-trace. Proof = any
+  // body the trainee retrieved by reaching an internal-prefix
+  // endpoint without a valid admin JWT.
+  "V-6": (proof) => proof.trim().length > 0,
+
+  // V-26 — UTC-bucket withdrawal-limit bypass. Proof = the second
+  // withdrawal id (or txid) that landed on the same wallet within
+  // a minute of the first across the UTC boundary.
+  "V-26": (proof) => proof.trim().length > 0,
+
+  // V-42 — zero-conf deposit credit. Proof = a deposit row id whose
+  // status walked credited→dropped without a compensating debit.
+  "V-42": (proof) => /^[0-9a-zA-Z_-]+$/.test(proof.trim()),
+
+  // V-43 — fee-tier maker-side filter miss. Proof = the trade id or
+  // fee-tier name the trainee observed inflated past their volume.
+  "V-43": (proof) => proof.trim().length > 0,
+
+  // V-44 — yield-accrual ordering inflates a mid-tick supply. Proof
+  // = the lending position id that received the inflated accrual.
+  "V-44": (proof) => /^[0-9a-zA-Z_-]+$/.test(proof.trim()),
+
+  // V-45 — staking-claim concurrent update double-credit. Proof =
+  // the claim id that ran twice OR the difference between expected
+  // and actual credit.
+  "V-45": (proof) => proof.trim().length > 0,
+
+  // V-50 — HTTP request smuggling. Proof = a smuggled HTTP frame
+  // containing both Content-Length and Transfer-Encoding plus a
+  // pipelined second request line.
+  "V-50": (proof) =>
+    /Transfer-Encoding\s*:\s*chunked/i.test(proof) &&
+    /Content-Length\s*:/i.test(proof) &&
+    /(GET|POST|PATCH|PUT|DELETE)\s+\/[a-zA-Z0-9/.\-_]+\s+HTTP/.test(proof),
+
   // ─── Killer chains ──────────────────────────────────────────────
 
   // CHAIN-A: drain hot wallet (V-48 → V-6 → V-33). Trainee submits
