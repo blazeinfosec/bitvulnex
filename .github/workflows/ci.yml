@@ -1,0 +1,79 @@
+name: CI
+
+# Functional CI for the Bitvulnex lab. This pipeline validates that the
+# app TYPE-CHECKS, its unit tests pass, and the full docker-compose stack
+# BUILDS AND BOOTS. It deliberately does NOT run security scanners as a
+# gate — the planted vulnerabilities in VULNS.md are intentional features,
+# not CI failures. See CLAUDE.md.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# Cancel superseded runs on the same ref to keep the queue green and fast.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    name: Typecheck + unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9.12.0
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Typecheck (workspace lint = tsc --noEmit)
+        run: pnpm -r lint
+
+      - name: Unit tests (vitest)
+        run: pnpm test
+
+  docker-smoke:
+    name: Stack builds and boots
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Seed env from example
+        run: cp .env.example .env
+
+      - name: Build and start the stack
+        run: docker compose up -d --build
+
+      - name: Wait for the edge to report healthy
+        run: |
+          for i in $(seq 1 60); do
+            if curl -sf http://localhost/api/health | grep -q '"ok"'; then
+              echo "stack healthy after ~$((i*5))s"
+              curl -s http://localhost/api/health
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "::error::stack did not become healthy in time"
+          docker compose ps
+          docker compose logs --tail=80
+          exit 1
+
+      - name: Confirm db-migrate seeded the database
+        run: docker compose logs db-migrate | grep -q "seeded" && echo "seed OK"
+
+      - name: Tear down (verifies clean volume teardown)
+        if: always()
+        run: docker compose down -v

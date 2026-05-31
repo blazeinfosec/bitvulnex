@@ -361,7 +361,7 @@ describe("snapshotOnce", () => {
     const res = await snapshotOnce(db, now);
     expect(res.users).toBe(1);
     expect(snapshots.length).toBe(1);
-    expect(snapshots[0].userId).toBe("u1");
+    expect(snapshots[0]!.userId).toBe("u1");
   });
 
   it("keeps writing a zero-equity row once the user has a prior snapshot", async () => {
@@ -389,6 +389,6 @@ describe("snapshotOnce", () => {
     balances.length = 0;
     await snapshotOnce(db, now2);
     expect(snapshots.length).toBe(2);
-    expect(snapshots[1].totalUsd.toString()).toBe("0");
+    expect(snapshots[1]!.totalUsd.toString()).toBe("0");
   });
 });

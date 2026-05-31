@@ -1,0 +1,29 @@
+# Dependabot config for the Bitvulnex lab.
+#
+# IMPORTANT: this is a DELIBERATELY VULNERABLE training app. Several
+# dependencies are pinned to old/vulnerable versions ON PURPOSE and are
+# tracked in VULNS.md (e.g. V-15 xml2js@0.4.23 / CVE-2023-0842, V-49
+# dependency-confusion artifact). Do NOT let Dependabot "fix" those — the
+# pins are the product. We ignore the documented planted packages so
+# Dependabot stops opening perpetually-red bump PRs against them, while
+# still surfacing genuinely *unintended* vulnerable deps for hygiene.
+
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: "/"
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    ignore:
+      # V-15 — planted vulnerable dependency (CVE-2023-0842). Intentional.
+      - dependency-name: "xml2js"
+    commit-message:
+      prefix: "chore(deps)"
+    labels:
+      - dependencies
+
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
