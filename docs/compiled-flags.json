@@ -1,0 +1,361 @@
+{
+  "generatedBy": "scripts/compile-hints.ts",
+  "warning": "ANSWER KEY — do NOT feed to the solver. Salt-derived flags are valid only for the cohort sharing this CTF_SALT fingerprint.",
+  "saltFingerprint": "7a03f08f",
+  "saltResolved": true,
+  "targetCount": 44,
+  "flags": [
+    {
+      "key": "V-1",
+      "kind": "plant",
+      "category": "OWASP / XSS",
+      "difficulty": "easy",
+      "flagType": "salt-derived",
+      "flag": "{BLAZE_BITVULNEX_a86ef83cf2214fd7}"
+    },
+    {
+      "key": "V-4",
+      "kind": "plant",
+      "category": "OWASP / Access control / IDOR",
+      "difficulty": "easy",
+      "flagType": "salt-derived",
+      "flag": "{BLAZE_BITVULNEX_a6b6182b26b6a954}"
+    },
+    {
+      "key": "V-6",
+      "kind": "plant",
+      "category": "OWASP / Auth / Trust boundary",
+      "difficulty": "medium",
+      "flagType": "salt-derived",
+      "flag": "{BLAZE_BITVULNEX_2166b8c6132f9fc5}"
+    },
+    {
+      "key": "V-8",
+      "kind": "plant",
+      "category": "OWASP / Auth",
+      "difficulty": "easy",
+      "flagType": "salt-derived",
+      "flag": "{BLAZE_BITVULNEX_f1bbcf72243b0e68}"
+    },
+    {
+      "key": "V-9",
+      "kind": "plant",
+      "category": "Auth / Infra",
+      "difficulty": "easy",
+      "flagType": "static",
+      "flag": "{BLAZE_BITVULNEX_4f9796051758783f}"
+    },
+    {
+      "key": "V-10",
+      "kind": "plant",
+      "category": "OWASP / Auth — predictable token",
+      "difficulty": "easy",
+      "flagType": "salt-derived",
+      "flag": "{BLAZE_BITVULNEX_02105d0833ab5cdb}"
+    },
+    {
+      "key": "V-11",
+      "kind": "plant",
+      "category": "OWASP / SQLi",
+      "difficulty": "medium",
+      "flagType": "salt-derived",
+      "flag": "{BLAZE_BITVULNEX_1de098ed8b3cc50c}"
+    },
+    {
+      "key": "V-12",
+      "kind": "plant",
+      "category": "OWASP / SQLi",
+      "difficulty": "medium",
+      "flagType": "salt-derived",
+      "flag": "{BLAZE_BITVULNEX_e71a11451469fbfb}"
+    },
+    {
+      "key": "V-13",
+      "kind": "plant",
+      "category": "OWASP / Auth — open redirect",
+      "difficulty": "easy",
+      "flagType": "salt-derived",
+      "flag": "{BLAZE_BITVULNEX_be2f78be11c6b4df}"
+    },
+    {
+      "key": "V-14",
+      "kind": "plant",
+      "category": "OWASP / Path traversal",
+      "difficulty": "easy",
+      "flagType": "salt-derived",
+      "flag": "{BLAZE_BITVULNEX_cbf8a8a276b2cb93}"
+    },
+    {
+      "key": "V-15",
+      "kind": "plant",
+      "category": "Infra / Supply chain",
+      "difficulty": "medium",
+      "flagType": "static",
+      "flag": "{BLAZE_BITVULNEX_1b3cca7c66cb0163}"
+    },
+    {
+      "key": "V-17",
+      "kind": "plant",
+      "category": "OWASP / Command injection",
+      "difficulty": "medium",
+      "flagType": "salt-derived",
+      "flag": "{BLAZE_BITVULNEX_5e6d8cc14d0f5508}"
+    },
+    {
+      "key": "V-18",
+      "kind": "plant",
+      "category": "OWASP / XSS / mXSS",
+      "difficulty": "medium",
+      "flagType": "salt-derived",
+      "flag": "{BLAZE_BITVULNEX_109a7894d179389f}"
+    },
+    {
+      "key": "V-19",
+      "kind": "plant",
+      "category": "OWASP / Auth — key confusion",
+      "difficulty": "medium",
+      "flagType": "salt-derived",
+      "flag": "{BLAZE_BITVULNEX_ae28f1fd3a310051}"
+    },
+    {
+      "key": "V-20",
+      "kind": "plant",
+      "category": "OWASP / Path traversal",
+      "difficulty": "medium",
+      "flagType": "salt-derived",
+      "flag": "{BLAZE_BITVULNEX_daf291186d48a6be}"
+    },
+    {
+      "key": "V-21",
+      "kind": "plant",
+      "category": "OWASP / Auth — refresh reuse",
+      "difficulty": "hard",
+      "flagType": "salt-derived",
+      "flag": "{BLAZE_BITVULNEX_4341e56eeda00245}"
+    },
+    {
+      "key": "V-22",
+      "kind": "plant",
+      "category": "OWASP / Mass assignment",
+      "difficulty": "medium",
+      "flagType": "salt-derived",
+      "flag": "{BLAZE_BITVULNEX_6cace021904052ab}"
+    },
+    {
+      "key": "V-23",
+      "kind": "plant",
+      "category": "WebSocket / CSWSH",
+      "difficulty": "medium",
+      "flagType": "salt-derived",
+      "flag": "{BLAZE_BITVULNEX_a94fb2e7d15ba503}"
+    },
+    {
+      "key": "V-24",
+      "kind": "plant",
+      "category": "Crypto / BTC protocol",
+      "difficulty": "medium",
+      "flagType": "salt-derived",
+      "flag": "{BLAZE_BITVULNEX_9177d27c80e23c0b}"
+    },
+    {
+      "key": "V-25",
+      "kind": "plant",
+      "category": "Business logic / Market manipulation",
+      "difficulty": "medium",
+      "flagType": "salt-derived",
+      "flag": "{BLAZE_BITVULNEX_41790215b88e9ed7}"
+    },
+    {
+      "key": "V-26",
+      "kind": "plant",
+      "category": "Crypto / Business logic",
+      "difficulty": "easy",
+      "flagType": "salt-derived",
+      "flag": "{BLAZE_BITVULNEX_87ff7e6771cddbbf}"
+    },
+    {
+      "key": "V-27",
+      "kind": "plant",
+      "category": "KYC tier — type confusion",
+      "difficulty": "easy",
+      "flagType": "salt-derived",
+      "flag": "{BLAZE_BITVULNEX_8144e1d24bc02809}"
+    },
+    {
+      "key": "V-28",
+      "kind": "plant",
+      "category": "Crypto / Race condition",
+      "difficulty": "hard",
+      "flagType": "salt-derived",
+      "flag": "{BLAZE_BITVULNEX_a5d1ce476a755bae}"
+    },
+    {
+      "key": "V-30",
+      "kind": "plant",
+      "category": "Business logic",
+      "difficulty": "hard",
+      "flagType": "salt-derived",
+      "flag": "{BLAZE_BITVULNEX_dc48a72c66b61747}"
+    },
+    {
+      "key": "V-32",
+      "kind": "plant",
+      "category": "Crypto / Race condition",
+      "difficulty": "hard",
+      "flagType": "salt-derived",
+      "flag": "{BLAZE_BITVULNEX_8b4324810acb3847}"
+    },
+    {
+      "key": "V-33",
+      "kind": "plant",
+      "category": "Crypto / BTC / Business logic",
+      "difficulty": "expert",
+      "flagType": "salt-derived",
+      "flag": "{BLAZE_BITVULNEX_3d24301c3e182b43}"
+    },
+    {
+      "key": "V-34",
+      "kind": "plant",
+      "category": "OWASP / Prototype pollution",
+      "difficulty": "hard",
+      "flagType": "salt-derived",
+      "flag": "{BLAZE_BITVULNEX_e50a9c52146c6c1a}"
+    },
+    {
+      "key": "V-35",
+      "kind": "plant",
+      "category": "Framework / Auth",
+      "difficulty": "medium",
+      "flagType": "salt-derived",
+      "flag": "{BLAZE_BITVULNEX_82e70be192295014}"
+    },
+    {
+      "key": "V-40",
+      "kind": "plant",
+      "category": "SSRF",
+      "difficulty": "medium",
+      "flagType": "salt-derived",
+      "flag": "{BLAZE_BITVULNEX_44f5da3fb578a0fd}"
+    },
+    {
+      "key": "V-41",
+      "kind": "plant",
+      "category": "OWASP / XSS / Upload",
+      "difficulty": "medium",
+      "flagType": "salt-derived",
+      "flag": "{BLAZE_BITVULNEX_ca9b212aa2c9f796}"
+    },
+    {
+      "key": "V-42",
+      "kind": "plant",
+      "category": "Business logic / Race condition",
+      "difficulty": "hard",
+      "flagType": "salt-derived",
+      "flag": "{BLAZE_BITVULNEX_4ecc05b8067f6440}"
+    },
+    {
+      "key": "V-43",
+      "kind": "plant",
+      "category": "Business logic / Crypto-finance arithmetic",
+      "difficulty": "hard",
+      "flagType": "salt-derived",
+      "flag": "{BLAZE_BITVULNEX_b48ec5108b08e39b}"
+    },
+    {
+      "key": "V-44",
+      "kind": "plant",
+      "category": "Business logic / Crypto-finance arithmetic",
+      "difficulty": "medium",
+      "flagType": "salt-derived",
+      "flag": "{BLAZE_BITVULNEX_60ff6e6b00e4845a}"
+    },
+    {
+      "key": "V-45",
+      "kind": "plant",
+      "category": "Crypto / Race condition",
+      "difficulty": "hard",
+      "flagType": "salt-derived",
+      "flag": "{BLAZE_BITVULNEX_55bf6072d7175dfc}"
+    },
+    {
+      "key": "V-46",
+      "kind": "plant",
+      "category": "Auth / Trust boundary",
+      "difficulty": "medium",
+      "flagType": "salt-derived",
+      "flag": "{BLAZE_BITVULNEX_50fcad2018d51abb}"
+    },
+    {
+      "key": "V-47",
+      "kind": "plant",
+      "category": "Crypto / BTC protocol",
+      "difficulty": "hard",
+      "flagType": "salt-derived",
+      "flag": "{BLAZE_BITVULNEX_fffbf739fd40d5a6}"
+    },
+    {
+      "key": "V-48",
+      "kind": "plant",
+      "category": "Infra / Supply chain / Secrets",
+      "difficulty": "easy",
+      "flagType": "static",
+      "flag": "{BLAZE_BITVULNEX_78c8d02381bf68da}"
+    },
+    {
+      "key": "V-49",
+      "kind": "plant",
+      "category": "Infra / Supply chain",
+      "difficulty": "medium",
+      "flagType": "static",
+      "flag": "{BLAZE_BITVULNEX_7a2cba180cac80f4}"
+    },
+    {
+      "key": "V-50",
+      "kind": "plant",
+      "category": "Infra / OWASP / HTTP smuggling",
+      "difficulty": "hard",
+      "flagType": "salt-derived",
+      "flag": "{BLAZE_BITVULNEX_d388a699d001341a}"
+    },
+    {
+      "key": "V-51",
+      "kind": "plant",
+      "category": "OWASP / Broken access control",
+      "difficulty": "medium",
+      "flagType": "salt-derived",
+      "flag": "{BLAZE_BITVULNEX_ae2d9173272aaf57}"
+    },
+    {
+      "key": "CHAIN-A",
+      "kind": "chain",
+      "category": "Crypto / Trust boundary chain",
+      "difficulty": "hard",
+      "flagType": "salt-derived",
+      "flag": "{BLAZE_BITVULNEX_41427e67d44a87c4}"
+    },
+    {
+      "key": "CHAIN-B",
+      "kind": "chain",
+      "category": "Infra / Auth — smuggling chain",
+      "difficulty": "expert",
+      "flagType": "salt-derived",
+      "flag": "{BLAZE_BITVULNEX_fc70d6cea278e91f}"
+    },
+    {
+      "key": "CHAIN-C",
+      "kind": "chain",
+      "category": "Business logic — oracle chain",
+      "difficulty": "hard",
+      "flagType": "salt-derived",
+      "flag": "{BLAZE_BITVULNEX_86aed8e9dc9fdf9b}"
+    },
+    {
+      "key": "CHAIN-D",
+      "kind": "chain",
+      "category": "SSRF → metadata → exfil chain",
+      "difficulty": "medium",
+      "flagType": "salt-derived",
+      "flag": "{BLAZE_BITVULNEX_a241b86427f2973b}"
+    }
+  ]
+}
