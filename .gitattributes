@@ -1,0 +1,4 @@
+# Normalize line endings to LF in the repository; check out native on
+# each platform. Silences the LF/CRLF warnings on Windows checkouts.
+* text=auto
+*.sh text eol=lf
