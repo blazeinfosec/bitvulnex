@@ -1,4 +1,4 @@
-# Contributing to BVBE
+# Contributing to Bitvulnex
 
 > Read [`CLAUDE.md`](./CLAUDE.md) first. The four-gate workflow is
 > non-negotiable.

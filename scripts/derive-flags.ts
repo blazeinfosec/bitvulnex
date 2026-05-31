@@ -9,6 +9,7 @@
 // re-rotate per cohort.
 
 import { createHash } from "node:crypto";
+import { deriveDigest, formatFlag } from "../apps/web/lib/ctf/derive";
 
 const SALT_DERIVED: string[] = [
   // Slice 1 wired
@@ -66,20 +67,13 @@ const STATIC_PATTERN_C: Array<[string, string]> = [
 ];
 
 function flagFor(vulnId: string, salt: string): string {
-  const digest = createHash("sha256")
-    .update(`${vulnId}:${salt}`)
-    .digest("hex")
-    .slice(0, 32);
-  return `BVBE{${digest}}`;
+  // Salt-derived flag — same envelope + digest as the runtime flagFor.
+  return formatFlag(deriveDigest(`${vulnId}:${salt}`));
 }
 
 function derivableFlag(vulnId: string, secret: string): string {
-  // Same formula as apps/web/lib/ctf/derive.ts — no salt involved.
-  const digest = createHash("sha256")
-    .update(`${vulnId}:${secret}`)
-    .digest("hex")
-    .slice(0, 32);
-  return `BVBE{${digest}}`;
+  // Pattern C — no salt involved; identical to apps/web/lib/ctf/derive.
+  return formatFlag(deriveDigest(`${vulnId}:${secret}`));
 }
 
 function main() {
@@ -90,7 +84,7 @@ function main() {
   }
 
   const total = SALT_DERIVED.length + STATIC_PATTERN_C.length;
-  console.log(`# BVBE CTF flag table — ${total} flags for cohort salt fp:${
+  console.log(`# Bitvulnex CTF flag table ({BLAZE_BITVULNEX_...}) — ${total} flags for cohort salt fp:${
     createHash("sha256").update(salt).digest("hex").slice(0, 8)
   }`);
   console.log(`# Pattern A + B + chain (${SALT_DERIVED.length} flags, salt-derived):`);

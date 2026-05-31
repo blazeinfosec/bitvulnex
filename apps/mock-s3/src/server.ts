@@ -29,7 +29,7 @@ const SYNTHETIC_DOC = {
   issuedAt: "2020-01-01",
   expiresAt: "2030-01-01",
   notes:
-    "This is synthetic lab data generated for the BVBE security education " +
+    "This is synthetic lab data generated for the Bitvulnex security education " +
     "lab. No real personally identifying information is present. Do not " +
     "deploy this lab anywhere a real reviewer could mistake it for live " +
     "data.",

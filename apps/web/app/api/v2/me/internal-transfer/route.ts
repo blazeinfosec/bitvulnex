@@ -14,7 +14,7 @@ import { AssetError } from "@/lib/assets";
 registerEndpoint({
   method: "post",
   path: "/api/v2/me/internal-transfer",
-  summary: "Move funds to another BVBE user (fee-free, off-chain)",
+  summary: "Move funds to another Bitvulnex user (fee-free, off-chain)",
   responses: {
     "200": { description: "OK" },
     "400": { description: "Validation / insufficient balance" },

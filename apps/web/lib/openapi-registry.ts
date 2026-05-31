@@ -49,10 +49,10 @@ export function buildOpenApiDocument(): unknown {
   return {
     openapi: "3.1.0",
     info: {
-      title: "BVBE — Public API",
+      title: "Bitvulnex — Public API",
       version: "0.0.0-phase0",
       description:
-        "Public API for the Blaze Vulnerable Bitcoin Exchange. " +
+        "Public API for Bitvulnex, a deliberately vulnerable Bitcoin exchange. " +
         "DO NOT DEPLOY. Authorized security education only.",
     },
     paths,

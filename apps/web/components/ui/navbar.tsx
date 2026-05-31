@@ -75,7 +75,7 @@ export function NavBar() {
         <Link
           href="/"
           className="no-underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent rounded-md"
-          aria-label="BVBE home"
+          aria-label="Bitvulnex home"
         >
           <Wordmark />
         </Link>

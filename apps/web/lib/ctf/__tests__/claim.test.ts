@@ -6,10 +6,10 @@ vi.mock("@/lib/ctf", async () => {
   return {
     ctfModeEnabled: () => ctfMode,
     flagFor: (vulnId: string) =>
-      `BVBE{${createHash("sha256")
+      `{BLAZE_BITVULNEX_${createHash("sha256")
         .update(`${vulnId}:test-salt`)
         .digest("hex")
-        .slice(0, 32)}}`,
+        .slice(0, 16)}}`,
   };
 });
 
@@ -36,7 +36,7 @@ describe("processClaim — Pattern B (V-1, V-13) under CTF_MODE", () => {
   it("V-1 accepts any non-empty proof", async () => {
     const r = await processClaim("V-1", "exfil-tag-xyz");
     expect(r.ok).toBe(true);
-    if (r.ok) expect(r.flag).toMatch(/^BVBE\{[0-9a-f]{32}\}$/);
+    if (r.ok) expect(r.flag).toMatch(/^\{BLAZE_BITVULNEX_[0-9a-f]{16}\}$/);
   });
 
   it("V-1 rejects whitespace-only proof", async () => {

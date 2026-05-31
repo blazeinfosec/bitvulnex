@@ -4,7 +4,7 @@
 // Phase 7 extends the surface for the withdrawal worker and the
 // treasury coordinator: `sendmany`, `bumpfee`, plus a working
 // `decodepsbt` / `walletprocesspsbt` / `finalizepsbt` over the
-// BVBE PSBT caricature envelope defined in `@bvbe/shared`.
+// Bitvulnex PSBT caricature envelope defined in `@bvbe/shared`.
 
 import type {
   BlockchainInfo,

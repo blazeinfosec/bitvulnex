@@ -4,7 +4,7 @@ import { prisma } from "@bvbe/db";
 import { userFromAuthorization } from "@/lib/auth";
 import { jsonError, readJson } from "@/lib/api";
 import { ctfModeEnabled, flagFor } from "@/lib/ctf";
-import { derivableFlag, expectedSecretFor } from "@/lib/ctf/derive";
+import { derivableFlag, expectedSecretFor, flagPrefix } from "@/lib/ctf/derive";
 import { isKnownTarget } from "@/lib/ctf/catalog";
 import { registerEndpoint } from "@/lib/openapi-registry";
 
@@ -50,7 +50,7 @@ export async function POST(
   // admin-revealed. The flagPrefix and submittedAt reflect the
   // override so the audit trail makes it clear this was not a
   // trainee solve.
-  const prefix = (expected.match(/BVBE\{([0-9a-f]{8})/) ?? [])[1] ?? "";
+  const prefix = flagPrefix(expected);
   await prisma.ctfSubmission.upsert({
     where: {
       cohortId_userId_targetKey_valid: {

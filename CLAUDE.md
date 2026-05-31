@@ -1,6 +1,6 @@
-# Blaze Vulnerable Bitcoin Exchange
+# Bitvulnex — Vulnerable Bitcoin Exchange
 
-> **AUTHORIZED SECURITY EDUCATION PROJECT.** This is a *deliberately vulnerable*
+> **AUTHORIZED SECURITY EDUCATION PROJECT.** Bitvulnex is a *deliberately vulnerable*
 > web application built by Blaze Information Security for training,
 > CTF-style exercises, and red/blue team practice. Security flaws are
 > intentional. **Never deploy this to a public network. Never use real funds.

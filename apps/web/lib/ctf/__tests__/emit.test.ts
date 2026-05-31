@@ -7,10 +7,10 @@ vi.mock("@/lib/ctf", async () => {
   return {
     ctfModeEnabled: () => ctfMode,
     flagFor: (vulnId: string) =>
-      `BVBE{${createHash("sha256")
+      `{BLAZE_BITVULNEX_${createHash("sha256")
         .update(`${vulnId}:test-salt`)
         .digest("hex")
-        .slice(0, 32)}}`,
+        .slice(0, 16)}}`,
   };
 });
 
@@ -34,7 +34,9 @@ describe("maybeEmitFlag", () => {
     ctfMode = true;
     const out = maybeEmitFlag({ ok: true }, "V-4");
     expect(out.ok).toBe(true);
-    expect((out as { _flag?: string })._flag).toMatch(/^BVBE\{[0-9a-f]{32}\}$/);
+    expect((out as { _flag?: string })._flag).toMatch(
+      /^\{BLAZE_BITVULNEX_[0-9a-f]{16}\}$/,
+    );
   });
 
   it("produces stable flag for the same vulnId", () => {

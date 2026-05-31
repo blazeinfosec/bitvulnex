@@ -74,7 +74,7 @@ export default function WalletTransferPage() {
           Internal transfer
         </h1>
         <p className="text-sm text-text-dim mt-1">
-          Move funds between BVBE accounts instantly. Fee-free.
+          Move funds between Bitvulnex accounts instantly. Fee-free.
         </p>
       </div>
 

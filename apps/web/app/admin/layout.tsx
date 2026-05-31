@@ -37,7 +37,7 @@ export default function AdminLayout({
           <div className="text-xs uppercase tracking-wider text-text-mute font-semibold">
             Admin console
           </div>
-          <div className="text-sm text-text mt-1">BVBE</div>
+          <div className="text-sm text-text mt-1">Bitvulnex</div>
         </div>
         <nav className="p-2 space-y-1">
           {sections.map((s) => (

@@ -10,7 +10,7 @@ export function generateTotpSecret(): string {
 export function totpUri(
   secret: string,
   account: string,
-  issuer = "BVBE",
+  issuer = "Bitvulnex",
 ): string {
   const params = new URLSearchParams({
     secret,

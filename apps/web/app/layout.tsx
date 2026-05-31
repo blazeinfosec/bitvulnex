@@ -6,7 +6,7 @@ import { Footer } from "@/components/ui/footer";
 import { TickerHost } from "@/components/exchange/TickerHost";
 
 export const metadata: Metadata = {
-  title: "BVBE — Blaze Vulnerable Bitcoin Exchange",
+  title: "Bitvulnex — Vulnerable Bitcoin Exchange",
   description:
     "Authorized security education lab. Deliberately vulnerable. Do not deploy.",
   robots: { index: false, follow: false },

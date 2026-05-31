@@ -141,7 +141,7 @@ export default function P2PPage() {
       <div>
         <h1 className="text-2xl font-semibold tracking-tight text-text">P2P</h1>
         <p className="text-sm text-text-dim mt-1">
-          Trade peer-to-peer with BVBE as escrow. Sellers lock the asset when
+          Trade peer-to-peer with Bitvulnex as escrow. Sellers lock the asset when
           they post; buyers mark fiat paid and sellers release.
         </p>
       </div>

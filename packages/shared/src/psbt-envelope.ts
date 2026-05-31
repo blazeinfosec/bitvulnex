@@ -33,7 +33,7 @@ export function encodePsbt(payload: PsbtPayload): string {
 }
 
 /**
- * Parse a BVBE PSBT envelope. Skips any leading preamble and reads
+ * Parse a Bitvulnex PSBT envelope. Skips any leading preamble and reads
  * the JSON payload that follows the first `BVBE_PSBT_V1:` marker.
  * If the input contains more markers (e.g. metadata segments
  * appended during a multi-step signing flow) the parser stops at

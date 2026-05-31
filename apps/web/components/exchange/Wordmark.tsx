@@ -22,7 +22,7 @@ export function Wordmark({ className }: { className?: string }) {
           strokeLinecap="round"
         />
       </svg>
-      <span className="text-text font-bold tracking-tight text-lg">BVBE</span>
+      <span className="text-text font-bold tracking-tight text-lg">Bitvulnex</span>
     </div>
   );
 }

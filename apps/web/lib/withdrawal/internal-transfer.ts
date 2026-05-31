@@ -1,4 +1,4 @@
-// Internal transfer. Fee-free peer-to-peer move within BVBE,
+// Internal transfer. Fee-free peer-to-peer move within Bitvulnex,
 // designed for OTC desk client servicing and direct B2B settlement
 // between onboarded users. Sender and recipient must both have an
 // account; the move never touches the blockchain.

@@ -1,4 +1,4 @@
-// Prisma schema for BVBE.
+// Prisma schema for Bitvulnex.
 //
 // Phase 1 extends the User model and adds RefreshToken,
 // PasswordResetToken, ApiKey. Subsequent phases extend additively.
@@ -850,7 +850,7 @@ model CtfSubmission {
   cohortId     String
   userId       String
   targetKey    String   // "V-22" or "CHAIN-A"
-  flagPrefix   String   // first 8 hex of submitted BVBE{...}
+  flagPrefix   String   // first 8 hex of submitted {BLAZE_BITVULNEX_...}
   valid        Boolean
   submittedAt  DateTime @default(now())
 

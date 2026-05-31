@@ -2,7 +2,7 @@
 // consolidating cold-wallet UTXOs into hot-wallet outputs, collect
 // 2-of-3 signatures, and broadcast.
 //
-// The PSBT here uses the BVBE caricature envelope (`BVBE_PSBT_V1:<json>`)
+// The PSBT here uses the Bitvulnex caricature envelope (`BVBE_PSBT_V1:<json>`)
 // defined in `@bvbe/shared`. It is NOT a BIP-174 PSBT — the lab uses
 // a text envelope so trainees can hand-craft signing flows without
 // needing a real PSBT codec.

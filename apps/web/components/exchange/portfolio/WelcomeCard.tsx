@@ -57,7 +57,7 @@ export function WelcomeCard({ steps, className }: WelcomeCardProps) {
       <div className="flex items-start justify-between gap-4 mb-3">
         <div>
           <h2 className="text-base font-semibold text-text">
-            Get started on BVBE
+            Get started on Bitvulnex
           </h2>
           <p className="text-xs text-text-dim mt-1">
             {doneCount} of {steps.length} complete — finish onboarding to

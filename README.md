@@ -1,6 +1,6 @@
-# Blaze Vulnerable Bitcoin Exchange (BVBE)
+# Bitvulnex — Vulnerable Bitcoin Exchange
 
-> 🚨 **DO NOT DEPLOY.** This is a deliberately vulnerable application
+> 🚨 **DO NOT DEPLOY.** Bitvulnex is a deliberately vulnerable application
 > built by [Blaze Information Security](https://www.blazeinfosec.com/)
 > for authorized security training. Security flaws are *intentional*.
 > Never use real funds. Never expose to the public internet. Never
@@ -83,8 +83,9 @@ The exchange ships with a 44-target CTF mode (40 planted vulnerabilities
 + 4 killer-chain bonus flags). Set `CTF_MODE=true` in `.env` and the
 trainee-facing surfaces appear:
 
-- **`/ctf`** — trainee page. Lists every target, accepts `BVBE{...}`
-  flag submissions, tracks per-trainee score, exposes an optional
+- **`/ctf`** — trainee page. Lists every target, accepts
+  `{BLAZE_BITVULNEX_...}` flag submissions, tracks per-trainee score,
+  exposes an optional
   two-tier hint system (basic = category-only, verbose = lens + category,
   time-locked per the cohort's `verboseUnlockSeconds`).
 - **`/admin/ctf`** — instructor console (reach by typing the URL; not
@@ -120,7 +121,8 @@ trainee-facing surfaces appear:
 Three patterns, used per the vuln's natural exploit shape:
 
 - **Pattern A — inline emission.** The vuln's exploit-condition is
-  server-side detectable; the response includes `_flag: BVBE{...}`.
+  server-side detectable; the response includes
+  `_flag: {BLAZE_BITVULNEX_...}`.
   Used by V-4, V-22, V-25, V-40, V-46, V-47, V-51 (more wiring tracked
   in `docs/phases/phase-11/slice-2x-todo.md`).
 - **Pattern B — claim endpoint.** `POST /api/v2/ctf/claim` with

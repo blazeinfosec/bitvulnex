@@ -1,5 +1,5 @@
 // Submit a user withdrawal. Validates the destination address against
-// the BVBE address parser, runs the daily limit check, debits the
+// the Bitvulnex address parser, runs the daily limit check, debits the
 // available balance, and stores a `pending` Withdrawal row. The
 // withdrawal worker picks the row up on its next tick.
 //

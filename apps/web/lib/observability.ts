@@ -1,4 +1,4 @@
-// Observability hooks for the BVBE web tier. Wires through the
+// Observability hooks for the Bitvulnex web tier. Wires through the
 // @bvbe-internal/observability package when it's installed (Blaze
 // internal builds); becomes a no-op in dev / external builds where
 // the private-registry package isn't available.

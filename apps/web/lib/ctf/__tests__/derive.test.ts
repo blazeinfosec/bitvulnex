@@ -7,16 +7,16 @@ import {
 } from "../derive";
 
 function hash(vulnId: string, secret: string): string {
-  return `BVBE{${createHash("sha256")
+  return `{BLAZE_BITVULNEX_${createHash("sha256")
     .update(`${vulnId}:${secret}`)
     .digest("hex")
-    .slice(0, 32)}}`;
+    .slice(0, 16)}}`;
 }
 
 describe("derivableFlag", () => {
   it("produces the spec'd format", () => {
     const f = derivableFlag("V-9", "changeme");
-    expect(f).toMatch(/^BVBE\{[0-9a-f]{32}\}$/);
+    expect(f).toMatch(/^\{BLAZE_BITVULNEX_[0-9a-f]{16}\}$/);
     expect(f).toBe(hash("V-9", "changeme"));
   });
 

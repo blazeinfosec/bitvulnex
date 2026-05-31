@@ -7,11 +7,11 @@ export function Footer() {
       <Container className="py-8 flex flex-col gap-6 sm:flex-row sm:items-start sm:justify-between">
         <div className="space-y-2">
           <div>
-            <span className="font-semibold text-text">BVBE</span> · Authorized
+            <span className="font-semibold text-text">Bitvulnex</span> · Authorized
             security education lab · Apache 2.0
           </div>
           <p className="text-xs text-text-mute max-w-md">
-            Blaze Vulnerable Bitcoin Exchange. Deliberately vulnerable for
+            Bitvulnex — a deliberately vulnerable Bitcoin exchange for
             training. Do not deploy. Never use real funds.
           </p>
         </div>

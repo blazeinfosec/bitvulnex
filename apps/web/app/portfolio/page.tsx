@@ -9,7 +9,7 @@ import { PortfolioClient } from "./portfolio-client";
 export const dynamic = "force-dynamic";
 
 export const metadata = {
-  title: "Portfolio — BVBE",
+  title: "Portfolio — Bitvulnex",
   description: "Account dashboard: balances, equity curve, activity.",
 };
 

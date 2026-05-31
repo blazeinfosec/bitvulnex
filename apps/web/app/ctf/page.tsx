@@ -227,7 +227,7 @@ export default function CtfPage() {
           <input
             value={submitInput}
             onChange={(e) => setSubmitInput(e.target.value)}
-            placeholder="BVBE{…}"
+            placeholder="{BLAZE_BITVULNEX_…}"
             className="w-full h-10 px-3 rounded-md bg-bg border border-border text-text font-mono text-sm focus:outline-none focus:ring-2 focus:ring-accent"
           />
         </div>

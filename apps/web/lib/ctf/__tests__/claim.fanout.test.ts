@@ -9,10 +9,10 @@ vi.mock("@/lib/ctf", async () => {
   return {
     ctfModeEnabled: () => ctfMode,
     flagFor: (vulnId: string) =>
-      `BVBE{${createHash("sha256")
+      `{BLAZE_BITVULNEX_${createHash("sha256")
         .update(`${vulnId}:test-salt`)
         .digest("hex")
-        .slice(0, 32)}}`,
+        .slice(0, 16)}}`,
   };
 });
 
@@ -70,7 +70,7 @@ describe("Pattern B — exploit-proof validators (slice-2 stubs)", () => {
     it(`${v} accepts a plausible proof`, async () => {
       const r = await processClaim(v, proof);
       expect(r.ok).toBe(true);
-      if (r.ok) expect(r.flag).toMatch(/^BVBE\{[0-9a-f]{32}\}$/);
+      if (r.ok) expect(r.flag).toMatch(/^\{BLAZE_BITVULNEX_[0-9a-f]{16}\}$/);
     });
   }
 

@@ -5,7 +5,7 @@ import { describe, expect, it, vi, beforeEach } from "vitest";
 let ctfMode = true;
 vi.mock("@/lib/ctf", () => ({
   ctfModeEnabled: () => ctfMode,
-  flagFor: (v: string) => `BVBE{${v}-fake}`,
+  flagFor: (v: string) => `{BLAZE_BITVULNEX_${v}-fake}`,
 }));
 
 const cohortMem = new Map<

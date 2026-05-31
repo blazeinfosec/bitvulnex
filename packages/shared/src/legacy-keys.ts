@@ -1,5 +1,5 @@
 // "Legacy" RSA keypair kept around for the v1 mobile-app JWT path.
-// Generated freshly for the BVBE lab — not in use anywhere outside
+// Generated freshly for the Bitvulnex lab — not in use anywhere outside
 // this repo. Replace before any non-lab use.
 
 export const LEGACY_KID = "legacy-2022";

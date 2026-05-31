@@ -14,7 +14,7 @@ export default function HomePage() {
               Trade Bitcoin and majors with desk-grade execution.
             </h1>
             <p className="text-base sm:text-lg text-text-dim mb-8 max-w-2xl">
-              BVBE is a deliberately vulnerable training exchange. Build attack
+              Bitvulnex is a deliberately vulnerable training exchange. Build attack
               chains, exercise blue-team detection, or just inspect the code.
               Nothing here touches mainnet.
             </p>

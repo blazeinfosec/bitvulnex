@@ -1,13 +1,10 @@
-import { createHash } from "node:crypto";
 import { env } from "./env";
+import { deriveDigest, formatFlag } from "./ctf/derive";
 
 export function flagFor(vulnId: string): string {
-  const salt = env().CTF_SALT;
-  const digest = createHash("sha256")
-    .update(`${vulnId}:${salt}`)
-    .digest("hex")
-    .slice(0, 32);
-  return `BVBE{${digest}}`;
+  // Salt-derived (Pattern A / B / chain) flags rotate per cohort via
+  // CTF_SALT. Format is the canonical {BLAZE_BITVULNEX_...} envelope.
+  return formatFlag(deriveDigest(`${vulnId}:${env().CTF_SALT}`));
 }
 
 export function ctfModeEnabled(): boolean {
