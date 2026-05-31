@@ -36,7 +36,13 @@ jobs:
           cache: pnpm
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        # --no-frozen-lockfile (not the CI default) because apps/web declares
+        # the planted V-49 dependency-confusion artifact
+        # `@bvbe-internal/observability` as an optionalDependency. It cannot
+        # resolve from the public registry (by design), so it is absent from
+        # pnpm-lock.yaml and a frozen install would error ERR_PNPM_OUTDATED_LOCKFILE.
+        # The web Dockerfile installs the same way. Do NOT "fix" the lockfile.
+        run: pnpm install --no-frozen-lockfile
 
       - name: Typecheck (workspace lint = tsc --noEmit)
         run: pnpm -r lint

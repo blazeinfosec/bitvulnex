@@ -91,9 +91,11 @@ export function MyOrdersTable({
   const [bumpKey, setBumpKey] = useState(0);
   const [busyIds, setBusyIds] = useState<Set<number>>(new Set());
   // Tracked in state so a sign-in flow flips this without a reload.
-  const [authed, setAuthed] = useState<boolean>(() =>
-    typeof window === "undefined" ? false : Boolean(getAccessToken()),
-  );
+  // Initialise to `false` on both server and client so the first
+  // (hydration) render matches; the effect below reads the real token
+  // after mount. Reading localStorage in the initializer would desync
+  // SSR vs client and trip a hydration mismatch.
+  const [authed, setAuthed] = useState<boolean>(false);
   useEffect(() => {
     const update = () => setAuthed(Boolean(getAccessToken()));
     update();

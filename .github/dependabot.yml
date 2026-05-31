@@ -3,10 +3,15 @@
 # IMPORTANT: this is a DELIBERATELY VULNERABLE training app. Several
 # dependencies are pinned to old/vulnerable versions ON PURPOSE and are
 # tracked in VULNS.md (e.g. V-15 xml2js@0.4.23 / CVE-2023-0842, V-49
-# dependency-confusion artifact). Do NOT let Dependabot "fix" those — the
-# pins are the product. We ignore the documented planted packages so
-# Dependabot stops opening perpetually-red bump PRs against them, while
-# still surfacing genuinely *unintended* vulnerable deps for hygiene.
+# dependency-confusion artifact @bvbe-internal/observability). The whole
+# dependency graph is curated for the lab.
+#
+# Version-update PRs are therefore NOISE here: they fight the intentional
+# pins, would break the app on major bumps (express 5, prisma 7, etc.),
+# and can never be merged. We disable them (open-pull-requests-limit: 0)
+# and additionally `ignore` the documented planted packages so security
+# updates do not reopen them either. Security advisories remain visible in
+# the repo Security tab for instructional purposes.
 
 version: 2
 updates:
@@ -14,16 +19,9 @@ updates:
     directory: "/"
     schedule:
       interval: weekly
-    open-pull-requests-limit: 5
+    # 0 = do not open version-update PRs (the lab's deps are curated).
+    open-pull-requests-limit: 0
     ignore:
-      # V-15 — planted vulnerable dependency (CVE-2023-0842). Intentional.
-      - dependency-name: "xml2js"
-    commit-message:
-      prefix: "chore(deps)"
-    labels:
-      - dependencies
-
-  - package-ecosystem: github-actions
-    directory: "/"
-    schedule:
-      interval: weekly
+      # Planted, intentional — do not let Dependabot "fix" these.
+      - dependency-name: "xml2js"           # V-15 (CVE-2023-0842)
+      - dependency-name: "@bvbe-internal/*"  # V-49 dependency-confusion artifact
