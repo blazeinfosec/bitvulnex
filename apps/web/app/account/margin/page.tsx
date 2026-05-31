@@ -145,7 +145,10 @@ export default function MarginPage() {
         </CardHeader>
         <CardContent className="text-sm">
           {open_positions.length === 0 ? (
-            <p className="text-text-dim">No open positions.</p>
+            <p className="text-text-dim">
+              No open positions. Open a leveraged position from the Trade
+              screen.
+            </p>
           ) : (
             <table className="w-full">
               <thead className="text-left text-text-mute text-xs uppercase">

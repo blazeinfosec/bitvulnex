@@ -59,7 +59,10 @@ export default function OrdersPage() {
         </CardHeader>
         <CardContent className="text-sm">
           {orders.length === 0 ? (
-            <p className="text-text-dim">No open orders.</p>
+            <p className="text-text-dim">
+              No open orders. Place one from the Trade screen, then edit it
+              here.
+            </p>
           ) : (
             <table className="w-full">
               <thead className="text-left text-text-mute text-xs uppercase">
