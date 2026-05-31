@@ -1,5 +1,12 @@
 # Phase 12 — Senior Architect review (Gate 1)
 
+> **Update 2026-05-31:** a later continuous live re-run reproduced **V-26**
+> (via the `x-bvbe-lab-now` affordance) → **38/40 proven live, 2 documented**
+> (V-15 SCA-only, V-50 smuggle env-blunted), and drove **all four chains
+> end-to-end** including CHAIN C's full liquidation cascade. Receipts:
+> `docs/exploitation/17-rerun-receipts.md`. Figures below are the
+> as-of-phase-12 snapshot.
+
 **Scope:** Ledger / documentation reconciliation after the full live-exploitation
 pass. 37/40 plants proven live; 3 plants (V-15, V-26, V-50) did not fully
 reproduce end-to-end, and V-35 was found edge-blunted. This phase is

@@ -1,5 +1,9 @@
 # Phase 12 — Paranoid QA (Gate 4) — Ledger-correction sign-off
 
+> **Update 2026-05-31:** subsequent live re-run → **38/40 proven live**
+> (V-26 reproduced) and all four chains driven end-to-end; no code/config
+> touched (lab-safety unchanged). See `docs/exploitation/17-rerun-receipts.md`.
+
 **Scope:** Defensive/compliance audit of the documentation edits made after the
 full live-exploitation pass (37/40 plants proven live). The edits correct the
 ledger for three plants that did not fully reproduce live (V-15, V-26, V-50) and

@@ -1,5 +1,11 @@
 # Phase 12 — Adversarial QA (Gate 3)
 
+> **Update 2026-05-31:** a follow-up continuous live re-run moved the count to
+> **38/40 proven live** (V-26 reproduced via the `x-bvbe-lab-now` affordance)
+> and drove **all four chains end-to-end** (CHAIN C's liquidation cascade is no
+> longer "primitive-only" — see `docs/exploitation/17-rerun-receipts.md`). The
+> "37/40 · 3 documented" figures below are the as-of-phase-12 snapshot.
+
 **Scope:** Documentation-only ledger correction following the full live
 exploitation pass (37/40 plants proven live; evidence in
 `docs/exploitation/`). Verify that (a) the planted-vuln constructs are
