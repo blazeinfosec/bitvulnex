@@ -1,4 +1,4 @@
-# BVBE Discovery Progression — suggested cohort curriculum
+# Bitvulnex Discovery Progression — suggested cohort curriculum
 
 > A two-day curriculum for a typical mid-to-senior pentest cohort,
 > calibrated to the post-Phase-9 ship state of the lab. Adjust pacing

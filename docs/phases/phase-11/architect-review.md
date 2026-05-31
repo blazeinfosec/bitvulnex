@@ -138,7 +138,7 @@ picks:
    Difficulty multipliers are tempting but introduce subjectivity
    (V-33 expert vs V-4 easy — does V-33 pay 3× because it's
    harder?). Keep it simple; let cohort organizers introduce
-   their own multipliers in their CTF platform on top of BVBE's
+   their own multipliers in their CTF platform on top of Bitvulnex's
    scores.
 
 5. **`/ctf` page route.** Top-level `/ctf`. Approved. Trainees

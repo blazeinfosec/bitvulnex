@@ -121,7 +121,7 @@ produces a clean stack — phase 10 does not alter that property.
   so every page rendered under the root layout inherits both
   banners.
 - `apps/web/components/banner/do-not-deploy.tsx:20` carries the
-  copy "DO NOT DEPLOY — Blaze Vulnerable Bitcoin Exchange is an…"
+  copy "DO NOT DEPLOY — Bitvulnex is an…"
 - `README.md` carries the lab-warning banner at the top
   (pre-existing, unchanged).
 - The new `apps/web/app/not-found.tsx` and `apps/web/app/error.tsx`

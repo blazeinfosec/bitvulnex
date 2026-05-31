@@ -1,4 +1,4 @@
-# BVBE Holistic L7 QA Review (Cross-phase)
+# Bitvulnex Holistic L7 QA Review (Cross-phase)
 
 **Reviewer:** L7 staff/principal QA (independent, holistic audit)
 **Date:** 2026-05-29 (refresh: phase-10-revamp closeout)

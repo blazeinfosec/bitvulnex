@@ -1,4 +1,4 @@
-# BVBE — Architecture
+# Bitvulnex — Architecture
 
 > Phase 0 baseline. This document evolves as feature phases land. The
 > purpose is to make trust boundaries and request flow legible so that

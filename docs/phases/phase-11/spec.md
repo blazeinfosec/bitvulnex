@@ -1,4 +1,4 @@
-# Spec: BVBE phase 11 — CTF flags + two-tier hint toggle
+# Spec: Bitvulnex phase 11 — CTF flags + two-tier hint toggle
 
 ## Context
 
@@ -7,13 +7,13 @@ is unfulfilled at HEAD. `apps/web/lib/ctf.ts` exports a `flagFor()`
 helper and an env-flag check; `scripts/derive-flags.ts` prints flags
 for 20 of 40 V-NNNs; **zero call sites** in the running app emit or
 accept a flag. A trainee who exploits V-22 today gets a normal 200 —
-no `BVBE{...}` feedback. Self-paced training, unattended hackathons,
+no `{BLAZE_BITVULNEX_...}` feedback. Self-paced training, unattended hackathons,
 and per-cohort scoring are all impossible.
 
 Phase 11 closes the loop in two intertwined ways:
 
 1. **Flag wiring (already locked):** three delivery patterns
-   (inline / claim-endpoint / self-derivable) emit `BVBE{...}` tokens
+   (inline / claim-endpoint / self-derivable) emit `{BLAZE_BITVULNEX_...}` tokens
    to trainees when an exploit's server-side condition fires. 4
    killer-chain bonus flags. A new trainee `/ctf` page accepts
    submissions and shows score. New `Cohort` model + `CtfSubmission`
@@ -41,7 +41,7 @@ paranoid-QA re-runs see no diff.
 | Killer chain hints | **Per-step hints inside the chain.** Each step gets its own two-tier hint with chain-context wrapping. |
 | Scoring interaction | **Logged-only.** Hint usage recorded in DB; score unaffected; equal points across the scoreboard. Instructor sees hint analytics. |
 | Control | **Per-cohort default + per-trainee opt-out.** Instructor sets cohort baseline; trainee can override; override is logged. |
-| Default for new cohorts | **OFF.** Hints disabled by default. Cohort creator must explicitly enable. Frames BVBE as CTF first, training material second. |
+| Default for new cohorts | **OFF.** Hints disabled by default. Cohort creator must explicitly enable. Frames Bitvulnex as CTF first, training material second. |
 
 ## Architecture overview
 
@@ -347,7 +347,7 @@ Layout (no UI assumed — drafted from scratch):
 │  Salt fp: 4f8a…             Hints: cohort=OFF  you=enabled  │
 │  ─────────────────────────────────────────────────────────  │
 │                                                             │
-│  [ Paste a BVBE{…} flag                ] [ Submit ]         │
+│  [ Paste a {BLAZE_BITVULNEX_…} flag                ] [ Submit ]         │
 │                                                             │
 │  PLANT TARGETS (40)                                         │
 │  ┌────────────┐ ┌────────────┐ ┌────────────┐               │

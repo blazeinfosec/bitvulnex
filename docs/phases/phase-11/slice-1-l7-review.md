@@ -117,7 +117,7 @@ With `CTF_MODE=true` (set via `.env`, applied via `docker compose up -d web`,
 
 - **V-4** — `curl /api/v2/me/orders/1 -H "Authorization: Bearer <alan-T1-token>"`
   where order #1 is owned by a different user. Response: full order JSON
-  plus `"_flag":"BVBE{a6b6182b26b6a954cf7faa64cb6c6f0f}"`. The plant
+  plus `"_flag":"{BLAZE_BITVULNEX_a6b6182b26b6a954}"`. The plant
   (lookup without userId filter) is verbatim preserved; the detector is
   the additive read-only `order.userId !== claims.sub` check.
 - **V-22** — detector wires on `GET /api/v2/me/orders/[id]` when
@@ -139,7 +139,7 @@ With `CTF_MODE=true` (set via `.env`, applied via `docker compose up -d web`,
 **Pattern B (claim endpoint validates exploit proof):**
 
 - **V-1** — `POST /api/v2/ctf/claim {"vulnId":"V-1","proof":"any-tag"}` →
-  200 `{"flag":"BVBE{a86ef83cf2214fd72089875b619b8f57}"}`. As the
+  200 `{"flag":"{BLAZE_BITVULNEX_a86ef83cf2214fd7}"}`. As the
   commit notes, this is the slice-1 MVP — real exfil-tag tracking lands
   slice 2. Acceptable per architect approval.
 - **V-13** — `POST {"vulnId":"V-13","proof":"https://attacker.example/p"}` →
@@ -149,11 +149,11 @@ With `CTF_MODE=true` (set via `.env`, applied via `docker compose up -d web`,
 **Pattern C (claim endpoint validates discovered secret):**
 
 - **V-9** — `POST {"vulnId":"V-9","proof":"changeme"}` → 200
-  `{"flag":"BVBE{4f9796051758783f093d9b3870cec5ad}"}`. Wrong secret → 400
+  `{"flag":"{BLAZE_BITVULNEX_4f9796051758783f}"}`. Wrong secret → 400
   `"proof does not match"`.
 - **V-48** — `POST {"vulnId":"V-48","proof":"devsecret-do-not-use-in-prod-bvbe-2026"}`
   → 200 with flag. The Pattern-C derivable formula
-  `sha256(vulnId + ":" + secret).slice(0,32)` correctly does NOT use
+  `sha256(vulnId + ":" + secret).slice(0, 16)` correctly does NOT use
   `CTF_SALT` (matches `apps/web/lib/ctf/derive.ts:30-33`).
 
 **Unknown vuln:** `{"vulnId":"V-999","proof":"x"}` → 400
@@ -177,7 +177,7 @@ Verified live:
   `diff /tmp/own_on.json /tmp/own_off.json` returns no differences.
 - `GET /api/v2/me` (no V-NNN wired to this endpoint in slice 1) → identical.
 - `GET /api/v2/me/orders/1` (the IDOR — exploit fires for alan) — diff is
-  exactly `,"_flag":"BVBE{a6b6182b26b6a954cf7faa64cb6c6f0f}"` appended before
+  exactly `,"_flag":"{BLAZE_BITVULNEX_a6b6182b26b6a954}"` appended before
   the closing brace; the rest of the JSON is byte-identical.
 - `POST /api/v2/ctf/claim` → 404 (not 403) when CTF_MODE off; 200/400 when on.
 

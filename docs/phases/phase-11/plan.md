@@ -15,7 +15,7 @@ utility (`scripts/derive-flags.ts`) prints flags for **20 of 40**
 V-NNNs when invoked. **None of this is wired into the app.** Zero
 call sites for `flagFor` or `ctfModeEnabled` outside the module
 itself. A trainee who exploits V-22 (mass-assign role→admin) and
-becomes admin gets a normal 200 — no `BVBE{...}` token anywhere.
+becomes admin gets a normal 200 — no `{BLAZE_BITVULNEX_...}` token anywhere.
 
 This phase closes that loop: every planted V-NNN gains a flag
 emission point, the 4 killer chains gain chain-completion flags,
@@ -45,7 +45,7 @@ Today, "completing CHAIN A" means an instructor watches a screen
 share. Phase 11 changes that to: the trainee submits four flags
 (one per chain) to `/ctf` and gets visible credit.
 
-**Pedagogically:** Phase 11 transforms BVBE from "lab + lecture"
+**Pedagogically:** Phase 11 transforms Bitvulnex from "lab + lecture"
 into "lab + asynchronous practice." A trainee can clone, run, and
 self-test against the catalog without any instructor present —
 which is the whole point of CTFs.
@@ -111,7 +111,7 @@ without changing the V-NNN's reachability:
   watcher tick; emit V-47 on the bump response.
 - **V-23** — on the first WS message after a subscribe whose
   upgrade arrived with no `Origin` header or a non-allowlist
-  `Origin`; emit V-23 as a `{ "kind":"ctf", "flag":"BVBE{...}" }`
+  `Origin`; emit V-23 as a `{ "kind":"ctf", "flag":"{BLAZE_BITVULNEX_...}" }`
   message.
 - **V-50** — when the upstream `web` Node parser accepts a CL+TE
   smuggled request whose smuggled portion targets a planted route;
@@ -183,21 +183,21 @@ discovery itself is the success. For these, the flag is
 **deterministic and derivable** from what the trainee learns:
 
 ```
-flag = BVBE{ sha256("V-NNN:" + <discovered-secret>).slice(0,32) }
+flag = {BLAZE_BITVULNEX_ sha256("V-NNN:" + <discovered-secret>).slice(0, 16) }
 ```
 
 The trainee finds the secret, hashes it themselves (or pastes into
 `/ctf` which hashes for them), and submits.
 
-- **V-9** — `flag = BVBE{ sha256("V-9:changeme")[:32] }`. The
+- **V-9** — `flag = {BLAZE_BITVULNEX_ sha256("V-9:changeme")[:16] }`. The
   weak default `JWT_SECRET_LEGACY` IS the secret.
-- **V-48** — `flag = BVBE{ sha256("V-48:devsecret-do-not-use-in-prod-bvbe-2026")[:32] }`.
+- **V-48** — `flag = {BLAZE_BITVULNEX_ sha256("V-48:devsecret-do-not-use-in-prod-bvbe-2026")[:16] }`.
   The leaked `.env.bak` secret.
-- **V-49** — `flag = BVBE{ sha256("V-49:@bvbe-internal/observability")[:32] }`.
+- **V-49** — `flag = {BLAZE_BITVULNEX_ sha256("V-49:@bvbe-internal/observability")[:16] }`.
   The private-scope name from `optionalDependencies`.
-- **V-15** — `flag = BVBE{ sha256("V-15:CVE-2023-0842")[:32] }`.
+- **V-15** — `flag = {BLAZE_BITVULNEX_ sha256("V-15:CVE-2023-0842")[:16] }`.
   The discovered CVE id.
-- **V-26** — `flag = BVBE{ sha256("V-26:" + utcDate)[:32] }`.
+- **V-26** — `flag = {BLAZE_BITVULNEX_ sha256("V-26:" + utcDate)[:16] }`.
   The calendar-day boundary the limit reset against.
 
 Pattern C covers ~5 V-NNNs. Bonus: `derive-flags.ts` can show
@@ -309,7 +309,7 @@ submit flags.
   auth + `CTF_MODE=true`. Shows:
   - Cohort header (cohort name, salt fingerprint, deadline if set).
   - Score (X/44 flags found; Y/4 chains completed).
-  - Submission box (paste `BVBE{...}`; instant validation).
+  - Submission box (paste `{BLAZE_BITVULNEX_...}`; instant validation).
   - Per-target grid (40 plant cards + 4 chain cards) with status
     (unsubmitted / valid / invalid). Locked targets show only
     category + difficulty (not title).
@@ -330,7 +330,7 @@ submit flags.
   handling.
 
 **Exit criteria:**
-- Trainee can `BVBE{...}` paste and see score update.
+- Trainee can `{BLAZE_BITVULNEX_...}` paste and see score update.
 - Per-cohort scoreboard accessible via the same `/ctf` page
   (top 20 by score) — opt-in via `CTF_SCOREBOARD_VISIBLE` env.
 - Submitting an invalid flag is rate-limited (3/min) and never

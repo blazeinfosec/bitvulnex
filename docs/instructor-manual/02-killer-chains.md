@@ -1,4 +1,4 @@
-# BVBE Killer Chains — instructor tutorials
+# Bitvulnex Killer Chains — instructor tutorials
 
 > Four end-to-end chains that weave individual plants into "what an
 > actual attacker would do." Each chain is the headline objective
@@ -239,6 +239,19 @@ on `PATCH /api/v2/me`).
 **Hardest step.** Constructing the CL/TE smuggle and ensuring it
 lands on a legitimate user's pipelined connection. The cohort needs
 a raw-TCP tool (Python `socket` or `nc -C`).
+
+> **LIVE-VERIFIED CAVEAT (Phase-12 review, see
+> `04-exploitability-audit.md` §V-50 and
+> `docs/exploitation/15-not-reproduced-assessment.md`):** the V-50
+> smuggle **delivery** is **edge-blunted** against the shipped edge —
+> nginx 1.25.5 rejects the CL+TE conflict with `400` (RFC 7230
+> §3.3.3) before forwarding, so a clean desync does not reproduce
+> as-shipped (a working smuggle would need a deliberately-lenient
+> edge pinned in front — optional future infra, not done now).
+> **CHAIN B still closes:** its terminal "promote to admin" impact is
+> proven live via **V-51** (the standalone `PATCH /api/v2/me
+> {"role":"admin"}` in Step 2). Treat the smuggle (Steps 3-4) as the
+> stretch-goal *mechanism* and V-51 as the guaranteed terminal.
 
 ### Step 1 — confirm both halves of V-50
 

@@ -1,4 +1,4 @@
-# BVBE Live QA Test Plan
+# Bitvulnex Live QA Test Plan
 
 **Owner:** L7 QA Engineering
 **Target:** Functional readiness for Docker local + VPS deploy

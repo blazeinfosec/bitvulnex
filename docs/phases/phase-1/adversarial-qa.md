@@ -122,8 +122,8 @@ http://exchange.local/login?next=//attacker.example/phish
 After the user authenticates, the SPA calls `router.push(nextPath)`
 with the unsanitised `next` value. A protocol-relative or absolute URL
 navigates the freshly-authenticated browser off-origin. Useful for
-phishing variants ("fake BVBE login page that posts back to legit
-BVBE and then redirects to attacker") and for OAuth-code-style
+phishing variants ("fake Bitvulnex login page that posts back to legit
+Bitvulnex and then redirects to attacker") and for OAuth-code-style
 interception patterns once social login lands in a later phase.
 
 Confirmed by reading `apps/web/app/login/login-form.tsx`: `nextPath`

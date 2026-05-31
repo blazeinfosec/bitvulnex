@@ -76,7 +76,7 @@ Per-component verdict (12 files in `apps/web/components/exchange/`, all re-expor
 - **Skeleton** (`Skeleton.tsx`): `aria-hidden="true"`, `animate-pulse` (Tailwind built-in), inline width/height styles. PASS.
 - **StatCard** (`StatCard.tsx`): label / value / optional delta via PercentChangeCell / optional hint. `font-mono tabular-nums` on the big value. PASS.
 - **TickerChyron** (`TickerChyron.tsx`): `useMemo` duplicates the list for seamless loop; `animate-marquee` (40s linear infinite). Pauses on hover via `group-hover:[animation-play-state:paused]`. `role="region"` + `aria-label="Market ticker"`. PASS. **Nit:** marquee duration is hard-coded 40s — fine for static data, will need parametrization in slice 2 when WS feed lands.
-- **Wordmark** (`Wordmark.tsx`): inline SVG hexagon with linear-gradient #FCD535 → #F0B90B, diagonal slash, BVBE text. `aria-hidden="true"` on the SVG. The wordmark is text-readable via the `<span>BVBE</span>`, so accessible name comes from that. PASS.
+- **Wordmark** (`Wordmark.tsx`): inline SVG hexagon with linear-gradient #FCD535 → #F0B90B, diagonal slash, Bitvulnex text. `aria-hidden="true"` on the SVG. The wordmark is text-readable via the `<span>Bitvulnex</span>`, so accessible name comes from that. PASS.
 - **index.ts**: re-exports all 12 components plus the `formatNumber` helper and `Column`/`DataTableProps`/`TickerMarket` types. PASS.
 
 ### NumberCell smart-precision contract (9 cases verified)
@@ -122,7 +122,7 @@ The slice-0 trim-the-decimal-point bug is NOT reintroduced. Sign handling is cor
 
 ## Chrome restyle audit
 
-- **Banner**: Present on every route (`/`, `/login`, `/signup`, `/staking`, `/lending`, `/admin` all confirmed via Playwright). Top + footer variants. Warn-yellow `text-warn` on `bg-bg-elevated` with `border-warn/40`. `role="alert"`. AlertTriangle icon. Text content preserved verbatim from pre-slice ("DO NOT DEPLOY — Blaze Vulnerable Bitcoin Exchange is an intentionally vulnerable lab. ..."). ✓
+- **Banner**: Present on every route (`/`, `/login`, `/signup`, `/staking`, `/lending`, `/admin` all confirmed via Playwright). Top + footer variants. Warn-yellow `text-warn` on `bg-bg-elevated` with `border-warn/40`. `role="alert"`. AlertTriangle icon. Text content preserved verbatim from pre-slice ("DO NOT DEPLOY — Bitvulnex is an intentionally vulnerable lab. ..."). ✓
 - **Navbar** (`components/ui/navbar.tsx`): dark `bg-bg-elevated` with `border-b border-border`. Wordmark on the left. **All `href` values unchanged** vs pre-slice: `/account/trading/BTC-USDT`, `/lending`, `/staking`, `/otc`, `/p2p`, `/withdraw`, `/support`, `/about/changelog`, `/docs`, `/login`, `/signup`. Diff confirms only className tweaks. ✓
 - **Footer** (`components/ui/footer.tsx`): dark `border-t border-border bg-bg-elevated`. Links: `/about/changelog`, `/docs`, `https://www.blazeinfosec.com/` (pre-existing Phase-0 marketing link with `rel="noopener noreferrer" target="_blank"` — not introduced by slice 1). ✓
 - **Auth pages**: dark card on dark body. Wordmark, yellow CTA, red-tinted error card. ✓

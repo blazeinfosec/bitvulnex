@@ -62,7 +62,7 @@ planted it (`apps/worker/src/index.ts` deposit-watcher hitting
 | `apps/web/app/staking/page.tsx` | 26 | `/api/v2/public/staking/programs` (same-origin) |
 | `apps/web/app/p2p/page.tsx` | 29 | `/api/v2/public/p2p/offers` (same-origin) |
 
-All three are browser-side relative-path calls back to the BVBE app. No
+All three are browser-side relative-path calls back to the Bitvulnex app. No
 worker-side or server-side `fetch` in Phase 6 code. No outbound third-party
 URL anywhere.
 

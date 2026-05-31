@@ -102,7 +102,7 @@ for `db` and `redis`. `docker-compose down -v` must wipe everything.
   `DATABASE_URL`, `REDIS_URL`. Falls back behavior is deliberate
   Phase 1 territory; Phase 0 just defines the schema with strict
   parsing.
-- `lib/ctf.ts` — flag-string derivation: `BVBE{<sha256(vulnId + salt)>}`.
+- `lib/ctf.ts` — flag-string derivation: `{BLAZE_BITVULNEX_<sha256(vulnId + salt)>}`.
   Salt comes from env. Phase 0 ships the function; no flag is wired
   to any surface yet.
 - `styles/globals.css` — Tailwind + design tokens (navy/white)

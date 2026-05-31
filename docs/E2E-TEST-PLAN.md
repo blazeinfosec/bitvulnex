@@ -1,7 +1,7 @@
-# BVBE — End-to-End Functional Test Plan
+# Bitvulnex — End-to-End Functional Test Plan
 
 > **Scope:** Functional verification of every user-facing surface in
-> the Blaze Vulnerable Bitcoin Exchange. **Out of scope:** verifying
+> the Bitvulnex. **Out of scope:** verifying
 > that planted vulnerabilities (V-NNN) are exploitable — that lives
 > in each phase's `adversarial-qa.md` and in `HOLISTIC-L7-REVIEW.md`.
 >

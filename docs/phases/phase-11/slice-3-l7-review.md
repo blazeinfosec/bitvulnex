@@ -42,7 +42,7 @@ auto-creates a `default` cohort with `hintsDefault=false`; basic hint with
 secondsRemaining=900; POST `/interaction` writes the `CtfInteraction` row;
 shrinking `verboseUnlockSeconds` to 1 + a 3s wait → verbose returns 200 with
 prose distinct from the basic tier. The salt-derived V-4 flag
-`BVBE{a6b6182b…6f0f}` validates → `valid:true`, `plantFlags=1`. Re-submit is
+`{BLAZE_BITVULNEX_a6b6182b…}` validates → `valid:true`, `plantFlags=1`. Re-submit is
 idempotent (still 1). Wrong flag → `valid:false` with **no canonical-flag
 echo**, `plantFlags` unchanged. `/ctf` page returns HTTP 200 (client-rendered;
 PLANT_KEYS array enumerates 40 V-NNN client-side).
@@ -148,7 +148,7 @@ create` race. ✅
 | (d) `?tier=verbose` (no interaction yet) | 425 secondsRemaining | `{error:{message:"too early",secondsRemaining:900}}` HTTP 425 ✅ |
 | (d') `POST /interaction {V-4}` then check `ctf_interactions` | Row written with firstAt | 1 row, firstAt timestamp ✅ |
 | (e) `UPDATE cohorts SET verboseUnlockSeconds=1` + 3s + retry verbose | 200, distinct prose | Verbose returns 425-character lens-prose; distinct from basic ✅ |
-| (f) Submit `BVBE{a6b6182b…6f0f}` (V-4 flag) | valid:true, plantFlags→1 | `{valid:true,targetKey:"V-4"}`; `/me` score plantFlags=1 ✅ |
+| (f) Submit `{BLAZE_BITVULNEX_a6b6182b…}` (V-4 flag) | valid:true, plantFlags→1 | `{valid:true,targetKey:"V-4"}`; `/me` score plantFlags=1 ✅ |
 | (g) Resubmit same flag | idempotent | `{valid:true}`, plantFlags still 1 ✅ |
 | (h) Submit wrong flag | valid:false, no canonical echo | `{valid:false,targetKey:"V-4"}`; plantFlags=1 unchanged; no `flag` key in response ✅ |
 | (i) `GET /ctf` | HTTP 200 trainee page | 200, client-rendered (PLANT_KEYS enumerates 40 V-NNN client-side) ✅ |

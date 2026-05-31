@@ -119,13 +119,13 @@ other plant files are empty-diff against `a173e10`.
 After `docker compose up -d web` + 13s settle:
 
 - **V-51 inline** — login as alan; `PATCH /api/v2/me {"role":"admin"}` →
-  `{"user":{...,"role":"admin",...},"_flag":"BVBE{ae2d9173272aaf571e567df28a8354dd}"}`.
+  `{"user":{...,"role":"admin",...},"_flag":"{BLAZE_BITVULNEX_ae2d9173272aaf57}"}`.
   Matches `derive-flags.ts` V-51 exactly. The plant fired (role promoted in
   response); the additive detector emitted the flag.
 - **V-51 negative** — `PATCH /api/v2/me {"displayName":"Alan Hopper"}` → no
   `_flag` key. The `wroteRestrictedField` gate at L84-87 correctly suppresses.
 - **Pattern C V-15** — `POST /api/v2/ctf/claim {"vulnId":"V-15","proof":"CVE-2023-0842"}`
-  → `{"flag":"BVBE{1b3cca7c66cb0163ec564dd26ce885ba}"}` (matches derive script).
+  → `{"flag":"{BLAZE_BITVULNEX_1b3cca7c66cb0163}"}` (matches derive script).
 - **Pattern C V-49** — `proof:"@bvbe-internal/observability"` → matches.
 - **Pattern B V-10** — `proof:"abcdef0123456789"` → matches V-10 salt-derived.
 - **Pattern B V-33** — `proof:"BVBE_PSBT_V1:a BVBE_PSBT_V1:b BVBE_PSBT_V1:c"` →

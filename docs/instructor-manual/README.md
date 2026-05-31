@@ -1,6 +1,6 @@
-# BVBE Instructor Manual
+# Bitvulnex Instructor Manual
 
-> **Audience:** lead instructors running a BVBE cohort, co-instructors
+> **Audience:** lead instructors running a Bitvulnex cohort, co-instructors
 > picking up the lab cold, and advanced trainees doing self-paced study
 > against a clone of the repository.
 >
@@ -12,7 +12,7 @@
 ## What this manual is
 
 This is the operational reference for teaching the Blaze Vulnerable
-Bitcoin Exchange (BVBE) — a deliberately-vulnerable Bitcoin exchange
+Bitcoin Exchange (Bitvulnex) — a deliberately-vulnerable Bitcoin exchange
 training lab. The lab plants 40 catalogued vulnerabilities across
 nine development phases, deliberately structured so that the easy
 plants serve as confidence-building on-ramps and the hard plants

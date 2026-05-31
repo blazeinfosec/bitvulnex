@@ -31,7 +31,7 @@
 
 ## Goal
 
-Make BVBE feel like a full-featured CEX: users earn yield on idle
+Make Bitvulnex feel like a full-featured CEX: users earn yield on idle
 balances (lending + staking), do block-size trades off the public
 order book (OTC), and trade peer-to-peer with the platform as escrow
 (P2P). Real exchanges add these surfaces over time and they're

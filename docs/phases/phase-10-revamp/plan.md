@@ -201,7 +201,7 @@ New: Binance-style marketing-meets-product landing.
 ┌────────────────────────────────────────────────────────────────────┐
 │ [⚠ DO NOT DEPLOY banner — pale yellow on black]                    │
 ├────────────────────────────────────────────────────────────────────┤
-│ BVBE          Markets  Trade  Earn  Derivatives  Docs   Sign in [→]│
+│ Bitvulnex          Markets  Trade  Earn  Derivatives  Docs   Sign in [→]│
 ├────────────────────────────────────────────────────────────────────┤
 │  BTC 67,234.50 +1.23% │ ETH 3,422.10 +0.55% │ LTC 78.50 -0.30% │ ▶ │ ← TickerChyron
 ├────────────────────────────────────────────────────────────────────┤
@@ -554,7 +554,7 @@ before any code lands. The decisions:
 - **Aesthetic**: Binance / Bybit dark. Dense info, dark theme,
   yellow accent on black, red/green for sides, monospace numbers.
 - **Logo mark**: yellow hexagon with a diagonal slash, paired
-  with the BVBE wordmark. Used in header, favicon, OG image.
+  with the Bitvulnex wordmark. Used in header, favicon, OG image.
 - **Color tokens**: locked in the design-system section above
   (palette table). `#0B0E11` page bg, `#FCD535` Binance yellow,
   `#0ECB81` buy / `#F6465D` sell.

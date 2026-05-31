@@ -108,7 +108,7 @@ inherits the banner without per-page opt-in. Verified entry points:
 
 - `README.md:3-7` — banner at top.
 - Landing page (`apps/web/app/page.tsx:26`) — inherits layout +
-  inline "BVBE is a deliberately vulnerable training exchange" copy.
+  inline "Bitvulnex is a deliberately vulnerable training exchange" copy.
 - Login page — inherits root layout.
 - All `/admin/*` and `/support/*` pages — inherit root layout.
 - mock-imds and mock-s3 — no UI surface, banner not applicable.
