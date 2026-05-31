@@ -125,3 +125,55 @@ the signup zod schema. A 204-char `+`-laden local-part now returns
 The fix-pass diff scope is restricted to functional + a11y +
 input-validation cleanups. No planted vulnerability was modified,
 removed, or hardened.
+
+---
+
+## Re-run 2026-05-31 (L7 E2E + CI/CD gate)
+
+Full browser E2E re-run (Playwright/Chromium) against a fresh
+`docker compose` stack, plus stand-up of a real CI pipeline.
+
+### Coverage
+
+- **Route SSR sweep** — all 38 routes return `200`/redirect on a cold
+  server render; **zero 500s**.
+- **Browser walks, 0 console errors** — landing, signup→account, login,
+  trade (live order book + candlestick chart + order form; tier-0 user
+  correctly gated with "KYC Tier 1 required to trade"), portfolio, earn,
+  KYC, admin dashboard, admin users (all 50 seed users load; search +
+  "perf mode" intact).
+- **Banners** — DO NOT DEPLOY present top + bottom on every page checked.
+
+### Findings
+
+| ID | Severity | Status | Location |
+| -- | -------- | ------ | -------- |
+| F-9 | Medium | FIXED | `apps/web/components/exchange/trade/MyOrdersTable.tsx` — React hydration mismatch: `authed` was initialised from `getAccessToken()` in the `useState` initializer, so SSR (`false`) and client (`true`) disagreed on first render. Now initialised to `false` and set in `useEffect` after mount (same pattern as the navbar). |
+| C-1 | High (CI) | FIXED | `apps/web/package.json` — `lint` was the deprecated, interactive `next lint`, which hangs/fails non-interactively in CI. Switched to `tsc --noEmit` (matches every sibling package). |
+| C-2 | Medium (CI) | FIXED | `apps/worker/src/equity-snapshot.test.ts` — two `noUncheckedIndexedAccess` typecheck errors (passed under vitest, failed `tsc`). Added non-null assertions guarded by the preceding length checks. |
+
+No planted `V-NNN` was touched. The hydration fix and the two CI
+typecheck fixes are functional/tooling cleanups only.
+
+### CI/CD
+
+Added `.github/workflows/ci.yml` (first real pipeline in the repo) +
+`.github/dependabot.yml`. Both jobs **green on `main`** (run
+`26724043679`):
+
+- **Typecheck + unit tests** — `pnpm install --no-frozen-lockfile`
+  (planted V-49 optional dep can't resolve, by design) → `prisma generate`
+  → `pnpm -r lint` (9 packages) → `pnpm test` (264 cases). ✓
+- **Stack builds and boots** — `docker compose up -d --build`, health
+  poll, seed assert, `down -v`. ✓ (green since first run)
+
+Dependabot version updates disabled (curated lab deps); all 10 open
+bump PRs closed with rationale. Planted xml2js (V-15) and
+`@bvbe-internal/*` (V-49) explicitly ignored.
+
+### Verdict
+
+**SHIP-READY for lab use.** Zero Critical/High functional defects
+outstanding; the one Medium (F-9) is fixed and re-verified (trade page
+now loads with 0 console errors). CI is green end-to-end. The 40
+planted vulnerabilities remain intact and exploitable.

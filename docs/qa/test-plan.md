@@ -2,7 +2,17 @@
 
 **Owner:** L7 QA Engineering
 **Target:** Functional readiness for Docker local + VPS deploy
-**Date:** 2026-05-28
+**Date:** 2026-05-28 · **Revised:** 2026-05-31 (re-run + new cases + CI/CD gate)
+
+> **Revision 2026-05-31.** Re-ran the full E2E against a fresh stack via
+> Playwright (Chromium). Added: explicit cases for the features that
+> shipped after the original plan (keeper/liquidation, internal &
+> margin transfer, OTC quote→accept, P2P offer lifecycle, API-key CRUD,
+> 2FA enable/disable, RBF fee-bump, the `x-bvbe-lab-now` lab affordance),
+> a **CI/CD readiness** section (a real pipeline now lives at
+> `.github/workflows/ci.yml`), and a route-level SSR status sweep.
+> Findings + verdict for this run: `docs/qa/qa-summary.md` (§Re-run
+> 2026-05-31).
 
 ## Scope and non-goals
 
@@ -108,6 +118,49 @@ every variation of every flow. Approach:
 - Verify the "DO NOT DEPLOY" banner is visible at top + bottom on
   every page.
 
+#### New feature cases (added 2026-05-31)
+
+Each is a happy-path + empty/boundary/error walk like the above:
+
+- **Keeper / liquidation**: register as a keeper
+  (`/account/keeper`), view the liquidation queue, claim a flagged
+  liquidation; verify the rebate credits and the position closes.
+  (Triggering a liquidation legitimately needs a margin position +
+  a mark move; the manipulated-mark path is V-25/CHAIN C and is
+  out of scope here.)
+- **Internal transfer** (`/wallet/transfer`): transfer to another
+  user by email; verify sender debit + recipient credit, and the
+  empty/insufficient-balance error path.
+- **Margin transfer** (`/account/margin`): move spot→margin and
+  back; verify `marginAvailable` reflects the move; open a position
+  within the per-tier leverage cap and the over-cap rejection.
+- **OTC desk** (`/otc`): request a quote, accept within the 30s
+  validity window, and verify the expired-quote rejection.
+- **P2P** (`/p2p`): post an offer (seller locks asset), take it as
+  a buyer, mark fiat paid, seller releases; verify escrow state
+  transitions and the cancel path.
+- **API keys** (`/account/api-keys`): mint a scoped key (secret
+  shown once), list keys, revoke a key; verify a revoked key is
+  rejected.
+- **2FA** (`/account/security`): enable TOTP (QR + verify code),
+  confirm the login TOTP second-stage prompt appears, then disable.
+- **Password reset** (`/forgot` → `/reset`): request a reset (lab
+  prints the URL to the server console), complete it, log in with
+  the new password.
+- **RBF fee-bump** (admin withdrawal flow): bump a pending
+  withdrawal's fee; verify the UI reflects the new fee. (The
+  credit-before-confirm behaviour is V-47 and is out of scope.)
+- **Lab affordance** (`x-bvbe-lab-now`, dev mode only): confirm the
+  withdrawal daily-limit window honours the header **only** when
+  `LAB_AFFORDANCES_ENABLED=true`, and is ignored otherwise.
+- **Browser-render integrity** (per page): no React **hydration
+  mismatch** in the console on first SSR load — in particular on
+  pages whose render branches on the client-only auth token
+  (e.g. the trade screen's My-Orders panel). A hydration mismatch
+  is a functional defect, not a planted vuln.
+- **Route SSR sweep**: every route returns 200/redirect (no 500)
+  on a cold server-side render.
+
 Findings are written to `docs/qa/functional-qa-report.md` with
 the same schema as Paranoid.
 
@@ -179,6 +232,37 @@ final regression pass confirms the fixes.
   plus staking-rewards) log "ready" within 30s of start.
 - `docker compose down -v` cleanly destroys all volumes; a fresh
   `up -d` re-seeds and re-runs migrations.
+
+## CI/CD readiness (added 2026-05-31)
+
+A functional CI pipeline lives at `.github/workflows/ci.yml` and runs
+on every push to `main` and every PR. It is the green-checkmark gate.
+
+**Jobs:**
+
+1. **Typecheck + unit tests** — `pnpm install --no-frozen-lockfile`
+   (the lab declares the planted V-49 `@bvbe-internal/observability`
+   optional dep that cannot resolve publicly, so a frozen install would
+   error — the web Dockerfile installs the same way), then
+   `prisma generate` (tsc needs the generated `@prisma/client` types),
+   then `pnpm -r lint` (typecheck across all 9 packages) and
+   `pnpm test` (264 vitest cases).
+2. **Stack builds and boots** — `docker compose up -d --build`, poll
+   `GET /api/health` until `{"status":"ok"}`, assert `db-migrate`
+   seeded, then `docker compose down -v`. This is the most
+   representative "production-ready for a lab" check.
+
+**Deliberate non-gates:** security scanners do NOT fail CI. The planted
+`V-NNN` vulnerabilities are features. Dependabot **version updates are
+disabled** (`.github/dependabot.yml`, `open-pull-requests-limit: 0`)
+because the dependency graph is curated for the lab; bump PRs that fight
+the intentional pins (xml2js V-15, `@bvbe-internal/*` V-49, etc.) are
+noise and are never merged. Advisories remain visible in the Security
+tab for instructional use.
+
+**CI success criteria:** both jobs green on `main`. A red `checks` job
+is a ship blocker; a red `docker-smoke` job means the lab won't boot for
+trainees and is a ship blocker.
 
 ## Exit deliverables
 
