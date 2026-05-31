@@ -55,10 +55,16 @@ export async function checkAndDebitLimit(
     tier: Tier;
     asset: string;
     amountCents: number;
+    // Optional effective timestamp for the limit window. Defaults to
+    // the real clock; only overridden by the lab affordance (gated on
+    // LAB_AFFORDANCES_ENABLED) so the UTC-midnight reset can be
+    // demonstrated without waiting for or moving the system clock.
+    // The calendar-day bucketing itself is unchanged.
+    now?: Date;
   },
   db: LedgerDb = defaultPrisma,
 ): Promise<void> {
-  const today = currentDayUtc(new Date());
+  const today = currentDayUtc(args.now ?? new Date());
   const limitCents = kycLimits(args.tier).dailyWithdrawalCents;
 
   const existing = await db.withdrawalLimitLedger.findUnique({

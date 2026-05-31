@@ -13,6 +13,21 @@ import {
 } from "@/lib/withdrawal/submit";
 import { LimitExceededError } from "@/lib/withdrawal/limit";
 import { AssetError } from "@/lib/assets";
+import { env } from "@/lib/env";
+
+// LAB AFFORDANCE (gated on LAB_AFFORDANCES_ENABLED): lets an instructor
+// drive the daily-limit window's effective time via the `x-bvbe-lab-now`
+// header, so V-26's UTC-midnight limit-reset is demonstrable in seconds
+// (submit just before midnight, then just after) instead of needing the
+// real clock at the boundary. Ignored entirely when affordances are off;
+// the planted calendar-day bucketing is unchanged.
+function labNow(req: Request): Date | undefined {
+  if (!env().LAB_AFFORDANCES_ENABLED) return undefined;
+  const raw = req.headers.get("x-bvbe-lab-now");
+  if (!raw) return undefined;
+  const d = new Date(raw);
+  return Number.isNaN(d.getTime()) ? undefined : d;
+}
 
 registerEndpoint({
   method: "post",
@@ -69,6 +84,7 @@ export async function POST(req: Request) {
       asset: parsed.data.asset,
       amount: parsed.data.amount,
       destAddress: parsed.data.destAddress,
+      now: labNow(req),
     });
     return NextResponse.json(out);
   } catch (e) {

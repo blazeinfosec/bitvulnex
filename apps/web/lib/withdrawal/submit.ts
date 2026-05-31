@@ -46,6 +46,9 @@ export type SubmitArgs = {
   asset: string;
   amount: string;
   destAddress: string;
+  // Lab-affordance-only effective timestamp for the daily-limit window
+  // (see checkAndDebitLimit). Undefined in normal operation.
+  now?: Date;
 };
 
 export type SubmitResult = {
@@ -94,6 +97,7 @@ export async function submitWithdrawal(
       tier: args.tier,
       asset: args.asset,
       amountCents: amountToCents(args.asset, amount),
+      now: args.now,
     },
     db,
   );
