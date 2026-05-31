@@ -44,6 +44,11 @@ jobs:
         # The web Dockerfile installs the same way. Do NOT "fix" the lockfile.
         run: pnpm install --no-frozen-lockfile
 
+      - name: Generate Prisma client
+        # tsc needs the generated @prisma/client types (enums like
+        # ComplianceCaseStatus). Mirrors apps/db-migrate/Dockerfile.
+        run: pnpm --filter @bvbe/db generate
+
       - name: Typecheck (workspace lint = tsc --noEmit)
         run: pnpm -r lint
 
