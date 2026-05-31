@@ -6,48 +6,82 @@
 > Never use real funds. Never expose to the public internet. Never
 > reuse credentials from real systems. See [LICENSE](./LICENSE).
 
-A realistic, modern Bitcoin exchange (signup, KYC, deposit, spot
-trading, margin, lending, OTC, withdrawal, admin, treasury) seeded
-with ~39 planted vulnerabilities spanning OWASP Top 10,
-PortSwigger / James-Kettle-class tricks, Bitcoin-protocol flaws, and
-business-logic bugs drawn from real incidents (Mt. Gox, Bitfinex,
-FTX, Coincheck).
+Bitvulnex is a realistic, modern Bitcoin exchange — signup, KYC, deposits,
+spot trading, margin, lending/staking, OTC, P2P, withdrawals, treasury,
+admin, and a support desk — seeded with **40 planted vulnerabilities**.
+The flaws span the OWASP Top 10, Bitcoin-protocol and crypto-finance bugs,
+business-logic abuse, and infrastructure / supply-chain weaknesses, and are
+drawn from real exchange incidents (Mt. Gox, Bitfinex, FTX, Coincheck) and
+real CVE shapes (e.g. the Next.js middleware bypass, HTTP request smuggling).
+
+Every flaw is embedded in plausible business code — no `// VULN HERE`
+signposting — so the app reads like something a normal, slightly careless
+team shipped. The full catalog (root cause, exploitation path, and the fix a
+blue team would apply) lives in [`VULNS.md`](./VULNS.md).
 
 ## Audience
 
 - Pentester / red-team upskilling
 - Capture-the-Flag exercises (CTF mode toggleable per cohort)
-- Blue-team detection and IR practice
+- Blue-team detection and incident-response practice
 - Security research in isolated labs
 
 ## Status
 
-**Phase 0 — scaffolding & safety rails.** No planted vulnerabilities
-yet. Feature phases land per the workflow in [`CLAUDE.md`](./CLAUDE.md).
+**Feature-complete.** All planned phases have shipped through the four-gate
+workflow in [`CLAUDE.md`](./CLAUDE.md). The lab contains **40 planted
+vulnerabilities** (catalog: [`VULNS.md`](./VULNS.md)) and **4 end-to-end
+"killer chains"** — all verified exploitable against a live stack
+(receipts: [`docs/exploitation/`](./docs/exploitation/)).
+
+| Chain | Outcome | Path |
+|-------|---------|------|
+| **A** | Drain the hot wallet | git-history JWT leak → forged admin → internal-namespace bypass → polyglot PSBT broadcast |
+| **B** | Become admin & persist | mass-assignment on `PATCH /api/v2/me` → plant a second admin (CL/TE smuggle is the env-dependent delivery variant) |
+| **C** | Mass user takeover | self-trade poisons the public price oracle → liquidation worker fires → attacker keeper claims the rebate |
+| **D** | Exfiltrate user DB + KYC | internal-namespace dump of password hashes, *or* KYC URL-import SSRF → cloud metadata → mock S3 |
 
 ## Quick start
 
-Requirements: Docker + Docker Compose, Node 22, pnpm 9.
+Requirements: Docker + Docker Compose. (Node 22 + pnpm 9 only needed for
+local non-Docker dev.)
 
 ```bash
 cp .env.example .env
-make up        # docker-compose up -d
-make seed      # prisma migrate + seed admin user
-open http://exchange.local/        # add to hosts: 127.0.0.1 exchange.local
+make up        # docker compose up -d — builds + starts all services
+               # the db-migrate container applies migrations and seeds ~54 users
+open http://localhost/
 ```
 
-Then:
+Everything comes up self-contained — the seed runs automatically as part of
+`make up`. Useful URLs once the stack is healthy:
 
-- `http://exchange.local/` — landing page (with DO NOT DEPLOY banner)
-- `http://exchange.local/about/changelog` — in-app changelog
-- `http://exchange.local/docs` — public API documentation (Swagger)
-- `http://exchange.local/api/health` — health check
+- `http://localhost/` — landing page (with DO NOT DEPLOY banner)
+- `http://localhost/about/changelog` — in-app changelog
+- `http://localhost/docs` — public API documentation (Swagger)
+- `http://localhost/api/health` — health check (`{"status":"ok"}`)
 
-Reset the lab:
+Seeded logins (password `change-me-after-first-login`):
+`admin@bvbe.local`, `treasury@bvbe.local`, `compliance@bvbe.local`,
+`mm.alpha@bvbe.local` / `mm.beta@bvbe.local` (pre-funded market makers).
+
+Re-seed or reset the lab:
 
 ```bash
-make reset     # docker-compose down -v && up
+make seed      # re-run prisma seed against the running db
+make reset     # docker compose down -v && up  (pristine state)
 ```
+
+## Tech stack
+
+- **Framework:** Next.js 15 (App Router) + TypeScript, React 19, Tailwind
+- **DB / ORM:** PostgreSQL + Prisma
+- **Auth:** custom (intentionally weak in places) — *not* Auth.js/NextAuth
+- **Background jobs:** BullMQ + Redis (deposit watch, liquidations, market
+  maker, yield accrual, withdrawals)
+- **Bitcoin:** simulated regtest only — a JS bitcoind RPC mock. **No mainnet
+  code, ever.**
+- **Edge:** nginx reverse proxy. **Containerization:** Docker Compose.
 
 ## Repository layout
 
@@ -55,26 +89,33 @@ make reset     # docker-compose down -v && up
 .
 ├── CLAUDE.md                  # canonical workflow + hard rules
 ├── AGENTS.md                  # pointer for non-Claude AI agents
-├── VULNS.md                   # planted-vulnerability ledger
+├── VULNS.md                   # planted-vulnerability ledger (40 entries)
 ├── README.md                  # this file
 ├── LICENSE                    # Apache 2.0 + security-education notice
 ├── CONTRIBUTING.md            # how the 4-gate workflow operates
 ├── CHANGELOG.md               # mirrored at /about/changelog in-app
-├── Makefile                   # thin wrapper around pnpm + docker-compose
-├── docker-compose.yml         # 6 services
-├── nginx/                     # reverse proxy config
+├── Makefile                   # thin wrapper around pnpm + docker compose
+├── docker-compose.yml         # 9 services + a db-migrate init container
+├── nginx/                     # reverse proxy config (the public edge)
 ├── apps/
-│   ├── web/                   # Next.js 15 (App Router)
-│   ├── worker/                # BullMQ worker
-│   └── bitcoin-mock/          # JS bitcoind RPC simulator (own container)
+│   ├── web/                   # Next.js 15 (App Router) — the exchange
+│   ├── worker/                # BullMQ worker (jobs + market-maker bot)
+│   ├── ws-gateway/            # WebSocket gateway (live order book / trades)
+│   ├── bitcoin-mock/          # JS bitcoind RPC simulator (own container)
+│   ├── db-migrate/            # one-shot migrate + seed container
+│   ├── mock-imds/             # mock cloud metadata service (SSRF target)
+│   └── mock-s3/               # mock S3 (KYC bucket; SSRF pivot target)
 ├── packages/
 │   ├── db/                    # Prisma schema + seed
 │   ├── shared/                # JWT, types, shared utilities
 │   └── bitcoin-rpc-types/     # RPC contract types
 ├── docs/
 │   ├── architecture.md        # request flow + trust boundaries
-│   └── phases/phase-N/        # plan, architect, adversarial, paranoid QA
-└── scripts/                   # seed framework, reset, derive-flags
+│   ├── phases/phase-N/         # plan, architect, adversarial, paranoid QA
+│   ├── exploitation/          # live-verified PoCs + per-chain receipts
+│   ├── instructor-manual/     # vuln catalog, killer chains, audit
+│   └── hints/                  # per-vuln + per-chain CTF hints
+└── scripts/                   # seed framework, reset, derive-flags, cohorts
 ```
 
 ## Running a CTF cohort
@@ -161,9 +202,6 @@ hints.test.ts`) — malformed front-matter fails `pnpm -w run test`. After
 editing hints in the docker dev stack, hit `POST /api/v2/admin/ctf/
 reload-hints` to clear the in-process cache without restarting the web
 container.
-
-Slice-3x-hints-todo.md tracks which V-NNN hints are still open
-(authoring labor only — no code changes required).
 
 ## Workflow
 

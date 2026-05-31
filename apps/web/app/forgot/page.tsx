@@ -34,13 +34,18 @@ export default function ForgotPage() {
             </p>
           ) : (
             <form onSubmit={submit} className="space-y-3">
+              <p className="text-sm text-text-dim">
+                Enter your account email and we&apos;ll send a
+                password-reset link.
+              </p>
               <input
                 type="email"
                 required
-                placeholder="email"
+                autoComplete="email"
+                placeholder="you@example.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full border border-border rounded-md h-10 px-3"
+                className="w-full border border-border rounded-md h-10 px-3 bg-bg text-text placeholder:text-text-mute focus:outline-none focus:ring-2 focus:ring-accent focus:border-accent transition-colors"
               />
               <Button type="submit" className="w-full">
                 Send reset link

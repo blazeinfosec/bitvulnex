@@ -10,7 +10,8 @@ export default function BugBountyPage() {
           Bug bounty
         </h1>
         <p className="text-sm text-text-dim mt-1">
-          Help us keep Bitvulnex secure. Coordinated disclosure rewards in our scope.
+          Help us keep Bitvulnex secure. We reward coordinated disclosure of
+          in-scope findings.
         </p>
       </div>
 

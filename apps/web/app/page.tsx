@@ -50,8 +50,9 @@ export default function HomePage() {
                 For pentesters
               </h3>
               <p className="text-sm text-text-dim leading-relaxed">
-                ~40 planted vulnerabilities across OWASP, PortSwigger, James
-                Kettle, and Bitcoin-specific categories. Pyramid difficulty.
+                40 planted vulnerabilities across OWASP Top 10, Bitcoin-protocol,
+                business-logic, and infrastructure / supply-chain categories.
+                Graded easy to expert.
               </p>
             </div>
             <div className="rounded-lg border border-border bg-bg-elevated p-5">
