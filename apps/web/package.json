@@ -18,7 +18,7 @@
     "@radix-ui/react-slot": "^1.1.0",
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.1.1",
-    "ioredis": "^5.4.1",
+    "ioredis": "^5.11.0",
     "jose": "^5.9.3",
     "lightweight-charts": "^5.0.0",
     "lucide-react": "^0.451.0",
