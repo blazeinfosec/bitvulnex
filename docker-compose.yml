@@ -7,7 +7,9 @@ services:
   nginx:
     image: nginx:1.25-alpine
     ports:
-      - "80:80"
+      # Host port is configurable via WEB_PORT (default 80). The
+      # container always listens on 80; only the host-side mapping moves.
+      - "${WEB_PORT:-80}:80"
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
     depends_on:
@@ -15,10 +17,19 @@ services:
     networks:
       - bvbe-net
 
-  web:
+  web: &web
     build:
       context: .
       dockerfile: apps/web/Dockerfile
+    image: bvbe-web:local
+    # Auto-recover a crashed dev server. `next dev` can fatally exit —
+    # e.g. a JS-heap OOM under heavy compile load, or a V-34 poison that
+    # crashes the process rather than just 500-ing — and with no policy
+    # the container stays down and nginx 502s. `unless-stopped` brings it
+    # straight back (tmpfs .next → clean cold start). This is the safety
+    # net for the crash case; the web-watchdog sidecar handles the poison
+    # case where the process stays UP but every DB route 500s.
+    restart: unless-stopped
     environment:
       NODE_ENV: development
       PORT: "3000"
@@ -33,21 +44,39 @@ services:
       # (see OPS-2024-117). nginx forwards both Content-Length and
       # Transfer-Encoding when present; this flag tells Node to accept
       # the resulting requests instead of rejecting with HPE_*.
-      NODE_OPTIONS: "--insecure-http-parser"
+      #
+      # The heap ceiling keeps a horizontally-scaled dev fleet from
+      # sizing V8's old space off total host RAM and ratcheting up under
+      # load. But it is a HARD wall: if `next dev` needs more than the
+      # cap during a heavy compile it fatally OOMs ("Reached heap limit
+      # Allocation failed") and the container exits.
+      #
+      # WARNING (learned the hard way, 2026-08-07): a light-route load
+      # sweep suggested 512 MB was fine, but under real pentest load the
+      # pages server (web) compiling heavy routes (/docs, /admin/kyc/*,
+      # PDF/XML/PSBT) blew past 512 and OOM-crashed the whole tier ->
+      # 502s. The `restart: unless-stopped` above now auto-recovers a
+      # crash, but the real fix is headroom: default is 2048 MB (a replica
+      # was observed riding the 1536 wall under load). Do NOT drop this
+      # below ~1024 without load-testing the HEAVY routes, not just
+      # /api/v2/me/*. Rough tier RAM ~= WEB_NODE_HEAP_MB high-water
+      # x (1 + WEB_API_REPLICAS); 2048 x6 = 12 GB ceiling, fine on a 30 GB
+      # host but watch host free RAM under load and cut WEB_API_REPLICAS
+      # before raising this further on a memory-constrained box.
+      NODE_OPTIONS: "--insecure-http-parser --max-old-space-size=${WEB_NODE_HEAP_MB:-2048}"
       CTF_MODE: ${CTF_MODE:-false}
       HINT_MODE: ${HINT_MODE:-false}
       SCOREBOARD_ENABLED: ${SCOREBOARD_ENABLED:-false}
       CTF_SALT: ${CTF_SALT:?CTF_SALT must be set. Copy .env.example to .env.}
     volumes:
       # Bind mounts so `next dev` Fast Refresh sees host edits.
-      # The anonymous-volume entries for node_modules / .next prevent
-      # the host OS file layer from contending with the container's.
+      # The anonymous-volume entries for node_modules prevent the host
+      # OS file layer from contending with the container's.
       - ./apps/web:/repo/apps/web
       - ./packages:/repo/packages
       - ./CHANGELOG.md:/repo/CHANGELOG.md:ro
       - ./docs/hints:/repo/docs/hints:ro
       - /repo/apps/web/node_modules
-      - /repo/apps/web/.next
       - /repo/packages/shared/node_modules
       - /repo/packages/db/node_modules
       - /repo/packages/bitcoin-rpc-types/node_modules
@@ -57,6 +86,19 @@ services:
       # "down -v destroys everything" hard rule intact — bind-mounted
       # host paths persist across resets, but named volumes don't.
       - bvbe-uploads:/repo/apps/web/uploads
+    tmpfs:
+      # `.next` on tmpfs (RAM), NOT an anonymous volume. This is a
+      # V-34 recovery lever: V-34 (prototype pollution) can poison a
+      # replica's webpack on-disk cache under .next, and once poisoned
+      # every DB-backed route 500s or hangs for the process lifetime.
+      # An anonymous-volume .next SURVIVES `docker restart`, so the
+      # poison can persist and recovery needs a full rm+recreate (~15s
+      # cold each). tmpfs is wiped whenever the container stops, so a
+      # plain `docker restart` ALWAYS yields a clean .next — fast,
+      # deterministic recovery (see scripts/web-pool-doctor.sh). .next
+      # is ~42 MB per replica; size cap is generous headroom for the
+      # dev build + HMR chunk churn.
+      - /repo/apps/web/.next:size=512m
     depends_on:
       db:
         condition: service_healthy
@@ -74,6 +116,60 @@ services:
       # pinned to that IP; no other service on this net uses
       # link-local addresses.
       - bvbe-imds-net
+
+  # Capacity pool for the API surface. `WEB_API_REPLICAS` (see
+  # .env.example) is the single knob — total `next dev` processes is
+  # 1 (`web`, which serves pages / _next / HMR) + WEB_API_REPLICAS.
+  # nginx resolves the `web-api` service name through Docker's embedded
+  # DNS at request time and round-robins across whatever replicas are
+  # up, so changing the count needs no nginx edit:
+  #
+  #     WEB_API_REPLICAS=2 docker compose up -d --remove-orphans
+  #
+  # Inherits the full `web` config via the &web anchor: per-container
+  # anonymous .next / node_modules volumes, the shared bvbe-uploads
+  # named volume, and the same image (built once). All cross-request
+  # state that matters is in Postgres (Prisma) and Redis
+  # (engine/pubsub.ts) — but note `lib/global-store.ts` stores are
+  # per-process, so any flow that writes on one request and reads on
+  # the next only works reliably at WEB_API_REPLICAS=1.
+  web-api:
+    <<: *web
+    deploy:
+      replicas: ${WEB_API_REPLICAS:-5}
+
+  # V-34 pool watchdog. Auto-restarts any web-api replica a V-34
+  # (prototype-pollution) trigger has poisoned into pool-wide 500s/hangs,
+  # so an automated pentest self-heals instead of stalling on a dead API
+  # (see scripts/web-watchdog.sh). Enabled by default via
+  # COMPOSE_PROFILES=watchdog in .env — comment that line out to run the
+  # lab WITHOUT auto-healing (e.g. to observe the raw DoS).
+  #
+  # - Uses the host Docker socket to probe/restart sibling containers.
+  #   That is root-equivalent on the host, so it is scoped STRICTLY to
+  #   THIS compose project's `web-api` service (project+service labels,
+  #   auto-detected from its own labels) and can never touch another
+  #   project's containers (e.g. vulnkeep-backend-web-1).
+  # - network_mode: none — it talks only to the socket, has no network,
+  #   and is unreachable from bvbe-net, so pentest agents cannot see it.
+  # - node (for the probe) runs INSIDE each target via `docker exec`;
+  #   the docker:cli image itself only needs docker + busybox sh.
+  web-watchdog:
+    image: docker:cli
+    profiles: ["watchdog"]
+    restart: unless-stopped
+    network_mode: none
+    depends_on:
+      web-api:
+        condition: service_started
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./scripts/web-watchdog.sh:/web-watchdog.sh:ro
+    environment:
+      WATCHDOG_INTERVAL: ${WATCHDOG_INTERVAL:-10}
+      WATCHDOG_FAIL_THRESHOLD: ${WATCHDOG_FAIL_THRESHOLD:-3}
+    entrypoint: ["sh"]
+    command: ["/web-watchdog.sh"]
 
   # One-shot service: applies Prisma migrations and seeds the admin
   # row, then exits. `web` waits on `service_completed_successfully`
@@ -126,7 +222,14 @@ services:
       DATABASE_URL: postgresql://bvbe:bvbe@db:5432/bvbe?schema=public
       REDIS_URL: redis://redis:6379
       BITCOIN_MOCK_URL: http://bitcoin-mock:18443
-      WEB_INTERNAL_URL: http://web:3000
+      # Oracle price fetches (liquidation watcher, every 2s × active
+      # pairs) go to the `web-api` pool, NOT the single pinned `web`
+      # container, so this background load spreads over the replicas and
+      # leaves `web` free for pages/HMR. Points at the app tier directly
+      # (Docker DNS round-robin), NOT nginx — the nginx edge caches
+      # /api/v2/public/ for 5s, which would add oracle staleness and
+      # distort CHAIN C's manipulation-window timing.
+      WEB_INTERNAL_URL: http://web-api:3000
     volumes:
       - ./apps/worker:/repo/apps/worker
       - ./packages:/repo/packages
@@ -206,6 +309,20 @@ services:
 
   db:
     image: postgres:16-alpine
+    # Default max_connections=100 is exhausted under the scaled-web ×
+    # ~21-agent load: each Prisma client opens up to (cores*2)+1 = 33 conns
+    # on the 16-core box → at the shipped WEB_API_REPLICAS=5 that is 6 web
+    # containers (198) + worker (33) ≈ 231 > 100, and
+    # race_probe concurrency spikes push it over → "too many clients already"
+    # → 500s that mask the TOCTOU race plants (V-28/30/32). Raise the ceiling
+    # rather than throttling Prisma pools (which would serialize requests and
+    # suppress the races). shared_buffers bumped to match the higher conn count.
+    command:
+      - postgres
+      - -c
+      - max_connections=500
+      - -c
+      - shared_buffers=512MB
     environment:
       POSTGRES_USER: bvbe
       POSTGRES_PASSWORD: bvbe
