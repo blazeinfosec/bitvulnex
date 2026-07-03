@@ -1,6 +1,7 @@
 import { PrismaClient, type Role } from "@prisma/client";
 import { scrypt, randomBytes } from "node:crypto";
 import { promisify } from "node:util";
+import { seedActivity } from "./seed-activity";
 
 const prisma = new PrismaClient();
 const scryptAsync = promisify(scrypt);
@@ -210,6 +211,12 @@ async function main() {
   }
   await seedMarketMakerBalances();
   console.log(`seeded ${users.length} users (incl. mm.alpha / mm.beta)`);
+
+  // Populate a realistic backlog of exchange activity (balances, price
+  // history, deposits/withdrawals, KYC queue, tickets, positions, …).
+  // Guarded internally on an empty `trades` table so it's a no-op on an
+  // already-seeded database.
+  await seedActivity(prisma);
 }
 
 main()

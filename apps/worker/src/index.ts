@@ -16,6 +16,7 @@ import {
 } from "./withdrawal-processor.js";
 import { runMarketMakerTick, makeRedisPubSub } from "./market-maker.js";
 import { snapshotOnce } from "./equity-snapshot.js";
+import { simulateActivityTick } from "./activity-sim.js";
 
 const redisUrl = process.env.REDIS_URL ?? "redis://redis:6379";
 const mockUrl = process.env.BITCOIN_MOCK_URL ?? "http://bitcoin-mock:18443";
@@ -50,6 +51,15 @@ const STAKING_QUEUE = "staking-rewards";
 const WITHDRAWAL_QUEUE = "withdrawal-process";
 const MARKET_MAKER_QUEUE = "market-maker";
 const EQUITY_SNAPSHOT_QUEUE = "equity-snapshot";
+const ACTIVITY_SIM_QUEUE = "activity-sim";
+
+// Ambient-activity simulator cadence + on/off. Default on so the lab
+// feels live; set ACTIVITY_SIM_ENABLED=false to freeze it for a
+// deterministic demo.
+const ACTIVITY_SIM_ENABLED = process.env.ACTIVITY_SIM_ENABLED !== "false";
+const ACTIVITY_SIM_EVERY_MS = Number(
+  process.env.ACTIVITY_SIM_EVERY_MS ?? 20_000,
+);
 
 async function rpcCall<T>(method: string, params: unknown[]): Promise<T> {
   const res = await fetch(mockUrl, {
@@ -84,6 +94,7 @@ async function main() {
   const withdrawalQueue = new Queue(WITHDRAWAL_QUEUE, { connection });
   const marketMakerQueue = new Queue(MARKET_MAKER_QUEUE, { connection });
   const equitySnapshotQueue = new Queue(EQUITY_SNAPSHOT_QUEUE, { connection });
+  const activitySimQueue = new Queue(ACTIVITY_SIM_QUEUE, { connection });
   const depositEvents = new QueueEvents(DEPOSIT_QUEUE, { connection });
   const liquidationEvents = new QueueEvents(LIQUIDATION_QUEUE, { connection });
   const yieldEvents = new QueueEvents(YIELD_QUEUE, { connection });
@@ -93,6 +104,7 @@ async function main() {
   const equitySnapshotEvents = new QueueEvents(EQUITY_SNAPSHOT_QUEUE, {
     connection,
   });
+  const activitySimEvents = new QueueEvents(ACTIVITY_SIM_QUEUE, { connection });
 
   await depositQueue.upsertJobScheduler(
     "deposit-poll-scheduler",
@@ -135,6 +147,14 @@ async function main() {
       opts: { removeOnComplete: true, removeOnFail: 50 },
     },
   );
+
+  if (ACTIVITY_SIM_ENABLED) {
+    await activitySimQueue.upsertJobScheduler(
+      "activity-sim-scheduler",
+      { every: ACTIVITY_SIM_EVERY_MS },
+      { name: "tick", data: {}, opts: { removeOnComplete: true, removeOnFail: 50 } },
+    );
+  }
 
   const depositWorker = new Worker(
     DEPOSIT_QUEUE,
@@ -232,6 +252,23 @@ async function main() {
     console.error("[worker] equity-snapshot error:", err),
   );
 
+  const activitySimWorker = new Worker(
+    ACTIVITY_SIM_QUEUE,
+    async () => {
+      const { actions } = await simulateActivityTick();
+      if (actions.length > 0) {
+        console.log(`[worker] activity-sim: ${actions.join(", ")}`);
+      }
+    },
+    { connection, concurrency: 1 },
+  );
+  activitySimWorker.on("ready", () =>
+    console.log("[worker] activity-sim ready"),
+  );
+  activitySimWorker.on("error", (err) =>
+    console.error("[worker] activity-sim error:", err),
+  );
+
   const shutdown = async (sig: string) => {
     console.log(`[worker] received ${sig}, shutting down...`);
     await Promise.all([
@@ -242,6 +279,7 @@ async function main() {
       withdrawalWorker.close(),
       marketMakerWorker.close(),
       equitySnapshotWorker.close(),
+      activitySimWorker.close(),
       depositQueue.close(),
       liquidationQueue.close(),
       yieldQueue.close(),
@@ -249,6 +287,7 @@ async function main() {
       withdrawalQueue.close(),
       marketMakerQueue.close(),
       equitySnapshotQueue.close(),
+      activitySimQueue.close(),
       depositEvents.close(),
       liquidationEvents.close(),
       yieldEvents.close(),
@@ -256,6 +295,7 @@ async function main() {
       withdrawalEvents.close(),
       marketMakerEvents.close(),
       equitySnapshotEvents.close(),
+      activitySimEvents.close(),
     ]);
     await mmPub.quit();
     await connection.quit();

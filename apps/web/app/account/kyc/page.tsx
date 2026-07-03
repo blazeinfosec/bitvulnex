@@ -108,12 +108,17 @@ export default function KycPage() {
     setStep(2);
   }
 
-  async function uploadDoc(e: React.ChangeEvent<HTMLInputElement>) {
+  async function uploadDoc(
+    e: React.ChangeEvent<HTMLInputElement>,
+    typeOverride?: string,
+  ) {
     const f = e.target.files?.[0];
     if (!f) return;
     const fd = new FormData();
     fd.append("file", f);
-    fd.append("type", docType);
+    // Prefer an explicit type so callers that set state and upload in the
+    // same handler aren't bitten by the stale render-time `docType` value.
+    fd.append("type", typeOverride ?? docType);
     const access = getAccessToken();
     const res = await fetch("/api/v2/me/kyc/documents", {
       method: "POST",
@@ -437,7 +442,7 @@ export default function KycPage() {
               type="file"
               onChange={(e) => {
                 setDocType("address_proof");
-                uploadDoc(e);
+                uploadDoc(e, "address_proof");
               }}
               className="hidden"
               accept="image/*,application/pdf"

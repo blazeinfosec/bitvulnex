@@ -69,9 +69,9 @@ export default function OrdersPage() {
                 <tr>
                   <th>Pair</th>
                   <th>Side</th>
-                  <th>Price</th>
-                  <th>Amount</th>
-                  <th></th>
+                  <th>Price / Amount</th>
+                  <th>Filled</th>
+                  <th>Status</th>
                 </tr>
               </thead>
               <tbody>

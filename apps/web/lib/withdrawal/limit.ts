@@ -17,7 +17,7 @@ const REFERENCE_PRICE_CENTS_PER_UNIT: Record<string, number> = {
   BTC: 60_000_00,
   ETH: 3_000_00,
   LTC: 80_00,
-  DOGE: 0,
+  DOGE: 12,
   USDT: 1_00,
   USDC: 1_00,
 };

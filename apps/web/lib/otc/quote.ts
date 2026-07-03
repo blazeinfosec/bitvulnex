@@ -20,9 +20,12 @@ export type QuoteDb = Pick<typeof defaultPrisma, "trade" | "otcTicket">;
 
 function adjustmentBps(side: "buy" | "sell", amount: Prisma.Decimal): number {
   const sideAdjust = side === "buy" ? SIDE_ADJUST_BPS : -SIDE_ADJUST_BPS;
-  // Slippage scales with sqrt(amount). The unit is 1 base coin.
+  // Slippage scales with sqrt(amount) and always moves the price
+  // against the taker — up for a buy, down for a sell — so a larger
+  // order gets a worse fill, not a better one. The unit is 1 base coin.
   const slippage = Math.sqrt(Number(amount.toString())) * SIZE_SLIPPAGE_BPS;
-  return sideAdjust + Math.round(slippage);
+  const dir = side === "buy" ? 1 : -1;
+  return sideAdjust + dir * Math.round(slippage);
 }
 
 export async function quoteOtc(

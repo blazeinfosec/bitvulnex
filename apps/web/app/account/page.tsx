@@ -39,6 +39,20 @@ export default function AccountPage() {
     })();
   }, [router]);
 
+  async function downloadStatement() {
+    const res = await authedFetch("/api/v2/me/statement");
+    if (!res.ok) return;
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "bitvulnex-statement.csv";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  }
+
   async function logout() {
     const refresh = getRefreshToken();
     if (refresh) {
@@ -108,9 +122,17 @@ export default function AccountPage() {
             <p>
               <Link href="/account/api-keys">Manage API keys →</Link>
             </p>
-            <Button onClick={logout} variant="secondary">
-              Sign out
-            </Button>
+            <p>
+              <Link href="/fees">Fee schedule →</Link>
+            </p>
+            <div className="flex flex-wrap gap-2 pt-1">
+              <Button onClick={downloadStatement} variant="secondary">
+                Download statement (CSV)
+              </Button>
+              <Button onClick={logout} variant="secondary">
+                Sign out
+              </Button>
+            </div>
           </CardContent>
         </Card>
       </div>

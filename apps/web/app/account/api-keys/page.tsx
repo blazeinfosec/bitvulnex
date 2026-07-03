@@ -31,7 +31,6 @@ export default function ApiKeysPage() {
   const [keys, setKeys] = useState<ApiKeyListItem[]>([]);
   const [name, setName] = useState("");
   const [scopes, setScopes] = useState<string[]>(["read"]);
-  const [ipAllowlist, setIpAllowlist] = useState("");
   const [created, setCreated] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
 
@@ -279,20 +278,6 @@ export default function ApiKeysPage() {
                 </label>
               ))}
             </div>
-          </div>
-          <div>
-            <label className="block text-xs uppercase tracking-wider text-text-mute mb-1.5 font-medium">
-              IP allowlist (optional)
-            </label>
-            <input
-              placeholder="e.g. 198.51.100.0/24, comma-separated"
-              value={ipAllowlist}
-              onChange={(e) => setIpAllowlist(e.target.value)}
-              className={inputClass + " font-mono text-xs"}
-            />
-            <p className="mt-1 text-xs text-text-mute">
-              Restrict where this key can be used from.
-            </p>
           </div>
         </div>
       </Modal>

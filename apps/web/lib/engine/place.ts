@@ -42,49 +42,14 @@ export async function placeOrder(args: PlaceArgs): Promise<{ orderId: number }> 
   });
   if (!pairRow?.active) throw new Error("unknown or inactive pair");
 
-  // Asset we lock at placement time depends on side
+  // Asset we lock at placement time depends on side: buy locks quote,
+  // sell locks base.
   const lockAsset = args.side === "buy" ? quote : base;
-  const lockQty =
-    args.side === "buy"
-      ? // For a buy: lock quote = price * amount (limit) or
-        // conservative estimate for market (best-ask * amount approx)
-        // For market we lock amount * lastTradePrice as a stand-in.
-        (price ?? D(await bestPriceEstimate(args.pair, "ask"))).mul(amount)
-      : amount;
-  // Reject market orders against an empty book (Q-4.10).
-  if (args.type === "market" && lockQty.lte(0)) {
-    throw new Error("insufficient liquidity");
-  }
 
   const orderId = await prisma.$transaction(async (tx) => {
-    const bal = await tx.balance.findUnique({
-      where: { userId_asset: { userId: args.userId, asset: lockAsset } },
-    });
-    if (!bal || bal.available.lt(lockQty)) {
-      throw new Error("insufficient balance");
-    }
-    await tx.balance.update({
-      where: { userId_asset: { userId: args.userId, asset: lockAsset } },
-      data: {
-        available: { decrement: lockQty },
-        locked: { increment: lockQty },
-      },
-    });
-
-    const order = await tx.order.create({
-      data: {
-        userId: args.userId,
-        pair: args.pair,
-        side: args.side,
-        type: args.type,
-        price,
-        amount,
-        stopTrigger: args.stopTrigger ? D(args.stopTrigger) : null,
-        feeTier: args.feeTier,
-      },
-    });
-
-    // Pull the resting book (opposite side, status open/partial).
+    // Pull the resting book (opposite side, open/partial limit orders)
+    // up front so we can size the balance lock against the actual fills
+    // rather than a best-price estimate.
     const restingRaw = await tx.order.findMany({
       where: {
         pair: args.pair,
@@ -114,16 +79,65 @@ export async function placeOrder(args: PlaceArgs): Promise<{ orderId: number }> 
     const sorted = sortBook(resting, args.side);
     const { matches, remaining } = matchAgainstBook(taker, sorted);
 
-    // Apply matches: write trades, settle balances, update maker orders.
-    // Track the running actual quote cost so we can compute the
-    // refund precisely (Q-4.2 fix: previously the BUY-market refund
-    // used `lockQty - filled*price` with price=null on market orders,
-    // collapsing to a full refund of an already-decremented lock).
+    // Aggregate fill totals so we can lock the exact quote cost of a
+    // market buy and compute price-improvement refunds for limit buys.
     let filled = D(0);
     let actualQuoteSpent = D(0);
     for (const m of matches) {
       filled = filled.add(m.amount);
       actualQuoteSpent = actualQuoteSpent.add(m.price.mul(m.amount));
+    }
+
+    // A market order that can't fill anything has no book to execute
+    // against (Q-4.10).
+    if (args.type === "market" && filled.lte(0)) {
+      throw new Error("insufficient liquidity");
+    }
+
+    // How much to reserve. A market buy reserves exactly the swept cost
+    // (it never rests, and sweeping several price levels can cost more
+    // than best-ask * amount). A limit buy reserves the full limit
+    // notional so an unfilled remainder can rest in the book. Sells
+    // lock the base amount.
+    let lockQty: Prisma.Decimal;
+    if (args.side === "sell") {
+      lockQty = amount;
+    } else if (args.type === "market") {
+      lockQty = actualQuoteSpent;
+    } else {
+      if (!price) throw new Error("price required for non-market order");
+      lockQty = price.mul(amount);
+    }
+
+    const bal = await tx.balance.findUnique({
+      where: { userId_asset: { userId: args.userId, asset: lockAsset } },
+    });
+    if (!bal || bal.available.lt(lockQty)) {
+      throw new Error("insufficient balance");
+    }
+    await tx.balance.update({
+      where: { userId_asset: { userId: args.userId, asset: lockAsset } },
+      data: {
+        available: { decrement: lockQty },
+        locked: { increment: lockQty },
+      },
+    });
+
+    const order = await tx.order.create({
+      data: {
+        userId: args.userId,
+        pair: args.pair,
+        side: args.side,
+        type: args.type,
+        price,
+        amount,
+        stopTrigger: args.stopTrigger ? D(args.stopTrigger) : null,
+        feeTier: args.feeTier,
+      },
+    });
+
+    // Apply matches: write trades, settle balances, update maker orders.
+    for (const m of matches) {
       const makerFeeBps = FEE_TABLE[args.feeTier].makerBps;
       const takerFeeBps = FEE_TABLE[args.feeTier].takerBps;
 
@@ -141,12 +155,17 @@ export async function placeOrder(args: PlaceArgs): Promise<{ orderId: number }> 
         },
       });
 
-      // Settle: move locked → away, credit counter-asset
+      // Settle: move locked → away, credit counter-asset net of fee.
+      // Each side pays its bps fee on the asset it receives (standard
+      // maker/taker model); the fee is skimmed off the credit.
       // Taker
       const takerLockRelease = args.side === "buy"
         ? m.price.mul(m.amount)
         : m.amount;
-      const takerCredit = args.side === "buy" ? m.amount : m.price.mul(m.amount);
+      const takerGross = args.side === "buy" ? m.amount : m.price.mul(m.amount);
+      const takerCredit = takerGross.sub(
+        takerGross.mul(takerFeeBps).div(10000),
+      );
       const takerCreditAsset = args.side === "buy" ? base : quote;
       await tx.balance.update({
         where: { userId_asset: { userId: args.userId, asset: lockAsset } },
@@ -160,7 +179,10 @@ export async function placeOrder(args: PlaceArgs): Promise<{ orderId: number }> 
       const makerLockRelease = makerOrder.side === "buy"
         ? m.price.mul(m.amount)
         : m.amount;
-      const makerCredit = makerOrder.side === "buy" ? m.amount : m.price.mul(m.amount);
+      const makerGross = makerOrder.side === "buy" ? m.amount : m.price.mul(m.amount);
+      const makerCredit = makerGross.sub(
+        makerGross.mul(makerFeeBps).div(10000),
+      );
       const makerCreditAsset = makerOrder.side === "buy" ? base : quote;
       await tx.balance.update({
         where: { userId_asset: { userId: makerOrder.userId, asset: makerLockAsset } },
@@ -186,22 +208,31 @@ export async function placeOrder(args: PlaceArgs): Promise<{ orderId: number }> 
       data: { filled, status: takerStatus },
     });
 
-    // Market-order refund: any portion of the provisional lock that
-    // wasn't consumed by actual fills is released back to available.
-    // The match loop already decremented `locked` by the per-fill
-    // actual cost; we just need to clear the remainder.
-    if (args.type === "market") {
-      const refund =
-        args.side === "buy" ? lockQty.sub(actualQuoteSpent) : remaining;
-      if (refund.gt(0)) {
-        await tx.balance.update({
-          where: { userId_asset: { userId: args.userId, asset: lockAsset } },
-          data: {
-            available: { increment: refund },
-            locked: { decrement: refund },
-          },
-        });
-      }
+    // Release any over-lock back to available. The match loop already
+    // decremented `locked` by each fill's actual cost, so what remains
+    // locked is `lockQty - (base sold | quote spent)`. Two cases leave
+    // more locked than the order needs:
+    //  - a limit buy filled at a better price than its limit: the
+    //    price-improvement delta (limit*filled - actualQuoteSpent) on
+    //    the filled portion would otherwise stay locked forever;
+    //  - a market sell that didn't fully fill: the leftover base
+    //    (`remaining`) must be returned since a market order never rests.
+    // A market buy is locked at its exact cost, and a limit order's
+    // unfilled remainder must stay locked to back the resting order.
+    let releaseQty = D(0);
+    if (args.side === "buy" && args.type !== "market" && price) {
+      releaseQty = price.mul(filled).sub(actualQuoteSpent);
+    } else if (args.side === "sell" && args.type === "market") {
+      releaseQty = remaining;
+    }
+    if (releaseQty.gt(0)) {
+      await tx.balance.update({
+        where: { userId_asset: { userId: args.userId, asset: lockAsset } },
+        data: {
+          available: { increment: releaseQty },
+          locked: { decrement: releaseQty },
+        },
+      });
     }
 
     return order.id;
@@ -225,17 +256,4 @@ async function upsertBalance(
     create: { userId, asset, amount: delta, available: delta },
     update: { available: { increment: delta }, amount: { increment: delta } },
   });
-}
-
-async function bestPriceEstimate(pair: string, side: "bid" | "ask"): Promise<string> {
-  const o = await prisma.order.findFirst({
-    where: {
-      pair,
-      side: side === "ask" ? "sell" : "buy",
-      status: { in: ["open", "partial"] },
-      type: "limit",
-    },
-    orderBy: { price: side === "ask" ? "asc" : "desc" },
-  });
-  return (o?.price ?? new Prisma.Decimal(0)).toString();
 }
