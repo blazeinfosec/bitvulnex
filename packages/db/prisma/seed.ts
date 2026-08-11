@@ -46,7 +46,7 @@ function buildUsers(): SeedUser[] {
     {
       email: "admin@bvbe.local",
       displayName: "Admin",
-      password: "change-me-after-first-login",
+      password: "tT3KuqASMnwV8ZeWHRJAgd7IpIVM",
       role: "admin",
       kycTier: 3,
       emailVerified: true,
@@ -54,7 +54,7 @@ function buildUsers(): SeedUser[] {
     {
       email: "treasury@bvbe.local",
       displayName: "Treasury Ops",
-      password: "change-me-after-first-login",
+      password: "fjG4898@hf9sbbajskKwkd",
       role: "treasury",
       kycTier: 3,
       emailVerified: true,
@@ -70,7 +70,7 @@ function buildUsers(): SeedUser[] {
     {
       email: "treasury3@bvbe.local",
       displayName: "Treasury Ops C",
-      password: "change-me-after-first-login",
+      password: "CXwVuc6AsiDeV5iyskUh806whUVP",
       role: "treasury",
       kycTier: 3,
       emailVerified: true,
@@ -78,7 +78,7 @@ function buildUsers(): SeedUser[] {
     {
       email: "support1@bvbe.local",
       displayName: "Support Agent A",
-      password: "change-me-after-first-login",
+      password: "Hbaks52#jdh9nAth@nJa",
       role: "support",
       kycTier: 3,
       emailVerified: true,
@@ -94,7 +94,7 @@ function buildUsers(): SeedUser[] {
     {
       email: "compliance@bvbe.local",
       displayName: "Compliance Officer",
-      password: "change-me-after-first-login",
+      password: "ksdjf93jhfV@fjKlq746",
       role: "compliance",
       kycTier: 3,
       emailVerified: true,
@@ -102,7 +102,7 @@ function buildUsers(): SeedUser[] {
     {
       email: "mm.alpha@bvbe.local",
       displayName: "MM Alpha",
-      password: "change-me-after-first-login",
+      password: "iAQGIseS48R6EREZ2zsZk5KHKKd5",
       role: "user",
       kycTier: 3,
       emailVerified: true,
@@ -118,7 +118,7 @@ function buildUsers(): SeedUser[] {
     {
       email: "whale1@example.test",
       displayName: "High Roller Holdings",
-      password: "Sup3rLong-Whale-Pass-001",
+      password: "Xq2yXgRFuV9FIJLQqCRGQ4AOaVki",
       role: "user",
       kycTier: 3,
       emailVerified: true,
@@ -193,6 +193,142 @@ async function seedMarketMakerBalances() {
   }
 }
 
+// Regular-user accounts we populate with owned objects so cross-account
+// BOLA/IDOR testing has concrete targets (order ids, withdrawal ids, KYC doc
+// storedPath, ticket ids). Each account owns DIFFERENT objects, so fetching one
+// user's object under another user's session is a real cross-account test.
+const USER_OBJECT_ACCOUNTS = [
+  "whale1@example.test",
+  "whale2@example.test",
+  "mm.alpha@bvbe.local",
+  "mm.beta@bvbe.local",
+];
+
+// Populate per-user objects for the accounts above. STATE ONLY — this creates
+// no vulnerability and touches no planted flaw; it gives the exchange realistic
+// per-account data (funds, orders, withdrawals, KYC docs, tickets) so an
+// authenticated user actually owns objects. Without it, fresh accounts expose
+// only their user id and every cross-account IDOR probe dead-ends on a
+// non-existent object. All data is synthetic (regtest addresses, lab paths).
+//
+// Idempotent: unique-keyed rows use upsert; the rest are guarded by a per-user
+// existence check, so re-running the seed never piles up duplicates.
+async function seedTestAccountObjects() {
+  const funded: Record<string, string> = { BTC: "5", ETH: "50", USDT: "250000" };
+  const accounts = await prisma.user.findMany({
+    where: { email: { in: USER_OBJECT_ACCOUNTS } },
+  });
+  const byEmail = new Map(accounts.map((u) => [u.email, u]));
+  for (const email of USER_OBJECT_ACCOUNTS) {
+    const u = byEmail.get(email);
+    if (!u) continue;
+    const uid = u.id;
+    const tag = (email.split("@")[0] ?? "u").replace(/[^a-z0-9]/gi, "");
+
+    // Funded spot balances so trading/withdrawal endpoints operate.
+    for (const [asset, amt] of Object.entries(funded)) {
+      await prisma.balance.upsert({
+        where: { userId_asset: { userId: uid, asset } },
+        update: {},
+        create: { userId: uid, asset, amount: amt, available: amt, locked: "0" },
+      });
+    }
+
+    // Deposit — unique on (txid, vout), deterministic per user → upsert-able.
+    await prisma.deposit.upsert({
+      where: { txid_vout: { txid: `seed-dep-${tag}`, vout: 0 } },
+      update: {},
+      create: {
+        userId: uid,
+        asset: "BTC",
+        address: `bcrt1qseed${tag}`,
+        txid: `seed-dep-${tag}`,
+        vout: 0,
+        amount: "1.50000000",
+        confirmations: 6,
+        status: "credited",
+        creditedAt: new Date(),
+      },
+    });
+
+    // Orders (Int autoincrement id → no natural unique key; guard on count).
+    if ((await prisma.order.count({ where: { userId: uid } })) === 0) {
+      await prisma.order.createMany({
+        data: [
+          {
+            userId: uid,
+            pair: "BTC/USDT",
+            side: "buy",
+            type: "limit",
+            price: "40000",
+            amount: "0.50000000",
+            status: "open",
+          },
+          {
+            userId: uid,
+            pair: "ETH/USDT",
+            side: "sell",
+            type: "limit",
+            price: "3000",
+            amount: "2.00000000",
+            filled: "2.00000000",
+            status: "filled",
+          },
+        ],
+      });
+    }
+
+    // Withdrawal (cuid id; guard on count).
+    if ((await prisma.withdrawal.count({ where: { userId: uid } })) === 0) {
+      await prisma.withdrawal.create({
+        data: {
+          userId: uid,
+          asset: "BTC",
+          amount: "0.25000000",
+          fee: "0.00010000",
+          destAddress: `bcrt1qdest${tag}`,
+          status: "pending",
+        },
+      });
+    }
+
+    // KYC document — storedPath is a known cross-account IDOR surface.
+    if ((await prisma.kycDocument.count({ where: { userId: uid } })) === 0) {
+      await prisma.kycDocument.create({
+        data: {
+          userId: uid,
+          type: "passport",
+          filename: `passport-${tag}.pdf`,
+          storedPath: `kyc/${uid}/passport-${tag}.pdf`,
+          mimeType: "application/pdf",
+          size: 12345,
+          source: "upload",
+        },
+      });
+    }
+
+    // Support ticket + one message (cuid id; guard on count).
+    if ((await prisma.supportTicket.count({ where: { userId: uid } })) === 0) {
+      const ticket = await prisma.supportTicket.create({
+        data: {
+          userId: uid,
+          category: "account",
+          subject: `Account access question (${tag})`,
+          status: "open",
+        },
+      });
+      await prisma.supportTicketMessage.create({
+        data: {
+          ticketId: ticket.id,
+          authorId: uid,
+          isAgent: false,
+          bodyMd: "Please review my recent account activity.",
+        },
+      });
+    }
+  }
+}
+
 async function main() {
   const users = buildUsers();
   for (const u of users) {
@@ -210,7 +346,11 @@ async function main() {
     });
   }
   await seedMarketMakerBalances();
-  console.log(`seeded ${users.length} users (incl. mm.alpha / mm.beta)`);
+  await seedTestAccountObjects();
+  console.log(
+    `seeded ${users.length} users (incl. mm.alpha / mm.beta) + per-account ` +
+      `objects for ${USER_OBJECT_ACCOUNTS.length} test accounts`,
+  );
 
   // Populate a realistic backlog of exchange activity (balances, price
   // history, deposits/withdrawals, KYC queue, tickets, positions, …).

@@ -61,14 +61,20 @@ Everything comes up self-contained — the seed runs automatically as part of
 - `http://localhost/docs` — public API documentation (Swagger)
 - `http://localhost/api/health` — health check (`{"status":"ok"}`)
 
-Seeded logins (password `change-me-after-first-login`):
-`admin@bvbe.local`, `treasury@bvbe.local`, `compliance@bvbe.local`,
-`mm.alpha@bvbe.local` / `mm.beta@bvbe.local` (pre-funded market makers).
+(URLs assume the default `WEB_PORT=80`. If you set another host port in
+`.env` — e.g. `WEB_PORT=8080` when 80 is taken — use `http://localhost:8080/`.)
+
+Seeded logins: `admin@bvbe.local`, `treasury@bvbe.local`,
+`compliance@bvbe.local`, `mm.alpha@bvbe.local` / `mm.beta@bvbe.local`
+(pre-funded market makers). Passwords are set per-account in
+`packages/db/prisma/seed.ts` (`buildUsers()`).
 
 Re-seed or reset the lab:
 
 ```bash
-make seed      # re-run prisma seed against the running db
+make seed      # re-run prisma seed against the running db (idempotent —
+               # won't rotate an already-seeded row's password; use
+               # `make reset` for a clean slate)
 make reset     # docker compose down -v && up  (pristine state)
 ```
 

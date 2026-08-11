@@ -9,8 +9,7 @@ import {
 import { env } from "@/lib/env";
 import { jsonError, readJson } from "@/lib/api";
 import { registerEndpoint } from "@/lib/openapi-registry";
-import { getGlobalStore } from "@/lib/global-store";
-import { randomBytes } from "node:crypto";
+import { mintTotpTicket } from "@/lib/totp-tickets";
 
 registerEndpoint({
   method: "post",
@@ -29,22 +28,6 @@ const schema = z.object({
   password: z.string().min(1).max(256),
 });
 
-const totpTickets = getGlobalStore(
-  "totpTickets",
-  () => new Map<string, { userId: string; expiresAt: number }>(),
-);
-
-export function consumeTotpTicket(ticket: string): string | null {
-  const entry = totpTickets.get(ticket);
-  if (!entry) return null;
-  if (entry.expiresAt < Date.now()) {
-    totpTickets.delete(ticket);
-    return null;
-  }
-  totpTickets.delete(ticket);
-  return entry.userId;
-}
-
 export async function POST(req: Request) {
   const parsed = await readJson(req, schema);
   if (parsed.error) return parsed.error;
@@ -57,11 +40,7 @@ export async function POST(req: Request) {
   }
 
   if (user.totpEnabled) {
-    const ticket = randomBytes(24).toString("base64url");
-    totpTickets.set(ticket, {
-      userId: user.id,
-      expiresAt: Date.now() + 5 * 60 * 1000,
-    });
+    const ticket = await mintTotpTicket(user.id);
     return NextResponse.json({ totpRequired: true, ticket });
   }
 
