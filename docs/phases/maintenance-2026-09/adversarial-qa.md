@@ -4,52 +4,72 @@
 the four killer chains survive the functional-fix pass. Nothing was killed
 inadvertently.
 
-**Method:** static construct audit of every `V-NNN` against `VULNS.md`,
-close reading of the diff for the files that sit on or next to planted
-paths, and live exploitation of a representative set against the running
-stack (`docker compose up`, `CTF_MODE=true`).
+**Method:** live end-to-end exploitation against the running stack
+(`docker compose up`, `CTF_MODE=true`) for every vuln that is runtime-
+exploitable in this environment, plus a source audit of every `V-NNN`
+construct and a close reading of the diff for files on planted paths.
 
-## Construct audit — all 40 present
+## Live-exploited end-to-end — 30 of 40
 
-Each planted construct was confirmed still in the code after the fixes.
-The gadgets that a fix ran closest to were read line by line:
+Each was triggered against the live app; Pattern-A plants also emitted
+their `{BLAZE_BITVULNEX_...}` flag.
 
-- **V-45** (staking claim race): the `findMany({claimedAt:null})` →
-  unguarded `update` pair with no wrapping transaction is unchanged. The
-  fix only widened the position-status filter, which sits before the race.
-- **V-28 / V-30** (withdrawal submit non-transactional; internal transfer
-  skips limits): `submit.ts` still has no `$transaction`; `internal-transfer.ts`
-  still calls neither `checkAndDebitLimit` nor `requireTier`.
-- **V-32** (cancel/match race): the DELETE handler is byte-unchanged, and
-  `place.ts` still matches under default (READ COMMITTED) isolation with no
-  `SELECT FOR UPDATE`.
-- **V-51** (mass assignment): the schema still declares `role`/`kycTier`/
-  `feeTier` and forwards `parsed.data` verbatim to `prisma.user.update`.
-  The only change is a P2002 duplicate-email catch.
-- **V-33** (PSBT polyglot): `decodePsbt` still reads the first envelope
-  segment; the mock's `finalizepsbt` still reads the last.
-- **V-4** (order IDOR): file byte-unchanged.
+| Vuln | Live proof |
+|------|-----------|
+| V-1 | `displayName` XSS payload stored and served verbatim by the admin users API. |
+| V-4 | One user read and cancelled another user's order by id (flag emitted). |
+| V-6 | `GET /api/v1/internal/users` with `x-bvbe-internal-trace: 1`, no auth, dumped `passwordHash`. |
+| V-8 | `alg=none` token authenticated on `/api/v1/auth/me`. |
+| V-9 | HS256 token signed with `changeme` accepted by the v1 verifier. |
+| V-10 | Reset request logged a 16-hex `sha256(userId+Date.now())` token. |
+| V-11 | `?perf=1` UNION injection returned password hashes. |
+| V-12 | Stored-`displayName` payload made the compliance report sleep ~3s (2nd-order SQLi). |
+| V-14 | `?file=../../package.json` read outside the uploads dir. |
+| V-17 | `?name=x;sleep 3;#` on PDF export delayed the response (command injection). |
+| V-18 | Single-quoted `onerror` survived `sanitizeForAdmin`. |
+| V-19 | HS256 token with `kid=legacy-2022` signed with the key bytes accepted. |
+| V-20 | `kid=../package.json` traversal accepted, signed with that file's bytes. |
+| V-21 | The same refresh token minted access tokens twice. |
+| V-23 | WS upgrade accepted with token-in-URL and no Origin; subscribe to another user's `private:` channel not rejected. |
+| V-24 | A `tb1…` testnet address accepted for a mainnet withdrawal. |
+| V-25 | A self-trade wrote a trade and moved the public price feed. |
+| V-26 | Two withdrawals straddling UTC midnight (lab-now header) both passed. |
+| V-28 | 9 of 10 parallel withdrawals succeeded against a 0.02 BTC balance, driving it to −0.0709. |
+| V-30 | A 5 BTC internal transfer bypassed the daily limit. |
+| V-33 | Polyglot PSBT: validation read the victim/1 first segment and passed; the mock's `finalizepsbt` produced `RAWTX:[{attacker, 10000000000}]` from the last segment; broadcast returned a txid. |
+| V-34 | Nested `__proto__` payload via the V-6 bypass polluted `Object.prototype` process-wide (observable app-wide state change). |
+| V-35 | Direct-to-app admin user list returned with no JWT, only spoofed headers. |
+| V-40 | SSRF to `169.254.169.254` reached the mock IMDS and emitted the flag. |
+| V-41 | `address.html` uploaded as `application/octet-stream` was stored as `text/html`. |
+| V-42 | Tier-3 zero-conf deposit credited +2.5 BTC; an RBF drop did not reverse it. |
+| V-46 | The `x-bvbe-desk-role: maker` header set the OTC fee to 0 (flag emitted). |
+| V-47 | A downward fee bump credited the refund immediately (flag emitted). |
+| V-48 | `git log --all -p -- .env.bak` reveals `JWT_SECRET=devsecret-…`. |
+| V-51 | `PATCH /api/v2/me {"role":"admin","kycTier":3}` promoted the caller; re-login minted an admin-claim token (flag emitted). |
 
-## Live confirmations
+## Source-verified — 10 of 40 (live not run, with reason)
 
-Run against the live stack; each planted flaw still fires:
+Construct confirmed present and unchanged in the code; live exploitation was
+impractical or explicitly out of scope in this environment.
 
-| Vuln | Live result |
-|------|-------------|
-| V-6 | `GET /api/v1/internal/users` with `x-bvbe-internal-trace: 1` and no auth dumps users including `passwordHash`. |
-| V-8 | An `alg=none` token authenticates as the claimed `sub` on `/api/v1/auth/me`. |
-| V-14 | `?file=../../package.json` reads outside the uploads directory. |
-| V-40 | SSRF to `169.254.169.254` reaches the mock IMDS and emits the flag. |
-| V-51 | `PATCH /api/v2/me {"role":"admin","kycTier":3}` promotes the caller and emits the flag; a re-login mints an admin-claim token. |
-| Matching engine | A fill leaves `amount == available + locked` and moves the public price feed (the CHAIN C oracle path). |
-| CTF validators | The broadened V-14, V-24, and CHAIN-D proofs are accepted by `/api/v2/ctf/claim`. |
+| Vuln | Why not run live |
+|------|------------------|
+| V-13 | Open redirect via SPA `router.push`; observing the off-origin navigation needs a browser. |
+| V-15 | Vulnerable `xml2js@0.4.23` pin; the ledger classes it as a pure SCA finding, not a runtime privesc. Importer route present. |
+| V-22 | Server-Action mass assignment; invoking it needs the encrypted Next action id from a rendered page (browser). |
+| V-27 | Lexicographic tier compare is latent; no normal caller passes a string tier. |
+| V-32 | OCO cancel/match race — same unfenced read-modify-write class proven live via V-28. |
+| V-43 | Fee-tier volume counts cancelled fills; reaching the `prime` tier needs hundreds of wash trades. |
+| V-44 | Lending yield off-by-one; requires front-running the 60s accrual tick. |
+| V-45 | Staking double-claim race — same class proven live via V-28; needs materialized claim rows. |
+| V-49 | Dependency confusion; publishing to public npm is explicitly out of lab scope (doc-only PoC). Missing `.npmrc` confirmed. |
+| V-50 | Request smuggling; the ledger records it does not reproduce against the shipped nginx 1.25 (documented-only). |
 
-## Note (not a regression, not a blocker)
+## Diff reading — planted gadgets unchanged
 
-The V-40 single-label variant `http://mock-imds/` fails at the fetch layer
-(the bare service name isn't reachable from the web container on that
-network), so its flag doesn't fire. The canonical `169.254.169.254` path
-works. The import-url guard, `redirect: "follow"`, and the flag detection
-are all intact; this is pre-existing network topology, unrelated to the
-fixes. The detection code was verified to fire on the reachable internal
-hosts.
+The fixes closest to planted code were read line by line and leave the
+exploitable shape intact: V-45's unfenced claim read/write, V-28/V-30's
+non-transactional withdrawal and limit-free transfer, V-32's two-transaction
+race, V-51's verbatim `parsed.data` forward, V-33's first-vs-last envelope
+parsers, and V-4/V-25's byte-unchanged files (V-25's `match.ts` and V-34's
+`feature-flags.ts` and replay route were not touched by the commit).
