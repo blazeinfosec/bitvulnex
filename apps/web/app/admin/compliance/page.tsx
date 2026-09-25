@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { authedFetch } from "@/lib/token-storage";
+import { authedFetch, loadFailure } from "@/lib/token-storage";
 
 type CaseRow = {
   id: string;
@@ -17,12 +17,14 @@ function statusClass(s: string) {
   switch (s) {
     case "open":
       return "text-warn";
-    case "investigating":
-      return "text-warn";
-    case "closed":
-      return "text-text-mute";
+    case "in_review":
+      return "text-info";
     case "escalated":
       return "text-sell";
+    case "resolved":
+      return "text-buy";
+    case "dismissed":
+      return "text-text-mute";
     default:
       return "text-text-dim";
   }
@@ -30,15 +32,19 @@ function statusClass(s: string) {
 
 export default function AdminCompliancePage() {
   const router = useRouter();
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [cases, setCases] = useState<CaseRow[] | null>(null);
 
   useEffect(() => {
     (async () => {
       const res = await authedFetch("/api/v2/admin/compliance/cases");
-      if (res.status === 401 || res.status === 403) {
-        router.replace("/login");
+      const fail = await loadFailure(res);
+      if (fail) {
+        if (fail.redirect) router.replace("/login");
+        else setLoadError(fail.message);
         return;
       }
+      setLoadError(null);
       const body = (await res.json()) as { cases: CaseRow[] };
       setCases(body.cases);
     })();
@@ -63,8 +69,12 @@ export default function AdminCompliancePage() {
         </Link>
       </div>
 
-      <div className="rounded-lg border border-border bg-bg-elevated overflow-hidden">
-        {!cases ? (
+      <div className="rounded-lg border border-border bg-bg-elevated overflow-x-auto">
+        {!cases && loadError ? (
+          <p className="px-4 py-10 text-center text-sell text-sm">
+            {loadError}
+          </p>
+        ) : !cases ? (
           <p className="px-4 py-10 text-center text-text-mute text-sm">
             Loading…
           </p>

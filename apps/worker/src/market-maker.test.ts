@@ -190,7 +190,7 @@ function makeFake() {
           pair: string;
           userId: { in: string[] };
           status: { in: string[] };
-          createdAt: { lt: Date };
+          createdAt?: { lt: Date };
         };
         data: { status: string; cancelledAt: Date };
       }) => {
@@ -200,7 +200,7 @@ function makeFake() {
             o.pair === where.pair &&
             where.userId.in.includes(o.userId) &&
             where.status.in.includes(o.status) &&
-            o.createdAt < where.createdAt.lt
+            (!where.createdAt || o.createdAt < where.createdAt.lt)
           ) {
             o.status = data.status as OrderRow["status"];
             o.cancelledAt = data.cancelledAt;
@@ -241,6 +241,15 @@ function makeFake() {
         const u = users.find((x) => x.email === where.email);
         return u ? { id: u.id } : null;
       },
+    },
+    // Only the 24h-volume aggregate goes through raw SQL; its bound
+    // values are [pair, since].
+    $queryRaw: async (sql: Prisma.Sql) => {
+      const [pair, since] = sql.values as [string, Date];
+      const rows = trades.filter((t) => t.pair === pair && t.executedAt >= since);
+      if (rows.length === 0) return [{ vol: null }];
+      const vol = rows.reduce((acc, t) => acc.add(t.price.mul(t.amount)), D(0));
+      return [{ vol: vol.toString() }];
     },
   };
 
@@ -288,6 +297,24 @@ describe("nextPrice (price walk math)", () => {
     const ratio = Number(p.toString()) / Number(start.toString());
     expect(ratio).toBeGreaterThan(0.7);
     expect(ratio).toBeLessThan(1.3);
+  });
+
+  it("has no systematic drift in log space (mean log-return ≈ 0)", () => {
+    // Large sigma + fine tick so rounding is negligible. A linear
+    // `1 + N(0, sigma)` shock would give mean log-return ≈ -sigma²/2
+    // = -0.00125 here, ~3.5 standard errors below zero.
+    const rng = mulberry32(2024);
+    const sigma = 0.05;
+    const tick = D("0.00000001");
+    const start = D("1000");
+    const N = 20_000;
+    let sumLog = 0;
+    for (let i = 0; i < N; i++) {
+      const p = nextPrice(start, sigma, tick, rng);
+      sumLog += Math.log(Number(p.toString()) / 1000);
+    }
+    const meanLog = sumLog / N;
+    expect(Math.abs(meanLog)).toBeLessThan(0.0006);
   });
 
   it("always rounds to a multiple of the price tick", () => {
@@ -349,6 +376,48 @@ describe("runMarketMakerTick", () => {
       const cents = p * 100;
       expect(Math.abs(cents - Math.round(cents))).toBeLessThan(1e-6);
     }
+  });
+
+  it("keeps only one generation of MM quotes resting across consecutive ticks", async () => {
+    const { db, orders } = makeFake();
+    const rng = mulberry32(55);
+    for (let i = 0; i < 5; i++) {
+      await runMarketMakerTick(db, null, rng);
+    }
+    const open = orders.filter((o) => o.pair === "BTC/USDT" && o.status === "open");
+    expect(open.filter((o) => o.side === "buy").length).toBe(5);
+    expect(open.filter((o) => o.side === "sell").length).toBe(5);
+    // And the resting book is never crossed.
+    const bestBid = Math.max(...open.filter((o) => o.side === "buy").map((o) => Number(o.price!.toString())));
+    const bestAsk = Math.min(...open.filter((o) => o.side === "sell").map((o) => Number(o.price!.toString())));
+    expect(bestBid).toBeLessThan(bestAsk);
+  });
+
+  it("publishes ticker:all with 24h volume summed from trades", async () => {
+    const { db, trades } = makeFake();
+    const captured: Array<{ channel: string; message: string }> = [];
+    const pub: MmPubSub = {
+      publish: async (channel: string, message: string) => {
+        captured.push({ channel, message });
+        return 1;
+      },
+    };
+    const rng = mulberry32(3);
+    await runMarketMakerTick(db, pub, rng);
+    await runMarketMakerTick(db, pub, rng);
+    const tickerMsgs = captured.filter((c) => c.channel === "ticker:all");
+    const payload = JSON.parse(tickerMsgs[tickerMsgs.length - 1]!.message) as {
+      kind: string;
+      rows: Array<{ pair: string; last: string; change24h: number; vol24h: string }>;
+    };
+    expect(payload.kind).toBe("ticker");
+    const row = payload.rows.find((r) => r.pair === "BTC/USDT");
+    if (!row) throw new Error("ticker row missing");
+    expect(Object.keys(row).sort()).toEqual(["change24h", "last", "pair", "vol24h"]);
+    const expected = trades.reduce((acc, t) => acc.add(t.price.mul(t.amount)), D(0));
+    expect(row.vol24h).toBe(expected.toString());
+    expect(row.last).toBe(trades[trades.length - 1]!.price.toString());
+    expect(typeof row.change24h).toBe("number");
   });
 
   it("is a no-op when MM seed users are missing", async () => {

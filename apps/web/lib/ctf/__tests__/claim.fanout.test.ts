@@ -92,6 +92,34 @@ describe("Pattern B — exploit-proof validators (slice-2 stubs)", () => {
     const r = await processClaim("V-11", "hello world");
     expect(r.ok).toBe(false);
   });
+  it("V-14 accepts a URL-encoded traversal", async () => {
+    const r = await processClaim("V-14", "%2e%2e%2f%2e%2e%2fetc%2fpasswd");
+    expect(r.ok).toBe(true);
+  });
+  it("V-14 accepts a double-encoded traversal", async () => {
+    const r = await processClaim("V-14", "%252e%252e%252fetc%252fpasswd");
+    expect(r.ok).toBe(true);
+  });
+  it("V-14 accepts a backslash traversal", async () => {
+    const r = await processClaim("V-14", "..\\..\\package.json");
+    expect(r.ok).toBe(true);
+  });
+  it("V-24 accepts a cross-network tb1 address", async () => {
+    const r = await processClaim("V-24", "tb1qfakeqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq");
+    expect(r.ok).toBe(true);
+  });
+  it("V-24 accepts a bech32 string with a bad checksum", async () => {
+    const r = await processClaim("V-24", "bcrt1qfakeqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq");
+    expect(r.ok).toBe(true);
+  });
+  it("V-24 rejects a well-formed regtest address", async () => {
+    const r = await processClaim("V-24", "bcrt1qfakeqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqa84d5d");
+    expect(r.ok).toBe(false);
+  });
+  it("V-24 rejects a non-address string", async () => {
+    const r = await processClaim("V-24", "hello world");
+    expect(r.ok).toBe(false);
+  });
   it("V-14 rejects a path with no traversal", async () => {
     const r = await processClaim("V-14", "kyc/passport.pdf");
     expect(r.ok).toBe(false);
@@ -161,8 +189,30 @@ describe("Killer chain validators", () => {
     );
     expect(r.ok).toBe(true);
   });
+  it("CHAIN-D accepts the object key as the bucket lists it", async () => {
+    const r = await processClaim("CHAIN-D", "kyc/user-001/passport-front.pdf");
+    expect(r.ok).toBe(true);
+  });
+  it("CHAIN-D accepts a full object URL", async () => {
+    const r = await processClaim(
+      "CHAIN-D",
+      "http://s3.bvbe.internal/kyc-bucket/user-001/passport-front.pdf",
+    );
+    expect(r.ok).toBe(true);
+  });
+  it("CHAIN-D accepts the bucket-qualified long form", async () => {
+    const r = await processClaim(
+      "CHAIN-D",
+      "kyc-bucket/kyc/user-042/proof-of-address.pdf",
+    );
+    expect(r.ok).toBe(true);
+  });
   it("CHAIN-D rejects a non-bucket path", async () => {
-    const r = await processClaim("CHAIN-D", "kyc/user-001/passport.pdf");
+    const r = await processClaim("CHAIN-D", "uploads/user-001/passport.pdf");
+    expect(r.ok).toBe(false);
+  });
+  it("CHAIN-D rejects a key with no user segment", async () => {
+    const r = await processClaim("CHAIN-D", "kyc-bucket/passport.pdf");
     expect(r.ok).toBe(false);
   });
 });

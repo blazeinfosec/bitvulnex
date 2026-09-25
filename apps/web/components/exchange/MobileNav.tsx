@@ -12,9 +12,17 @@ interface MobileNavProps {
   open: boolean;
   onClose: () => void;
   isAuthed: boolean;
+  isStaff?: boolean;
+  onSignOut?: () => void;
 }
 
-export function MobileNav({ open, onClose, isAuthed }: MobileNavProps) {
+export function MobileNav({
+  open,
+  onClose,
+  isAuthed,
+  isStaff = false,
+  onSignOut,
+}: MobileNavProps) {
   const panelRef = useRef<HTMLDivElement | null>(null);
   const previouslyFocused = useRef<HTMLElement | null>(null);
 
@@ -89,18 +97,27 @@ export function MobileNav({ open, onClose, isAuthed }: MobileNavProps) {
       { href: "/account/api-keys", label: "API keys" },
       { href: "/referrals", label: "Referrals" },
       { href: "/subaccounts", label: "Sub-accounts" },
+      { href: "/support", label: "Support" },
     ],
   });
   if (isAuthed) {
     sections.push({
       label: "Account",
       items: [
+        { href: "/account", label: "Overview" },
         { href: "/account/profile", label: "Profile" },
         { href: "/account/security", label: "Security" },
         { href: "/account/kyc", label: "KYC" },
         { href: "/account/api-keys", label: "API keys" },
+        { href: "/account/orders", label: "Orders" },
       ],
     });
+    if (isStaff) {
+      sections.push({
+        label: "Staff",
+        items: [{ href: "/admin", label: "Admin console" }],
+      });
+    }
   }
   return (
     <div
@@ -179,7 +196,20 @@ export function MobileNav({ open, onClose, isAuthed }: MobileNavProps) {
                 Create account
               </Link>
             </div>
-          ) : null}
+          ) : (
+            <div className="px-3 pb-3 pt-2 border-t border-border-subtle mt-2">
+              <button
+                type="button"
+                onClick={() => {
+                  onClose();
+                  onSignOut?.();
+                }}
+                className="block w-full h-10 text-center text-sm font-medium text-text border border-border rounded-md hover:bg-bg-hover transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+              >
+                Sign out
+              </button>
+            </div>
+          )}
         </nav>
       </div>
     </div>

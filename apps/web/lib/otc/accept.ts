@@ -16,9 +16,35 @@ export type AcceptDb = Pick<
   "balance" | "otcTicket" | "$transaction"
 >;
 
+class QuoteExpiredError extends Error {
+  constructor(public ticketId: string) {
+    super("quote expired");
+  }
+}
+
 export async function acceptOtc(
   args: AcceptArgs,
   db: AcceptDb = defaultPrisma,
+): Promise<{ filled: boolean; baseDelta: string; quoteDelta: string }> {
+  try {
+    return await fillTicket(args, db);
+  } catch (e) {
+    if (e instanceof QuoteExpiredError) {
+      // Persist the expiry outside the (rolled-back) fill transaction
+      // so the ticket stops showing as quotable.
+      await db.otcTicket.updateMany({
+        where: { id: e.ticketId, status: "quoted" },
+        data: { status: "expired" },
+      });
+      throw new Error("quote expired");
+    }
+    throw e;
+  }
+}
+
+async function fillTicket(
+  args: AcceptArgs,
+  db: AcceptDb,
 ): Promise<{ filled: boolean; baseDelta: string; quoteDelta: string }> {
   return db.$transaction(async (tx: Prisma.TransactionClient) => {
     const ticket = await tx.otcTicket.findUnique({
@@ -29,11 +55,7 @@ export async function acceptOtc(
     if (ticket.status !== "quoted") throw new Error("ticket not quotable");
     if (!ticket.quotedPrice) throw new Error("ticket has no price");
     if (ticket.quoteExpiresAt && ticket.quoteExpiresAt.getTime() < Date.now()) {
-      await tx.otcTicket.update({
-        where: { id: ticket.id },
-        data: { status: "expired" },
-      });
-      throw new Error("quote expired");
+      throw new QuoteExpiredError(ticket.id);
     }
 
     // Atomically claim the ticket: only one concurrent acceptor can

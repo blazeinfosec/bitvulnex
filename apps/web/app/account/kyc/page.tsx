@@ -2,9 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
 import { Container } from "@/components/ui/container";
-import { authedFetch, getAccessToken } from "@/lib/token-storage";
+import { authedFetch, responseError } from "@/lib/token-storage";
 
 type DocSummary = {
   id: string;
@@ -56,13 +55,27 @@ export default function KycPage() {
   const [importUrl, setImportUrl] = useState("");
   const [importType, setImportType] = useState("address_proof");
   const [message, setMessage] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   async function load() {
-    const res = await authedFetch("/api/v2/me/kyc");
+    let res: Response;
+    try {
+      res = await authedFetch("/api/v2/me/kyc");
+    } catch {
+      setLoadError("Could not load your verification status.");
+      return;
+    }
     if (res.status === 401) {
       router.replace("/login");
       return;
     }
+    if (!res.ok) {
+      setLoadError(
+        await responseError(res, "Could not load your verification status."),
+      );
+      return;
+    }
+    setLoadError(null);
     const body = (await res.json()) as KycView;
     setState(body);
     if (body.profile) {
@@ -100,7 +113,7 @@ export default function KycPage() {
       }),
     });
     if (!res.ok) {
-      setMessage("Save failed.");
+      setMessage(await responseError(res, "Save failed."));
       return;
     }
     setMessage("Profile saved.");
@@ -119,15 +132,33 @@ export default function KycPage() {
     // Prefer an explicit type so callers that set state and upload in the
     // same handler aren't bitten by the stale render-time `docType` value.
     fd.append("type", typeOverride ?? docType);
-    const access = getAccessToken();
-    const res = await fetch("/api/v2/me/kyc/documents", {
+    const input = e.target;
+    const res = await authedFetch("/api/v2/me/kyc/documents", {
       method: "POST",
-      headers: access ? { authorization: `Bearer ${access}` } : {},
       body: fd,
     });
-    setMessage(res.ok ? "Uploaded." : "Upload failed.");
+    setMessage(res.ok ? "Uploaded." : await responseError(res, "Upload failed."));
     await load();
-    e.target.value = "";
+    input.value = "";
+  }
+
+  async function viewDoc(storedPath: string) {
+    // Open the tab synchronously so the popup blocker doesn't eat it, then
+    // point it at the fetched blob once the authenticated request returns.
+    const win = window.open("", "_blank");
+    const res = await authedFetch(
+      `/api/v2/me/kyc/doc?file=${encodeURIComponent(storedPath)}`,
+    );
+    if (!res.ok) {
+      win?.close();
+      setMessage(await responseError(res, "Could not open document."));
+      return;
+    }
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    if (win) win.location.href = url;
+    else window.open(url, "_blank");
+    window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
   }
 
   async function importFromUrl(e: React.FormEvent) {
@@ -139,10 +170,7 @@ export default function KycPage() {
       body: JSON.stringify({ url: importUrl, type: importType }),
     });
     if (!res.ok) {
-      const body = (await res.json().catch(() => ({}))) as {
-        error?: { message?: string };
-      };
-      setMessage(body.error?.message ?? "Import failed.");
+      setMessage(await responseError(res, "Import failed."));
       return;
     }
     setMessage("Imported.");
@@ -154,14 +182,19 @@ export default function KycPage() {
     setMessage(null);
     const res = await authedFetch("/api/v2/me/kyc/submit", { method: "POST" });
     if (!res.ok) {
-      const body = (await res.json().catch(() => ({}))) as {
-        error?: { message?: string };
-      };
-      setMessage(body.error?.message ?? "Submit failed.");
+      setMessage(await responseError(res, "Submit failed."));
       return;
     }
     setMessage("Submitted for review.");
     await load();
+  }
+
+  if (!state && loadError) {
+    return (
+      <Container className="py-10">
+        <p className="text-sell text-sm">{loadError}</p>
+      </Container>
+    );
   }
 
   if (!state) {
@@ -404,12 +437,13 @@ export default function KycPage() {
                   <span className="text-text-dim">
                     <span className="font-mono">{d.filename}</span> · {d.size}B
                   </span>
-                  <Link
-                    href={`/api/v2/me/kyc/doc?file=${encodeURIComponent(d.storedPath)}`}
-                    className="text-accent text-xs"
+                  <button
+                    type="button"
+                    onClick={() => void viewDoc(d.storedPath)}
+                    className="text-accent text-xs hover:underline"
                   >
                     view
-                  </Link>
+                  </button>
                 </li>
               ))}
             </ul>
@@ -441,8 +475,7 @@ export default function KycPage() {
             <input
               type="file"
               onChange={(e) => {
-                setDocType("address_proof");
-                uploadDoc(e, "address_proof");
+                void uploadDoc(e, "address_proof");
               }}
               className="hidden"
               accept="image/*,application/pdf"
@@ -458,12 +491,13 @@ export default function KycPage() {
                   <span className="text-text-dim">
                     <span className="font-mono">{d.filename}</span> · {d.size}B
                   </span>
-                  <Link
-                    href={`/api/v2/me/kyc/doc?file=${encodeURIComponent(d.storedPath)}`}
-                    className="text-accent text-xs"
+                  <button
+                    type="button"
+                    onClick={() => void viewDoc(d.storedPath)}
+                    className="text-accent text-xs hover:underline"
                   >
                     view
-                  </Link>
+                  </button>
                 </li>
               ))}
             </ul>

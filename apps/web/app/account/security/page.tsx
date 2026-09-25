@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Container } from "@/components/ui/container";
-import { authedFetch } from "@/lib/token-storage";
+import { authedFetch, responseError } from "@/lib/token-storage";
 
 const inputClass =
   "w-full h-10 px-3 rounded-md bg-bg border border-border text-text placeholder:text-text-mute font-mono focus:outline-none focus:ring-2 focus:ring-accent focus:border-accent transition-colors";
@@ -21,6 +21,10 @@ export default function SecurityPage() {
   const [uri, setUri] = useState<string | null>(null);
   const [code, setCode] = useState("");
   const [message, setMessage] = useState<string | null>(null);
+  const [disableOpen, setDisableOpen] = useState(false);
+  const [disablePassword, setDisablePassword] = useState("");
+  const [disableCode, setDisableCode] = useState("");
+  const [disableBusy, setDisableBusy] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -29,14 +33,23 @@ export default function SecurityPage() {
         router.replace("/login");
         return;
       }
+      if (!res.ok) {
+        setMessage(await responseError(res, "Could not load security settings."));
+        return;
+      }
       setMe(await res.json());
     })();
   }, [router]);
 
   async function enable() {
+    setMessage(null);
     const res = await authedFetch("/api/v2/auth/2fa/enable", {
       method: "POST",
     });
+    if (!res.ok) {
+      setMessage(await responseError(res, "Could not start 2FA setup."));
+      return;
+    }
     const body = await res.json();
     setSecret(body.secret);
     setUri(body.uri);
@@ -55,7 +68,32 @@ export default function SecurityPage() {
       setSecret(null);
       setUri(null);
     } else {
-      setMessage("Invalid code.");
+      setMessage(await responseError(res, "Invalid code."));
+    }
+  }
+
+  async function disable2fa(e: React.FormEvent) {
+    e.preventDefault();
+    setMessage(null);
+    setDisableBusy(true);
+    try {
+      const res = await authedFetch("/api/v2/auth/2fa/disable", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ password: disablePassword, code: disableCode }),
+      });
+      if (!res.ok) {
+        setMessage(await responseError(res, "Could not disable 2FA."));
+        return;
+      }
+      setMessage("2FA disabled.");
+      setMe((m) => (m ? { ...m, totpEnabled: false } : m));
+      setDisableOpen(false);
+      setDisablePassword("");
+      setDisableCode("");
+      setCode("");
+    } finally {
+      setDisableBusy(false);
     }
   }
 
@@ -119,9 +157,55 @@ export default function SecurityPage() {
         </div>
 
         {me?.totpEnabled ? (
-          <p className="text-sm text-text-dim">
-            Two-factor authentication is enabled on this account.
-          </p>
+          <div className="space-y-3">
+            <p className="text-sm text-text-dim">
+              Two-factor authentication is enabled on this account.
+            </p>
+            {disableOpen ? (
+              <form onSubmit={disable2fa} className="flex flex-wrap gap-2">
+                <input
+                  type="password"
+                  required
+                  autoComplete="current-password"
+                  placeholder="Current password"
+                  value={disablePassword}
+                  onChange={(e) => setDisablePassword(e.target.value)}
+                  className={inputClass + " w-56 font-sans"}
+                />
+                <input
+                  inputMode="numeric"
+                  pattern="\d{6}"
+                  required
+                  placeholder="123456"
+                  value={disableCode}
+                  onChange={(e) => setDisableCode(e.target.value)}
+                  className={inputClass + " w-32 tracking-widest text-center"}
+                />
+                <button
+                  type="submit"
+                  className={primaryBtn}
+                  disabled={disableBusy}
+                >
+                  {disableBusy ? "Disabling…" : "Disable 2FA"}
+                </button>
+                <button
+                  type="button"
+                  className={secondaryBtn}
+                  onClick={() => setDisableOpen(false)}
+                >
+                  Cancel
+                </button>
+              </form>
+            ) : (
+              <button
+                type="button"
+                className={secondaryBtn}
+                onClick={() => setDisableOpen(true)}
+              >
+                Disable 2FA
+              </button>
+            )}
+          </div>
         ) : secret ? (
           <div className="space-y-3">
             <p className="text-sm text-text-dim">

@@ -35,7 +35,7 @@ export function ClaimModal({
     }
   }, [open]);
 
-  const noRewards = Number(accrued) <= 0 || windows === 0;
+  const noRewards = !(Number(accrued) > 0);
 
   async function submit() {
     setBusy(true);

@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { Container } from "@/components/ui/container";
-import { authedFetch } from "@/lib/token-storage";
+import { authedFetch, responseError } from "@/lib/token-storage";
 
 const CATEGORIES = [
   "general",
@@ -28,18 +28,31 @@ export default function NewTicketPage() {
   const [subject, setSubject] = useState("");
   const [body, setBody] = useState("");
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   async function submit() {
     setBusy(true);
-    const res = await authedFetch("/api/v2/me/tickets", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ category, subject, body }),
-    });
-    setBusy(false);
-    if (res.ok) {
+    setError(null);
+    try {
+      const res = await authedFetch("/api/v2/me/tickets", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ category, subject, body }),
+      });
+      if (res.status === 401) {
+        router.replace("/login");
+        return;
+      }
+      if (!res.ok) {
+        setError(await responseError(res, "Could not open the ticket."));
+        return;
+      }
       const { ticket } = (await res.json()) as { ticket: { id: string } };
       router.replace(`/support/tickets/${ticket.id}`);
+    } catch {
+      setError("Could not open the ticket.");
+    } finally {
+      setBusy(false);
     }
   }
 
@@ -99,6 +112,7 @@ export default function NewTicketPage() {
           />
         </div>
 
+        {error && <p className="text-sell text-sm">{error}</p>}
         <button
           type="button"
           className={primaryBtn}

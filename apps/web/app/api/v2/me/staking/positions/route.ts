@@ -24,7 +24,18 @@ export async function GET(req: Request) {
   if (!claims) return jsonError(401, "unauthorized");
 
   const positions = await prisma.stakingPosition.findMany({
-    where: { userId: claims.sub, status: { in: ["active", "unstaking"] } },
+    where: {
+      userId: claims.sub,
+      OR: [
+        { status: { in: ["active", "unstaking"] } },
+        // Ended positions stay listed while they still carry rewards
+        // accrued before the unstake, so the user can claim them.
+        {
+          status: "ended",
+          claims: { some: { claimedAt: null, amount: { gt: 0 } } },
+        },
+      ],
+    },
     orderBy: { startedAt: "desc" },
   });
 

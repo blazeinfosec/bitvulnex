@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { authedFetch } from "@/lib/token-storage";
+import { useRouter } from "next/navigation";
+import { authedFetch, responseError } from "@/lib/token-storage";
 import { cn } from "@/lib/utils";
 
 type Cohort = {
@@ -38,6 +39,7 @@ type HeatRow = {
 };
 
 export default function AdminCtfPage() {
+  const router = useRouter();
   const [cohorts, setCohorts] = useState<Cohort[] | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -48,7 +50,17 @@ export default function AdminCtfPage() {
 
   const refresh = useCallback(async () => {
     setErr(null);
-    const r = await authedFetch("/api/v2/admin/ctf/cohorts");
+    let r: Response;
+    try {
+      r = await authedFetch("/api/v2/admin/ctf/cohorts");
+    } catch {
+      setErr("Could not reach the server.");
+      return;
+    }
+    if (r.status === 401) {
+      router.replace("/login");
+      return;
+    }
     if (r.status === 404) {
       setErr(
         "CTF mode is disabled on this deployment. Set CTF_MODE=true to enable.",
@@ -56,17 +68,17 @@ export default function AdminCtfPage() {
       return;
     }
     if (r.status === 403) {
-      setErr("Admin role required.");
+      setErr("You don't have access to this page.");
       return;
     }
     if (!r.ok) {
-      setErr(`Unexpected error (${r.status}).`);
+      setErr(await responseError(r, `Unexpected error (${r.status}).`));
       return;
     }
     const body = (await r.json()) as { cohorts: Cohort[] };
     setCohorts(body.cohorts);
     if (!selectedId && body.cohorts[0]) setSelectedId(body.cohorts[0].id);
-  }, [selectedId]);
+  }, [selectedId, router]);
 
   const loadScoreboard = useCallback(async (id: string) => {
     const r = await authedFetch(
@@ -108,6 +120,24 @@ export default function AdminCtfPage() {
     });
     await refresh();
     if (id === selectedId) await loadScoreboard(id);
+  }
+  async function exportCsv(id: string, name: string) {
+    const r = await authedFetch(
+      `/api/v2/admin/ctf/cohorts/${id}/scoreboard?format=csv`,
+    );
+    if (!r.ok) {
+      alert(await responseError(r, "CSV export failed."));
+      return;
+    }
+    const blob = await r.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `scoreboard-${name}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
   }
   async function reloadHints() {
     const r = await authedFetch("/api/v2/admin/ctf/reload-hints", {
@@ -174,7 +204,7 @@ export default function AdminCtfPage() {
       </div>
 
       {/* Cohort list */}
-      <div className="rounded-lg border border-border bg-bg-elevated mb-6">
+      <div className="rounded-lg border border-border bg-bg-elevated mb-6 overflow-x-auto">
         <table className="w-full text-sm">
           <thead className="text-[11px] uppercase tracking-wider text-text-mute border-b border-border">
             <tr>
@@ -289,14 +319,15 @@ export default function AdminCtfPage() {
             <h2 className="text-sm font-semibold uppercase tracking-wider text-text-mute">
               Scoreboard — {selected.name}
             </h2>
-            <a
-              href={`/api/v2/admin/ctf/cohorts/${selected.id}/scoreboard?format=csv`}
+            <button
+              type="button"
+              onClick={() => void exportCsv(selected.id, selected.name)}
               className="text-xs text-text-dim hover:text-accent underline"
             >
               CSV export ↓
-            </a>
+            </button>
           </div>
-          <div className="rounded-lg border border-border bg-bg-elevated mb-6">
+          <div className="rounded-lg border border-border bg-bg-elevated mb-6 overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="text-[11px] uppercase tracking-wider text-text-mute border-b border-border">
                 <tr>
@@ -354,7 +385,7 @@ export default function AdminCtfPage() {
           <h2 className="text-sm font-semibold uppercase tracking-wider text-text-mute mb-3">
             Per-target heat map
           </h2>
-          <div className="rounded-lg border border-border bg-bg-elevated mb-6">
+          <div className="rounded-lg border border-border bg-bg-elevated mb-6 overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="text-[11px] uppercase tracking-wider text-text-mute border-b border-border">
                 <tr>

@@ -59,6 +59,15 @@ const http = createServer((_req, res) => {
 const wss = new WebSocketServer({ noServer: true });
 
 http.on("upgrade", async (req, socket, head) => {
+  // The raw socket has no error listener until `ws` takes it over; a
+  // client reset while we're awaiting token verification would otherwise
+  // surface as an unhandled 'error' event and kill the process.
+  const onSocketError = (err: Error) => {
+    console.warn("[ws-gateway] upgrade socket error:", err.message);
+    socket.destroy();
+  };
+  socket.on("error", onSocketError);
+
   const url = new URL(req.url ?? "/", "http://localhost");
   if (url.pathname !== "/ws" && url.pathname !== "/") {
     socket.destroy();
@@ -78,7 +87,12 @@ http.on("upgrade", async (req, socket, head) => {
     }
   }
 
+  if (socket.destroyed) return;
   wss.handleUpgrade(req, socket, head, (ws) => {
+    socket.off("error", onSocketError);
+    ws.on("error", (err) =>
+      console.warn("[ws-gateway] client socket error:", err.message),
+    );
     const state: ClientState = { ws, userId, subscriptions: new Set() };
     clients.add(state);
     ws.on("message", (raw) => handleMessage(state, raw.toString()));
@@ -110,8 +124,13 @@ function handleMessage(state: ClientState, raw: string): void {
   }
 }
 
-startRedisListener().then(() => {
-  http.listen(port, () => {
-    console.log(`[ws-gateway] listening on :${port}`);
+startRedisListener()
+  .then(() => {
+    http.listen(port, () => {
+      console.log(`[ws-gateway] listening on :${port}`);
+    });
+  })
+  .catch((err) => {
+    console.error("[ws-gateway] failed to start Redis listener:", err);
+    process.exit(1);
   });
-});

@@ -22,7 +22,10 @@ export interface RecentTradesFeedProps {
 }
 
 function formatTime(t: string | number): string {
-  const d = typeof t === "string" ? new Date(t) : new Date(t);
+  // Web-published trades carry ISO strings; the worker market-maker sends
+  // epoch ms (occasionally stringified).
+  const d =
+    typeof t === "string" && /^\d+$/.test(t) ? new Date(Number(t)) : new Date(t);
   if (Number.isNaN(d.getTime())) return "—";
   const h = String(d.getUTCHours()).padStart(2, "0");
   const m = String(d.getUTCMinutes()).padStart(2, "0");

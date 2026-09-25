@@ -23,7 +23,14 @@ registerEndpoint({
 
 export const dynamic = "force-dynamic";
 
-const TARGET_RE = /^(V-[0-9]+|CHAIN-[A-D]-STEP-[0-9]+)$/;
+const TARGET_RE = /^(V-[0-9]+|CHAIN-[A-D](-STEP-[0-9]+)?)$/;
+
+// The CTF page asks for a chain by its bare key (CHAIN-A). Hints are
+// stored per step, so a bare chain key resolves to its first step.
+// The interaction timer and reveal log keep the key as requested.
+function hintKeyFor(target: string): string {
+  return /^CHAIN-[A-D]$/.test(target) ? `${target}-STEP-1` : target;
+}
 
 export async function GET(
   req: Request,
@@ -71,7 +78,7 @@ export async function GET(
     }
   }
 
-  const hint = loadHint(target, tier);
+  const hint = loadHint(hintKeyFor(target), tier);
   if (!hint) return jsonError(404, "unknown target");
 
   // Idempotent reveal log (architect addendum condition #8 — logged-

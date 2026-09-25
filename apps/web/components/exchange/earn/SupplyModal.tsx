@@ -11,6 +11,8 @@ import {
   amountInputClass,
   InlineMessage,
   formatDecimal,
+  failureMessage,
+  normalizeAmount,
 } from "./modal-shared";
 
 export interface SupplyModalProps {
@@ -58,14 +60,13 @@ export function SupplyModal({
       const res = await authedFetch("/api/v2/me/lending/supply", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ asset, amount }),
+        body: JSON.stringify({ asset, amount: normalizeAmount(amount) }),
       });
       if (res.ok) {
         onSuccess();
         onClose();
       } else {
-        const body = await res.text();
-        setError(`Supply failed (${res.status}): ${body || "unknown error"}`);
+        setError(await failureMessage(res, "Supply"));
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Network error");

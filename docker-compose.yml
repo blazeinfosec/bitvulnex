@@ -1,4 +1,4 @@
-# BVBE local lab — seven services.
+# BVBE local lab — nine services plus a one-shot db-migrate container.
 #
 # DO NOT DEPLOY. Local docker-compose only. `docker compose down -v`
 # fully destroys all state. No volumes survive a reset.
@@ -7,11 +7,15 @@ services:
   nginx:
     image: nginx:1.25-alpine
     ports:
-      - "80:80"
+      # Override with BVBE_HTTP_PORT in .env if port 80 is taken.
+      - "${BVBE_HTTP_PORT:-80}:80"
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    # nginx resolves both upstreams at startup and exits if either
+    # hostname is missing.
     depends_on:
       - web
+      - ws-gateway
     networks:
       - bvbe-net
 
@@ -38,6 +42,9 @@ services:
       HINT_MODE: ${HINT_MODE:-false}
       SCOREBOARD_ENABLED: ${SCOREBOARD_ENABLED:-false}
       CTF_SALT: ${CTF_SALT:?CTF_SALT must be set. Copy .env.example to .env.}
+      # File-change events don't cross Docker Desktop bind mounts on
+      # Windows/macOS; poll so `next dev` still hot-reloads host edits.
+      WATCHPACK_POLLING: "true"
     volumes:
       # Bind mounts so `next dev` Fast Refresh sees host edits.
       # The anonymous-volume entries for node_modules / .next prevent
@@ -127,6 +134,8 @@ services:
       REDIS_URL: redis://redis:6379
       BITCOIN_MOCK_URL: http://bitcoin-mock:18443
       WEB_INTERNAL_URL: http://web:3000
+      ACTIVITY_SIM_ENABLED: ${ACTIVITY_SIM_ENABLED:-true}
+      ACTIVITY_SIM_EVERY_MS: ${ACTIVITY_SIM_EVERY_MS:-20000}
     volumes:
       - ./apps/worker:/repo/apps/worker
       - ./packages:/repo/packages

@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Container } from "@/components/ui/container";
-import { authedFetch } from "@/lib/token-storage";
+import { authedFetch, responseError } from "@/lib/token-storage";
 
 type Me = {
   id: string;
@@ -27,17 +27,26 @@ export default function ProfilePage() {
   const [displayName, setDisplayName] = useState("");
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
     (async () => {
-      const res = await authedFetch("/api/v2/me");
-      if (res.status === 401) {
-        router.replace("/login");
-        return;
+      try {
+        const res = await authedFetch("/api/v2/me");
+        if (res.status === 401) {
+          router.replace("/login");
+          return;
+        }
+        if (!res.ok) {
+          setLoadError(await responseError(res, "Could not load your profile."));
+          return;
+        }
+        const body = (await res.json()) as Me;
+        setMe(body);
+        setDisplayName(body.displayName ?? "");
+      } catch {
+        setLoadError("Could not load your profile.");
       }
-      const body = (await res.json()) as Me;
-      setMe(body);
-      setDisplayName(body.displayName ?? "");
     })();
   }, [router]);
 
@@ -51,12 +60,24 @@ export default function ProfilePage() {
       body: JSON.stringify({ displayName }),
     });
     if (!res.ok) {
-      setError("Save failed.");
+      setError(await responseError(res, "Save failed."));
       return;
     }
-    const body = (await res.json()) as Me;
-    setMe(body);
+    const body = (await res.json().catch(() => ({}))) as
+      | { user?: Partial<Me> }
+      | Partial<Me>;
+    const updated: Partial<Me> =
+      "user" in body && body.user ? body.user : (body as Partial<Me>);
+    setMe((m) => ({ ...m!, ...updated }));
     setMessage("Profile saved.");
+  }
+
+  if (loadError) {
+    return (
+      <Container className="py-10">
+        <p className="text-sell text-sm">{loadError}</p>
+      </Container>
+    );
   }
 
   if (!me) {

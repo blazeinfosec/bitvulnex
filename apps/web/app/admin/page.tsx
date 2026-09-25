@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { authedFetch } from "@/lib/token-storage";
+import { authedFetch, loadFailure } from "@/lib/token-storage";
 import { StatCard } from "@/components/exchange";
 
 type QueueStats = {
@@ -17,43 +17,58 @@ export default function AdminLanding() {
   const router = useRouter();
   const [ok, setOk] = useState(false);
   const [stats, setStats] = useState<QueueStats | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
     (async () => {
-      const res = await authedFetch("/api/v2/admin/kyc/queue");
-      if (res.status === 401 || res.status === 403) {
-        router.replace("/login");
+      const res = await authedFetch("/api/v2/admin/kyc/queue").catch(() => null);
+      const fail = await loadFailure(res);
+      if (fail) {
+        if (fail.redirect) router.replace("/login");
+        else setLoadError(fail.message);
         return;
       }
       setOk(true);
       // Best-effort stats: KYC queue count, ticket count, etc.
       try {
-        const kyc = res.ok
-          ? ((await res.clone().json()) as { queue?: unknown[] })
-          : { queue: [] };
+        const kyc = (await res!.clone().json()) as { queue?: unknown[] };
         const [t, c, d] = await Promise.all([
           authedFetch("/api/v2/admin/tickets"),
           authedFetch("/api/v2/admin/compliance/cases"),
           authedFetch("/api/v2/admin/treasury/drafts"),
         ]);
-        const tickets = t.ok ? ((await t.json()) as { tickets?: unknown[] }) : { tickets: [] };
+        type WithStatus = { status?: string };
+        const tickets = t.ok
+          ? ((await t.json()) as { tickets?: WithStatus[] })
+          : { tickets: [] };
         const cases = c.ok
-          ? ((await c.json()) as { cases?: unknown[] })
+          ? ((await c.json()) as { cases?: WithStatus[] })
           : { cases: [] };
         const drafts = d.ok
-          ? ((await d.json()) as { drafts?: unknown[] })
+          ? ((await d.json()) as { drafts?: WithStatus[] })
           : { drafts: [] };
+        const count = (rows: WithStatus[] | undefined, open: string[]) =>
+          (rows ?? []).filter((r) => !r.status || open.includes(r.status))
+            .length;
         setStats({
           kycPending: kyc.queue?.length ?? 0,
-          ticketsOpen: tickets.tickets?.length ?? 0,
-          complianceOpen: cases.cases?.length ?? 0,
-          treasuryDrafts: drafts.drafts?.length ?? 0,
+          ticketsOpen: count(tickets.tickets, [
+            "open",
+            "awaiting_user",
+            "awaiting_agent",
+          ]),
+          complianceOpen: count(cases.cases, ["open", "in_review", "escalated"]),
+          treasuryDrafts: count(drafts.drafts, ["drafted", "partial"]),
         });
       } catch {
         // ignore — stats are best-effort
       }
     })();
   }, [router]);
+
+  if (loadError) {
+    return <p className="text-sell text-sm">{loadError}</p>;
+  }
 
   if (!ok) {
     return <p className="text-text-dim">Loading…</p>;
@@ -82,7 +97,7 @@ export default function AdminLanding() {
           hint="Support inbox"
         />
         <StatCard
-          label="Compliance cases"
+          label="Open compliance cases"
           value={stats?.complianceOpen ?? "—"}
           hint="Open investigations"
         />

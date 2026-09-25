@@ -62,6 +62,31 @@ function aggKey(pair: string): string {
   return `bvbe.ui.book.agg.${pair}`;
 }
 
+function normalizeTrade(input: unknown): RecentTrade | null {
+  if (!input || typeof input !== "object") return null;
+  const t = input as Record<string, unknown>;
+  const price = Number(t.price);
+  const size = Number(t.size ?? t.amount ?? t.qty);
+  if (!Number.isFinite(price) || !Number.isFinite(size)) return null;
+  const executedAt =
+    typeof t.executedAt === "string" || typeof t.executedAt === "number"
+      ? t.executedAt
+      : typeof t.at === "string" || typeof t.at === "number"
+        ? t.at
+        : Date.now();
+  const side = t.takerSide ?? t.side;
+  return {
+    id:
+      typeof t.id === "string" || typeof t.id === "number"
+        ? t.id
+        : `${executedAt}-${price}-${size}`,
+    price,
+    size,
+    executedAt,
+    takerSide: side === "buy" || side === "sell" ? side : undefined,
+  };
+}
+
 export interface TradingClientProps {
   base: string;
   quote: string;
@@ -73,19 +98,26 @@ export function TradingClient({ base, quote }: TradingClientProps) {
   const info = useMemo(() => pairFromString(pair)!, [pair]);
   const presets = useMemo(() => aggregationPresets(info), [info]);
 
-  // Initial aggregation: localStorage override, else middle preset
-  const [aggregation, setAggregation] = useState<number>(() => {
-    if (typeof window === "undefined") return presets[1]!;
+  // Initial aggregation: middle preset on first render (matches SSR), then
+  // apply any localStorage override after mount.
+  const [aggregation, setAggregation] = useState<number>(() => presets[1]!);
+  const aggLoadedFor = useRef<string | null>(null);
+  useEffect(() => {
+    let next = presets[1]!;
     try {
       const raw = window.localStorage.getItem(aggKey(pair));
       const v = raw ? Number(raw) : NaN;
-      if (Number.isFinite(v) && presets.includes(v)) return v;
+      if (Number.isFinite(v) && presets.includes(v)) next = v;
     } catch {
       /* ignore */
     }
-    return presets[1]!;
-  });
+    aggLoadedFor.current = pair;
+    setAggregation(next);
+  }, [pair, presets]);
   useEffect(() => {
+    // Don't persist until the stored value for this pair has been read,
+    // otherwise the default would overwrite the saved preference.
+    if (aggLoadedFor.current !== pair) return;
     try {
       window.localStorage.setItem(aggKey(pair), String(aggregation));
     } catch {
@@ -211,8 +243,11 @@ export function TradingClient({ base, quote }: TradingClientProps) {
             book?: Book;
             bids?: RawLevel[];
             asks?: RawLevel[];
-            trades?: RecentTrade[];
-            trade?: RecentTrade;
+            trades?: unknown[];
+            trade?: unknown;
+            price?: unknown;
+            amount?: unknown;
+            size?: unknown;
             rows?: MarketRow[];
           };
           // The gateway publishes a few message shapes — handle both
@@ -232,7 +267,18 @@ export function TradingClient({ base, quote }: TradingClientProps) {
                 });
             }
           } else if (msg.kind === "trade" || msg.kind === "trades") {
-            const incoming = msg.trades ?? (msg.trade ? [msg.trade] : []);
+            // Accept `{trade: {...}}`, `{trades: [...]}` and the older flat
+            // `{price, amount}` shape.
+            const raw: unknown[] = Array.isArray(msg.trades)
+              ? msg.trades
+              : msg.trade && typeof msg.trade === "object"
+                ? [msg.trade]
+                : msg.price !== undefined
+                  ? [msg]
+                  : [];
+            const incoming = raw
+              .map(normalizeTrade)
+              .filter((t): t is RecentTrade => t !== null);
             if (incoming.length > 0) {
               setRecent((prev) => [...incoming, ...prev].slice(0, 50));
             }
@@ -264,7 +310,11 @@ export function TradingClient({ base, quote }: TradingClientProps) {
                 };
               });
             });
-          } else if (msg.kind === "private" || msg.channel === `private:${me?.id}`) {
+          } else if (
+            msg.kind === "user_update" ||
+            msg.kind === "private" ||
+            (me?.id && msg.channel === `private:${me.id}`)
+          ) {
             // Own-order events → trigger refresh of orders + balances
             setRefreshKey((k) => k + 1);
             void refreshBalances();

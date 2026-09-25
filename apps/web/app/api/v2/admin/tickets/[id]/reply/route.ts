@@ -39,11 +39,18 @@ export async function POST(
   const parsed = await readJson(req, schema);
   if (parsed.error) return parsed.error;
   const { id } = await ctx.params;
-  const msg = await replyToTicket({
-    ticketId: id,
-    authorId: claims.sub,
-    isAgent: true,
-    body: parsed.data.body,
-  });
-  return NextResponse.json({ message: msg });
+  try {
+    const msg = await replyToTicket({
+      ticketId: id,
+      authorId: claims.sub,
+      isAgent: true,
+      body: parsed.data.body,
+    });
+    return NextResponse.json({ message: msg });
+  } catch (e) {
+    if (e instanceof Error && e.message === "ticket not found") {
+      return jsonError(404, "not found");
+    }
+    throw e;
+  }
 }

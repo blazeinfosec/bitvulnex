@@ -11,6 +11,8 @@ import {
   amountInputClass,
   InlineMessage,
   formatDecimal,
+  failureMessage,
+  normalizeAmount,
 } from "./modal-shared";
 
 export interface RepayModalProps {
@@ -141,14 +143,13 @@ export function RepayModal({
       const res = await authedFetch("/api/v2/me/lending/repay", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ positionId, amount }),
+        body: JSON.stringify({ positionId, amount: normalizeAmount(amount) }),
       });
       if (res.ok) {
         onSuccess();
         onClose();
       } else {
-        const body = await res.text();
-        setError(`Repay failed (${res.status}): ${body || "unknown error"}`);
+        setError(await failureMessage(res, "Repay"));
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Network error");

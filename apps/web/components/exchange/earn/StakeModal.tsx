@@ -11,6 +11,8 @@ import {
   amountInputClass,
   InlineMessage,
   formatDecimal,
+  failureMessage,
+  normalizeAmount,
 } from "./modal-shared";
 
 export interface StakeModalProps {
@@ -63,14 +65,13 @@ export function StakeModal({
       const res = await authedFetch("/api/v2/me/staking/stake", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ asset, amount }),
+        body: JSON.stringify({ asset, amount: normalizeAmount(amount) }),
       });
       if (res.ok) {
         onSuccess();
         onClose();
       } else {
-        const body = await res.text();
-        setError(`Stake failed (${res.status}): ${body || "unknown error"}`);
+        setError(await failureMessage(res, "Stake"));
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Network error");

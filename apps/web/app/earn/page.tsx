@@ -144,16 +144,28 @@ type ModalState =
       windows: number;
     };
 
-/** USD price for an asset. USDC/USDT pegged to 1.00; others computed from
- * `<ASSET>/USDT` market last price. Returns null if not derivable. */
+/** USD price for an asset. USDT is the quote unit (1.00); others are
+ * computed from the `<ASSET>/USDT` market last price, or the inverse of a
+ * `USDT/<ASSET>` market. USDC falls back to a 1.00 peg only when no market
+ * is listed. Returns null if not derivable. */
 function priceInUsd(asset: string, markets: Market[]): number | null {
-  if (asset === "USDT" || asset === "USDC") return 1;
-  const pair = markets.find(
+  if (asset === "USDT") return 1;
+  const direct = markets.find(
     (m) => m.base === asset && m.quote === "USDT" && m.last,
   );
-  if (!pair?.last) return null;
-  const n = Number(pair.last);
-  return Number.isFinite(n) ? n : null;
+  if (direct?.last) {
+    const n = Number(direct.last);
+    if (Number.isFinite(n) && n > 0) return n;
+  }
+  const inverse = markets.find(
+    (m) => m.base === "USDT" && m.quote === asset && m.last,
+  );
+  if (inverse?.last) {
+    const n = Number(inverse.last);
+    if (Number.isFinite(n) && n > 0) return 1 / n;
+  }
+  if (asset === "USDC") return 1;
+  return null;
 }
 
 function usd(value: number | null): string {
@@ -231,6 +243,17 @@ function EarnPageInner() {
 
   const loadAll = useCallback(async () => {
     setLoading(true);
+    try {
+      await loadAllInner();
+    } catch {
+      setToast({ kind: "err", text: "Could not load Earn data. Please retry." });
+    } finally {
+      setLoading(false);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  async function loadAllInner() {
     // Public data first — does not require auth.
     const [poolsRes, programsRes, marketsRes] = await Promise.all([
       fetch("/api/v2/public/lending/pools"),
@@ -254,7 +277,6 @@ function EarnPageInner() {
     const meRes = await authedFetch("/api/v2/me");
     if (meRes.status === 401) {
       setAuthed(false);
-      setLoading(false);
       return;
     }
     setAuthed(true);
@@ -280,8 +302,7 @@ function EarnPageInner() {
       const b = (await stakeRes.json()) as { positions: StakingPosition[] };
       setStakingPositions(b.positions);
     }
-    setLoading(false);
-  }, []);
+  }
 
   useEffect(() => {
     void loadAll();
@@ -1119,8 +1140,12 @@ function StakingTab({
       header: "Action",
       align: "right",
       render: (p) => {
+        // Ended positions keep their unclaimed rewards claimable, even
+        // though no new windows accrue.
         const claimDisabled =
-          actionDisabled || Number(p.accrued) <= 0 || p.accruedWindows === 0;
+          actionDisabled ||
+          Number(p.accrued) <= 0 ||
+          (p.status === "active" && p.accruedWindows === 0);
         const unstakeDisabled = actionDisabled || p.status !== "active";
         return (
           <div className="flex justify-end gap-2">

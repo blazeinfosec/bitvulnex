@@ -22,14 +22,37 @@ export async function publishBookUpdate(pair: string): Promise<void> {
   );
 }
 
+export type PublishedTrade = {
+  id: number;
+  price: string;
+  amount: string;
+  executedAt: Date;
+};
+
+// Same envelope the worker's market-maker publishes, so the client's
+// RecentTrade consumer handles both sources:
+// {kind:"trade", pair, trade:{id, price, size, executedAt, takerSide}}.
 export async function publishTrade(
   pair: string,
-  price: string,
-  amount: string,
+  trade: PublishedTrade,
+  takerSide: "buy" | "sell",
 ): Promise<void> {
+  const price = Number(trade.price);
+  const size = Number(trade.amount);
   await publisher().publish(
     `trades:${pair}`,
-    JSON.stringify({ kind: "trade", pair, price, amount, at: new Date().toISOString() }),
+    JSON.stringify({
+      kind: "trade",
+      pair,
+      trade: {
+        id: trade.id,
+        price: Number.isFinite(price) ? price : 0,
+        size: Number.isFinite(size) ? size : 0,
+        executedAt: trade.executedAt.toISOString(),
+        takerSide,
+      },
+      at: new Date().toISOString(),
+    }),
   );
 }
 

@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { authedFetch } from "@/lib/token-storage";
+import { authedFetch, loadFailure } from "@/lib/token-storage";
 
 type TicketRow = {
   id: string;
@@ -29,15 +29,19 @@ function statusClass(s: string) {
 
 export default function AdminTicketsPage() {
   const router = useRouter();
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [tickets, setTickets] = useState<TicketRow[] | null>(null);
 
   useEffect(() => {
     (async () => {
       const res = await authedFetch("/api/v2/admin/tickets");
-      if (res.status === 401 || res.status === 403) {
-        router.replace("/login");
+      const fail = await loadFailure(res);
+      if (fail) {
+        if (fail.redirect) router.replace("/login");
+        else setLoadError(fail.message);
         return;
       }
+      setLoadError(null);
       const body = (await res.json()) as { tickets: TicketRow[] };
       setTickets(body.tickets);
     })();
@@ -54,8 +58,12 @@ export default function AdminTicketsPage() {
         </p>
       </div>
 
-      <div className="rounded-lg border border-border bg-bg-elevated overflow-hidden">
-        {!tickets ? (
+      <div className="rounded-lg border border-border bg-bg-elevated overflow-x-auto">
+        {!tickets && loadError ? (
+          <p className="px-4 py-10 text-center text-sell text-sm">
+            {loadError}
+          </p>
+        ) : !tickets ? (
           <p className="px-4 py-10 text-center text-text-mute text-sm">
             Loading…
           </p>

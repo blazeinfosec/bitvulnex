@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Container } from "@/components/ui/container";
-import { authedFetch } from "@/lib/token-storage";
+import { authedFetch, responseError } from "@/lib/token-storage";
 import { DataTable, type Column, EmptyState } from "@/components/exchange";
 
 type DepositRow = {
@@ -20,7 +20,9 @@ type DepositRow = {
 
 type BalanceRow = { asset: string; amount: string; updatedAt: string };
 
-const ASSETS = ["BTC", "ETH", "LTC", "USDT", "USDC"] as const;
+// On-chain deposits are BTC-only in the lab (regtest node). Other assets
+// are acquired by trading or internal transfer.
+const ASSETS = ["BTC"] as const;
 
 const inputClass =
   "w-full h-10 px-3 rounded-md bg-bg border border-border text-text placeholder:text-text-mute font-mono focus:outline-none focus:ring-2 focus:ring-accent focus:border-accent transition-colors";
@@ -56,10 +58,7 @@ export default function WalletDepositPage() {
       return;
     }
     if (!addrRes.ok) {
-      const body = (await addrRes.json().catch(() => ({}))) as {
-        error?: { message?: string };
-      };
-      setError(body.error?.message ?? "Could not load address");
+      setError(await responseError(addrRes, "Could not load address"));
     } else {
       const a = (await addrRes.json()) as { address: string };
       setAddress(a.address);
@@ -237,6 +236,10 @@ export default function WalletDepositPage() {
             <h2 className="text-xs uppercase tracking-wider text-text-mute font-medium mb-3">
               Select asset
             </h2>
+            <p className="text-xs text-text-mute mb-3">
+              On-chain deposits are available for BTC only. ETH, LTC, USDT and
+              USDC balances can be acquired by trading or internal transfer.
+            </p>
             <div className="flex flex-wrap gap-2">
               {ASSETS.map((a) => (
                 <button
@@ -264,9 +267,7 @@ export default function WalletDepositPage() {
                 type="button"
                 className="px-3 py-1.5 rounded-md bg-accent text-accent-fg font-mono text-sm font-semibold"
               >
-                {asset === "USDT" || asset === "USDC"
-                  ? `${asset} (regtest)`
-                  : `${asset} (regtest)`}
+                {`${asset} (regtest)`}
               </button>
               <span className="text-xs text-text-mute">
                 Lab environment — mainnet networks disabled.
@@ -298,6 +299,8 @@ export default function WalletDepositPage() {
                   <strong>1-3</strong> depending on tier.
                 </div>
               </>
+            ) : error ? (
+              <p className="text-sm text-sell">{error}</p>
             ) : (
               <p className="text-sm text-text-dim">Loading address…</p>
             )}

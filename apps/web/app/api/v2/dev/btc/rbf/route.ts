@@ -7,7 +7,7 @@ import { z } from "zod";
 import { userFromAuthorization } from "@/lib/auth";
 import { jsonError, readJson } from "@/lib/api";
 import { env } from "@/lib/env";
-import { callMockAffordance } from "@/lib/btc-rpc-client";
+import { callMockAffordance, MockAffordanceError } from "@/lib/btc-rpc-client";
 
 export const dynamic = "force-dynamic";
 
@@ -25,10 +25,16 @@ export async function POST(req: Request) {
   const parsed = await readJson(req, schema);
   if (parsed.error) return parsed.error;
 
-  const result = await callMockAffordance<{ replacementTxid: string }>(
-    "/test/rbf",
-    parsed.data,
-  );
+  let result: { replacementTxid: string };
+  try {
+    result = await callMockAffordance<{ replacementTxid: string }>(
+      "/test/rbf",
+      parsed.data,
+    );
+  } catch (e) {
+    if (e instanceof MockAffordanceError) return jsonError(e.status, e.message);
+    throw e;
+  }
   return NextResponse.json({
     ...result,
     note: "lab affordance — RBF-replaces a mempool tx",

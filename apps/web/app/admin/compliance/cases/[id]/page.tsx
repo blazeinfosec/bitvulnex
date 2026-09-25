@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { authedFetch } from "@/lib/token-storage";
+import { authedFetch, loadFailure } from "@/lib/token-storage";
 
 type Detail = {
   case: {
@@ -28,6 +28,7 @@ const primaryBtn =
 
 export default function ComplianceCaseDetail() {
   const router = useRouter();
+  const [loadError, setLoadError] = useState<string | null>(null);
   const params = useParams<{ id: string }>();
   const [data, setData] = useState<Detail | null>(null);
   const [exportName, setExportName] = useState("");
@@ -36,10 +37,13 @@ export default function ComplianceCaseDetail() {
     const res = await authedFetch(
       `/api/v2/admin/compliance/cases/${params.id}`,
     );
-    if (res.status === 401 || res.status === 403) {
-      router.replace("/login");
+    const fail = await loadFailure(res);
+    if (fail) {
+      if (fail.redirect) router.replace("/login");
+      else setLoadError(fail.message);
       return;
     }
+    setLoadError(null);
     setData((await res.json()) as Detail);
   }
 
@@ -62,6 +66,7 @@ export default function ComplianceCaseDetail() {
     alert(JSON.stringify(body));
   }
 
+  if (!data && loadError) return <p className="text-sell text-sm">{loadError}</p>;
   if (!data) return <p className="text-text-dim">Loading…</p>;
 
   return (

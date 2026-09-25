@@ -19,8 +19,14 @@ export async function claimRewards(
   args: ClaimArgs,
   db: ClaimDb = defaultPrisma,
 ): Promise<{ credited: string; rows: number }> {
+  // Rewards accrued before an unstake stay claimable, so an unstaking
+  // or ended position still resolves here.
   const pos = await db.stakingPosition.findFirst({
-    where: { id: args.positionId, userId: args.userId, status: "active" },
+    where: {
+      id: args.positionId,
+      userId: args.userId,
+      status: { in: ["active", "unstaking", "ended"] },
+    },
   });
   if (!pos) throw new Error("position not found");
 

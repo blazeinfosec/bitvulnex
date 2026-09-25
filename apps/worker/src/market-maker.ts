@@ -53,7 +53,7 @@ const MM_BETA_EMAIL = "mm.beta@bvbe.local";
 
 export type MmDb = Pick<
   typeof prisma,
-  "tradingPair" | "trade" | "order" | "balance" | "user"
+  "tradingPair" | "trade" | "order" | "balance" | "user" | "$queryRaw"
 >;
 
 export type MmPubSub = {
@@ -69,11 +69,11 @@ export function normalSample(sigma: number, rng: () => number = Math.random): nu
   return z * sigma;
 }
 
-// Round `price` to the nearest multiple of `tick` (DOWN; tick is the
+// Round `price` to the nearest multiple of `tick` (half-up; tick is the
 // price increment).
 export function roundToTick(price: Prisma.Decimal, tick: Prisma.Decimal): Prisma.Decimal {
   if (tick.lte(0)) return price;
-  // n = floor(price / tick); rounded = n * tick
+  // n = round_half_up(price / tick); rounded = n * tick
   const n = price.div(tick).toDecimalPlaces(0, Prisma.Decimal.ROUND_HALF_UP);
   return n.mul(tick);
 }
@@ -112,15 +112,20 @@ async function lastTradePrice(db: MmDb, pair: string): Promise<Prisma.Decimal> {
   return D(PAIR_SEED_PRICE[pair] ?? "1");
 }
 
-// Compute the next price via a multiplicative random walk and round
-// down to the pair's price tick. Exposed for tests.
+// Compute the next price via a log-normal random walk and round to the
+// nearest multiple of the pair's price tick. Exposed for tests.
+//
+// The step is exp(sigma * Z): the log-return is exactly N(0, sigma), so
+// the walk has no systematic drift in log space. (A linear `1 + N(0, sigma)`
+// shock has E[log] ~= -sigma^2/2 per tick, which at a 2s cadence walks the
+// typical path steadily downward over a long session.)
 export function nextPrice(
   last: Prisma.Decimal,
   sigma: number,
   tick: Prisma.Decimal,
   rng: () => number = Math.random,
 ): Prisma.Decimal {
-  const shock = 1 + normalSample(sigma, rng);
+  const shock = Math.exp(normalSample(sigma, rng));
   const raw = last.mul(D(shock));
   const rounded = roundToTick(raw, tick);
   // Never let the price go non-positive (extreme tail of the walk).
@@ -144,15 +149,13 @@ async function refreshBook(
   midPrice: Prisma.Decimal,
   rng: () => number,
 ): Promise<BookSnapshot> {
-  const tenSecondsAgo = new Date(Date.now() - 10_000);
-
-  // Cancel stale MM orders (older than 10s) for this pair.
+  // Pull every resting MM quote for this pair before re-quoting, so the
+  // DB book only ever holds the current generation of levels.
   await db.order.updateMany({
     where: {
       pair,
       userId: { in: [alphaId, betaId] },
       status: { in: ["open", "partial"] },
-      createdAt: { lt: tenSecondsAgo },
     },
     data: { status: "cancelled", cancelledAt: new Date() },
   });
@@ -339,7 +342,10 @@ async function computeTickerAll(db: MmDb): Promise<TickerRow[]> {
   const rows: TickerRow[] = [];
   for (const tp of pairs) {
     const pair = `${tp.base}/${tp.quote}`;
-    const [last, first, trades] = await Promise.all([
+    // last/open are single-row index lookups; 24h quote volume is summed
+    // in Postgres over the (pair, executedAt) index instead of pulling
+    // every trade row into the worker each tick.
+    const [last, first, volRows] = await Promise.all([
       db.trade.findFirst({
         where: { pair },
         orderBy: { executedAt: "desc" },
@@ -350,19 +356,17 @@ async function computeTickerAll(db: MmDb): Promise<TickerRow[]> {
         orderBy: { executedAt: "asc" },
         select: { price: true },
       }),
-      db.trade.findMany({
-        where: { pair, executedAt: { gte: since } },
-        select: { price: true, amount: true },
-      }),
+      db.$queryRaw<Array<{ vol: string | null }>>(Prisma.sql`
+        SELECT SUM(price * amount)::text AS vol
+        FROM trades
+        WHERE pair = ${pair} AND "executedAt" >= ${since}
+      `),
     ]);
     const lastStr = last?.price?.toString() ?? PAIR_SEED_PRICE[pair] ?? "0";
     const firstNum = Number(first?.price?.toString() ?? lastStr);
     const lastNum = Number(lastStr);
     const change = firstNum > 0 ? ((lastNum - firstNum) / firstNum) * 100 : 0;
-    const vol = trades.reduce(
-      (acc, t) => acc.add(t.price.mul(t.amount)),
-      new Prisma.Decimal(0),
-    );
+    const vol = D(volRows[0]?.vol ?? "0");
     rows.push({
       pair,
       last: lastStr,

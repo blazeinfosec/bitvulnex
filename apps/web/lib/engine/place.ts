@@ -13,6 +13,13 @@ import { publishBookUpdate, publishTrade, publishUserUpdate } from "./pubsub";
 
 const D = (v: Prisma.Decimal | string | number) => new Prisma.Decimal(v);
 
+type ExecutedTrade = {
+  id: number;
+  price: string;
+  amount: string;
+  executedAt: Date;
+};
+
 type PlaceArgs = {
   userId: string;
   pair: string; // "BTC/USDT"
@@ -46,7 +53,7 @@ export async function placeOrder(args: PlaceArgs): Promise<{ orderId: number }> 
   // sell locks base.
   const lockAsset = args.side === "buy" ? quote : base;
 
-  const orderId = await prisma.$transaction(async (tx) => {
+  const result = await prisma.$transaction(async (tx) => {
     // Pull the resting book (opposite side, open/partial limit orders)
     // up front so we can size the balance lock against the actual fills
     // rather than a best-price estimate.
@@ -57,6 +64,13 @@ export async function placeOrder(args: PlaceArgs): Promise<{ orderId: number }> 
         status: { in: ["open", "partial"] },
         type: { in: ["limit"] }, // only limit orders rest in the book
       },
+      // Best price first, then time priority within a level, so the
+      // `take` window always holds the top of the book.
+      orderBy: [
+        { price: args.side === "buy" ? "asc" : "desc" },
+        { createdAt: "asc" },
+        { id: "asc" },
+      ],
       take: 200,
     });
     const resting: RestingOrder[] = restingRaw.map((r) => ({
@@ -137,11 +151,13 @@ export async function placeOrder(args: PlaceArgs): Promise<{ orderId: number }> 
     });
 
     // Apply matches: write trades, settle balances, update maker orders.
+    const executed: ExecutedTrade[] = [];
     for (const m of matches) {
-      const makerFeeBps = FEE_TABLE[args.feeTier].makerBps;
+      const makerOrder = restingRaw.find((r) => r.id === m.makerOrderId)!;
+      const makerFeeBps = (FEE_TABLE[makerOrder.feeTier as FeeTier] ?? FEE_TABLE.base).makerBps;
       const takerFeeBps = FEE_TABLE[args.feeTier].takerBps;
 
-      await tx.trade.create({
+      const trade = await tx.trade.create({
         data: {
           pair: args.pair,
           takerOrderId: order.id,
@@ -153,6 +169,12 @@ export async function placeOrder(args: PlaceArgs): Promise<{ orderId: number }> 
           takerFeeBps,
           makerFeeBps,
         },
+      });
+      executed.push({
+        id: trade.id,
+        price: m.price.toString(),
+        amount: m.amount.toString(),
+        executedAt: trade.executedAt,
       });
 
       // Settle: move locked → away, credit counter-asset net of fee.
@@ -169,12 +191,14 @@ export async function placeOrder(args: PlaceArgs): Promise<{ orderId: number }> 
       const takerCreditAsset = args.side === "buy" ? base : quote;
       await tx.balance.update({
         where: { userId_asset: { userId: args.userId, asset: lockAsset } },
-        data: { locked: { decrement: takerLockRelease } },
+        data: {
+          locked: { decrement: takerLockRelease },
+          amount: { decrement: takerLockRelease },
+        },
       });
       await upsertBalance(tx, args.userId, takerCreditAsset, takerCredit);
 
       // Maker — opposite asset flow
-      const makerOrder = restingRaw.find((r) => r.id === m.makerOrderId)!;
       const makerLockAsset = makerOrder.side === "buy" ? quote : base;
       const makerLockRelease = makerOrder.side === "buy"
         ? m.price.mul(m.amount)
@@ -186,7 +210,10 @@ export async function placeOrder(args: PlaceArgs): Promise<{ orderId: number }> 
       const makerCreditAsset = makerOrder.side === "buy" ? base : quote;
       await tx.balance.update({
         where: { userId_asset: { userId: makerOrder.userId, asset: makerLockAsset } },
-        data: { locked: { decrement: makerLockRelease } },
+        data: {
+          locked: { decrement: makerLockRelease },
+          amount: { decrement: makerLockRelease },
+        },
       });
       await upsertBalance(tx, makerOrder.userId, makerCreditAsset, makerCredit);
 
@@ -200,9 +227,16 @@ export async function placeOrder(args: PlaceArgs): Promise<{ orderId: number }> 
       });
     }
 
-    // Update taker order filled/status
-    const takerStatus =
-      filled.gte(amount) ? "filled" : filled.gt(0) ? "partial" : "open";
+    // Update taker order filled/status. A market order never rests, so
+    // whatever it couldn't fill is cancelled rather than left `partial`
+    // (which would keep it listed among open orders forever).
+    const takerStatus = filled.gte(amount)
+      ? "filled"
+      : args.type === "market"
+        ? "cancelled"
+        : filled.gt(0)
+          ? "partial"
+          : "open";
     await tx.order.update({
       where: { id: order.id },
       data: { filled, status: takerStatus },
@@ -235,14 +269,17 @@ export async function placeOrder(args: PlaceArgs): Promise<{ orderId: number }> 
       });
     }
 
-    return order.id;
+    return { id: order.id, executed };
   });
 
   // Fire-and-forget WS broadcasts (outside the tx)
+  for (const t of result.executed) {
+    publishTrade(args.pair, t, args.side).catch(() => {});
+  }
   publishBookUpdate(args.pair).catch(() => {});
   publishUserUpdate(args.userId).catch(() => {});
 
-  return { orderId };
+  return { orderId: result.id };
 }
 
 async function upsertBalance(

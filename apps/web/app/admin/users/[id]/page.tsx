@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { authedFetch } from "@/lib/token-storage";
+import { authedFetch, loadFailure, responseError } from "@/lib/token-storage";
 
 type UserDetail = {
   user: {
@@ -42,17 +42,23 @@ const dangerBtn =
 
 export default function AdminUserDetailPage() {
   const router = useRouter();
+  const [loadError, setLoadError] = useState<string | null>(null);
   const params = useParams<{ id: string }>();
   const [data, setData] = useState<UserDetail | null>(null);
   const [adjAsset, setAdjAsset] = useState("BTC");
   const [adjDelta, setAdjDelta] = useState("");
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [actionOk, setActionOk] = useState<string | null>(null);
 
   async function load() {
     const res = await authedFetch(`/api/v2/admin/users/${params.id}`);
-    if (res.status === 401 || res.status === 403) {
-      router.replace("/login");
+    const fail = await loadFailure(res);
+    if (fail) {
+      if (fail.redirect) router.replace("/login");
+      else setLoadError(fail.message);
       return;
     }
+    setLoadError(null);
     setData((await res.json()) as UserDetail);
   }
 
@@ -61,6 +67,7 @@ export default function AdminUserDetailPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [params.id]);
 
+  if (!data && loadError) return <p className="text-sell text-sm">{loadError}</p>;
   if (!data) return <p className="text-text-dim">Loading…</p>;
 
   const u = data.user;
@@ -70,19 +77,33 @@ export default function AdminUserDetailPage() {
       : (u.displayName ?? "");
 
   async function freeze(action: "freeze" | "unfreeze") {
-    await authedFetch(`/api/v2/admin/users/${params.id}/${action}`, {
+    setActionError(null);
+    setActionOk(null);
+    const res = await authedFetch(`/api/v2/admin/users/${params.id}/${action}`, {
       method: "POST",
     });
+    if (!res.ok) {
+      setActionError(await responseError(res, `${action} failed.`));
+      return;
+    }
+    setActionOk(action === "freeze" ? "Account frozen." : "Account unfrozen.");
     await load();
   }
 
   async function adjust() {
-    await authedFetch(`/api/v2/admin/users/${params.id}/balance-adjust`, {
+    setActionError(null);
+    setActionOk(null);
+    const res = await authedFetch(`/api/v2/admin/users/${params.id}/balance-adjust`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ asset: adjAsset, delta: adjDelta }),
     });
+    if (!res.ok) {
+      setActionError(await responseError(res, "Balance adjustment failed."));
+      return;
+    }
     setAdjDelta("");
+    setActionOk("Balance adjusted.");
     await load();
   }
 
@@ -111,7 +132,7 @@ export default function AdminUserDetailPage() {
         <h2 className="text-xs uppercase tracking-wider text-text-mute font-medium mb-2">
           Balances
         </h2>
-        <div className="rounded-lg border border-border bg-bg-elevated overflow-hidden">
+        <div className="rounded-lg border border-border bg-bg-elevated overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-border">
@@ -154,6 +175,8 @@ export default function AdminUserDetailPage() {
 
       <section className="rounded-lg border border-border bg-bg-elevated p-5 space-y-4">
         <h2 className="text-sm font-semibold text-text">Internal actions</h2>
+        {actionError && <p className="text-sell text-sm">{actionError}</p>}
+        {actionOk && <p className="text-buy text-sm">{actionOk}</p>}
 
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-xs uppercase tracking-wider text-text-mute font-medium w-32">

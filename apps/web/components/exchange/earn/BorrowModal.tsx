@@ -11,6 +11,8 @@ import {
   amountInputClass,
   InlineMessage,
   formatDecimal,
+  failureMessage,
+  normalizeAmount,
 } from "./modal-shared";
 
 export interface BorrowAvailableAsset {
@@ -34,6 +36,14 @@ export interface BorrowModalProps {
 // (lib/lending/borrow.ts) values both legs in USDT before comparing; the
 // modal mirrors that math so the preview matches what submission accepts.
 const LTV_RATIO = 1.5;
+// Prices move between the preview and the server-side check; post a small
+// cushion above the minimum so a tick against us doesn't reject the loan.
+const COLLATERAL_BUFFER = 1.01;
+const EFFECTIVE_RATIO = LTV_RATIO * COLLATERAL_BUFFER;
+
+function ceil8(n: number): number {
+  return Math.ceil(n * 1e8 - 1e-6) / 1e8;
+}
 
 export function BorrowModal({
   open,
@@ -74,7 +84,7 @@ export function BorrowModal({
   const pricesOk = borrowPrice !== null && collateralPrice !== null;
   const collateralNeeded =
     amountValid && pricesOk && collateralPrice! > 0
-      ? (amountNum * borrowPrice!) / collateralPrice! * LTV_RATIO
+      ? ceil8(((amountNum * borrowPrice!) / collateralPrice!) * EFFECTIVE_RATIO)
       : 0;
   const collateralAvail = Number(
     collateralOptions.find((c) => c.asset === collateralAsset)?.available ?? "0",
@@ -93,7 +103,7 @@ export function BorrowModal({
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
           asset,
-          amount,
+          amount: normalizeAmount(amount),
           collateralAsset,
           collateralAmount: collateralNeeded.toFixed(8),
         }),
@@ -102,8 +112,7 @@ export function BorrowModal({
         onSuccess();
         onClose();
       } else {
-        const body = await res.text();
-        setError(`Borrow failed (${res.status}): ${body || "unknown error"}`);
+        setError(await failureMessage(res, "Borrow"));
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Network error");
@@ -182,7 +191,7 @@ export function BorrowModal({
                 ? (
                     (collateralAvail * collateralPrice!) /
                     borrowPrice! /
-                    LTV_RATIO
+                    EFFECTIVE_RATIO
                   ).toFixed(8)
                 : "0"
             }

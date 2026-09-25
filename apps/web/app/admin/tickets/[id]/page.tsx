@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { authedFetch } from "@/lib/token-storage";
+import { authedFetch, loadFailure, responseError } from "@/lib/token-storage";
 
 type Message = {
   id: string;
@@ -32,16 +32,22 @@ const dangerBtn =
 
 export default function AdminTicketDetail() {
   const router = useRouter();
+  const [loadError, setLoadError] = useState<string | null>(null);
   const params = useParams<{ id: string }>();
   const [data, setData] = useState<Detail | null>(null);
   const [reply, setReply] = useState("");
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [sending, setSending] = useState(false);
 
   async function load() {
     const res = await authedFetch(`/api/v2/admin/tickets/${params.id}`);
-    if (res.status === 401 || res.status === 403) {
-      router.replace("/login");
+    const fail = await loadFailure(res);
+    if (fail) {
+      if (fail.redirect) router.replace("/login");
+      else setLoadError(fail.message);
       return;
     }
+    setLoadError(null);
     setData((await res.json()) as Detail);
   }
 
@@ -51,24 +57,41 @@ export default function AdminTicketDetail() {
   }, [params.id]);
 
   async function send() {
-    await authedFetch(`/api/v2/admin/tickets/${params.id}/reply`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ body: reply }),
-    });
-    setReply("");
-    await load();
+    setActionError(null);
+    setSending(true);
+    try {
+      const res = await authedFetch(`/api/v2/admin/tickets/${params.id}/reply`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ body: reply }),
+      });
+      if (!res.ok) {
+        // Keep the draft so the agent doesn't lose their reply.
+        setActionError(await responseError(res, "Reply failed."));
+        return;
+      }
+      setReply("");
+      await load();
+    } finally {
+      setSending(false);
+    }
   }
 
   async function changeStatus(status: string) {
-    await authedFetch(`/api/v2/admin/tickets/${params.id}/status`, {
+    setActionError(null);
+    const res = await authedFetch(`/api/v2/admin/tickets/${params.id}/status`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ status }),
     });
+    if (!res.ok) {
+      setActionError(await responseError(res, "Status change failed."));
+      return;
+    }
     await load();
   }
 
+  if (!data && loadError) return <p className="text-sell text-sm">{loadError}</p>;
   if (!data) return <p className="text-text-dim">Loading…</p>;
 
   return (
@@ -127,6 +150,7 @@ export default function AdminTicketDetail() {
 
       <section className="rounded-lg border border-border bg-bg-elevated p-5 space-y-3">
         <h2 className="text-sm font-semibold text-text">Agent reply</h2>
+        {actionError && <p className="text-sell text-sm">{actionError}</p>}
         <textarea
           value={reply}
           onChange={(e) => setReply(e.target.value)}
@@ -135,8 +159,13 @@ export default function AdminTicketDetail() {
           className="w-full rounded-md bg-bg border border-border text-text placeholder:text-text-mute p-3 text-sm focus:outline-none focus:ring-2 focus:ring-accent focus:border-accent transition-colors"
         />
         <div className="flex flex-wrap items-center gap-2">
-          <button type="button" className={primaryBtn} onClick={send}>
-            Send reply
+          <button
+            type="button"
+            className={primaryBtn}
+            onClick={send}
+            disabled={sending || !reply.trim()}
+          >
+            {sending ? "Sending…" : "Send reply"}
           </button>
           <button
             type="button"

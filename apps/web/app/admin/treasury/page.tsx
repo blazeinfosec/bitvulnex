@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { authedFetch } from "@/lib/token-storage";
+import { useRouter } from "next/navigation";
+import { authedFetch, responseError } from "@/lib/token-storage";
 
 type DraftRow = {
   id: string;
@@ -40,6 +41,7 @@ function statusClass(s: string) {
 }
 
 export default function AdminTreasuryPage() {
+  const router = useRouter();
   const [drafts, setDrafts] = useState<DraftRow[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [outputAddress, setOutputAddress] = useState("bcrt1qhotwallet");
@@ -49,11 +51,16 @@ export default function AdminTreasuryPage() {
 
   async function loadDrafts() {
     const res = await authedFetch("/api/v2/admin/treasury/drafts");
+    if (res.status === 401) {
+      router.replace("/login");
+      return;
+    }
+    if (res.status === 403) {
+      setError("You don't have access to this page.");
+      return;
+    }
     if (!res.ok) {
-      const body = (await res.json().catch(() => ({}))) as {
-        error?: { message?: string };
-      };
-      setError(body.error?.message ?? "could not load drafts");
+      setError(await responseError(res, "could not load drafts"));
       return;
     }
     const body = (await res.json()) as { drafts: DraftRow[] };
@@ -79,7 +86,11 @@ export default function AdminTreasuryPage() {
         intentNote,
       }),
     });
-    if (res.ok) loadDrafts();
+    if (!res.ok) {
+      setError(await responseError(res, "could not create draft"));
+      return;
+    }
+    await loadDrafts();
   }
 
   async function sign(id: string) {
@@ -87,7 +98,11 @@ export default function AdminTreasuryPage() {
       `/api/v2/admin/treasury/drafts/${encodeURIComponent(id)}/sign`,
       { method: "POST" },
     );
-    if (res.ok) loadDrafts();
+    if (!res.ok) {
+      setError(await responseError(res, "sign failed"));
+      return;
+    }
+    await loadDrafts();
   }
 
   async function broadcast(id: string) {
@@ -104,7 +119,11 @@ export default function AdminTreasuryPage() {
         body: JSON.stringify(body),
       },
     );
-    if (res.ok) loadDrafts();
+    if (!res.ok) {
+      setError(await responseError(res, "broadcast failed"));
+      return;
+    }
+    await loadDrafts();
   }
 
   return (
