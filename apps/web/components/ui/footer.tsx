@@ -12,7 +12,8 @@ export function Footer() {
           </div>
           <p className="text-xs text-text-mute max-w-md">
             Bitvulnex — a deliberately vulnerable Bitcoin exchange for
-            training. Do not deploy. Never use real funds.
+            training. Run it only in isolated test environments; never on a
+            public network or with real funds.
           </p>
         </div>
         <div className="flex flex-col gap-2 text-xs">

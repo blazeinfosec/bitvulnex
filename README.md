@@ -1,10 +1,12 @@
 # Bitvulnex — Vulnerable Bitcoin Exchange
 
-> 🚨 **DO NOT DEPLOY.** Bitvulnex is a deliberately vulnerable application
-> built by [Blaze Information Security](https://www.blazeinfosec.com/)
-> for authorized security training. Security flaws are *intentional*.
-> Never use real funds. Never expose to the public internet. Never
-> reuse credentials from real systems. See [LICENSE](./LICENSE).
+> ⚠️ **For isolated test environments only.** Bitvulnex is a deliberately
+> vulnerable application built by [Blaze Information Security](https://www.blazeinfosec.com/)
+> for security education and training. The security flaws are *intentional*,
+> so treat any running instance as hostile: run it on a local machine or an
+> isolated lab network, keep it off the public internet and away from
+> untrusted users, and never point it at real funds, real keys, or real
+> personal data. See [LICENSE](./LICENSE).
 
 Bitvulnex is a realistic, modern Bitcoin exchange — signup, KYC, deposits,
 spot trading, margin, lending/staking, OTC, P2P, withdrawals, treasury,
@@ -31,8 +33,8 @@ warning signs.
 ![Markets — real-time spot prices across all listed pairs](docs/screenshots/markets.png)
 *Markets: real-time prices, 24h stats, and volume across every listed pair.*
 
-![Landing page with the DO NOT DEPLOY banner](docs/screenshots/landing.png)
-*Landing page — with the DO NOT DEPLOY banner every entry point carries.*
+![Landing page with the training-lab warning banner](docs/screenshots/landing.png)
+*Landing page — with the training-lab warning banner every entry point carries.*
 
 ## Audience
 
@@ -58,6 +60,16 @@ documents. How to get there is up to you.
 > files in `docs/` are the answer key. If you're a trainee, don't read
 > them.
 
+## Where to run it
+
+Bitvulnex is meant to be run — just in the right place. Good homes are a local
+developer machine, a disposable VM, an isolated lab or CTF network, or a
+private internal training host. Because every instance is intentionally
+exploitable, keep it off the public internet and away from untrusted users,
+run it against mock/regtest services only (the stack ships them), and never
+connect it to real funds, real keys, or real personal data. Treat a running
+instance the way you would any known-vulnerable target.
+
 ## Quick start
 
 Requirements: Docker with Compose v2 (Docker Desktop on Windows/macOS,
@@ -82,7 +94,7 @@ curl http://localhost/api/health  # {"status":"ok","phase":0}
 Everything comes up self-contained — the seed runs automatically as part of
 `make up`. Useful URLs once the stack is healthy:
 
-- `http://localhost/` — landing page (with DO NOT DEPLOY banner)
+- `http://localhost/` — landing page (with the training-lab warning banner)
 - `http://localhost/about/changelog` — in-app changelog
 - `http://localhost/docs` — public API documentation (Swagger)
 - `http://localhost/api/health` — health check (`{"status":"ok","phase":0}`)
@@ -283,6 +295,7 @@ that's an unintended bug — please open an issue. If it *is* in
 ## License
 
 [MIT](./LICENSE) © Blaze Information Security & the Bitvulnex contributors.
-Forks for training use are encouraged. Bitvulnex is deliberately vulnerable —
-keep the DO NOT DEPLOY warning and never run it on a public network or with
-real funds, keys, or personal data.
+Forks for training use are encouraged. Bitvulnex is deliberately vulnerable, so
+run it only in isolated test environments — keep the in-app warning banner, and
+never expose an instance to the public internet or point it at real funds, keys,
+or personal data.

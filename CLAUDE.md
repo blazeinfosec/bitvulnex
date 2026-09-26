@@ -221,8 +221,9 @@ debriefs.
 - **No outbound calls to third parties** from the app code path. SSRF demos
   target local mock services or the docker network, never the real internet.
 - **Banner discipline.** Every entry point (README, landing page footer,
-  login page, API root) must carry a visible "DELIBERATELY VULNERABLE — DO NOT
-  DEPLOY" banner.
+  login page, API root) must carry a visible warning that Bitvulnex is an
+  intentionally vulnerable training lab to be run only in isolated test
+  environments — never on a public network or with real funds.
 - **Phases ship vertically.** A phase delivers a working slice of the app
   (UI + API + DB + tests). No phase ships backend-only or frontend-only.
 
