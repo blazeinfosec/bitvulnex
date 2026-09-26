@@ -128,13 +128,16 @@ so the containers pick up the change.
 |----------|---------|---------|
 | `CTF_SALT` | `change-me-per-cohort` | Required. Flags derive from it; rotate per cohort (8+ chars). |
 | `CTF_MODE` / `HINT_MODE` / `SCOREBOARD_ENABLED` | `false` | Turn on the CTF surfaces. |
-| `BVBE_HTTP_PORT` | `80` | Host port for the nginx edge. |
+| `WEB_PORT` | `80` | Host port for the nginx edge. |
+| `WEB_API_REPLICAS` | `5` | API-tier `next dev` processes behind nginx. Lower it (e.g. `1`) on a memory-tight host. |
+| `WEB_NODE_HEAP_MB` | `2048` | V8 heap cap per web container (MB). |
+| `COMPOSE_PROFILES` | `watchdog` | Leave `watchdog` on to auto-heal a V-34-poisoned API replica; clear it to observe the raw effect. |
 | `ACTIVITY_SIM_ENABLED` / `ACTIVITY_SIM_EVERY_MS` | `true` / `20000` | Ambient simulated customer activity. |
 
 ### Troubleshooting
 
 - **Port 80 already in use** (common on Windows with IIS or `http.sys`):
-  set `BVBE_HTTP_PORT=8080` in `.env`, run `docker compose up -d`, and
+  set `WEB_PORT=8080` in `.env`, run `docker compose up -d`, and
   browse to `http://localhost:8080/`.
 - **`CTF_SALT must be set`**: you skipped `cp .env.example .env`.
 - **`web` never starts**: check `docker compose logs db-migrate` — the
@@ -167,7 +170,7 @@ so the containers pick up the change.
 ├── CONTRIBUTING.md            # how the 4-gate workflow operates
 ├── CHANGELOG.md               # mirrored at /about/changelog in-app
 ├── Makefile                   # thin wrapper around pnpm + docker compose
-├── docker-compose.yml         # 9 services + a db-migrate init container
+├── docker-compose.yml         # 10 services (web pages + web-api pool) + db-migrate init
 ├── nginx/                     # reverse proxy config (the public edge)
 ├── apps/
 │   ├── web/                   # Next.js 15 (App Router) — the exchange

@@ -240,18 +240,19 @@ on `PATCH /api/v2/me`).
 lands on a legitimate user's pipelined connection. The cohort needs
 a raw-TCP tool (Python `socket` or `nc -C`).
 
-> **LIVE-VERIFIED CAVEAT (Phase-12 review, see
-> `04-exploitability-audit.md` §V-50 and
-> `docs/exploitation/15-not-reproduced-assessment.md`):** the V-50
-> smuggle **delivery** is **edge-blunted** against the shipped edge —
-> nginx 1.25.5 rejects the CL+TE conflict with `400` (RFC 7230
-> §3.3.3) before forwarding, so a clean desync does not reproduce
-> as-shipped (a working smuggle would need a deliberately-lenient
-> edge pinned in front — optional future infra, not done now).
-> **CHAIN B still closes:** its terminal "promote to admin" impact is
-> proven live via **V-51** (the standalone `PATCH /api/v2/me
-> {"role":"admin"}` in Step 2). Treat the smuggle (Steps 3-4) as the
-> stretch-goal *mechanism* and V-51 as the guaranteed terminal.
+> **LIVE-VERIFIED (updated 2026-09-26, see `VULNS.md` §V-50 and
+> `docs/phases/maintenance-2026-09/adversarial-qa.md`):** the V-50
+> smuggle now **reproduces end-to-end**. The edge is pinned to
+> `nginx:1.18-alpine`, which forwards the CL+TE ambiguity to the
+> `--insecure-http-parser` upstream (llhttp `LENIENT_TRANSFER_ENCODING`
+> prefers `Transfer-Encoding`). A single client CL+TE request produces
+> two backend requests, and a smuggled request executes past the edge.
+> (The earlier "edge-blunted" note applied to nginx 1.25, which rejects
+> CL+TE with `400`; that is no longer the shipped edge.) It is
+> dev-mode-warmth-sensitive — hit the outer and smuggled routes once to
+> compile them before timing the desync. **CHAIN B closes via both
+> paths:** the V-50 smuggle *delivery* and the terminal V-51
+> `PATCH /api/v2/me {"role":"admin"}` are each proven live.
 
 ### Step 1 — confirm both halves of V-50
 

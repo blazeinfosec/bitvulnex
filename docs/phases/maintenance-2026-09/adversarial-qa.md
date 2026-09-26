@@ -98,7 +98,7 @@ impractical or explicitly out of scope in this environment.
 | V-44 | Lending yield off-by-one; requires front-running the 60s accrual tick. |
 | V-45 | Staking double-claim race — same class proven live via V-28; needs materialized claim rows. |
 | V-49 | Dependency confusion; publishing to public npm is explicitly out of lab scope (doc-only PoC). Missing `.npmrc` confirmed. |
-| V-50 | Request smuggling; the ledger records it does not reproduce against the shipped nginx 1.25 (documented-only). |
+| V-50 | ~~Request smuggling; documented-only against nginx 1.25.~~ **Superseded — see the second-pass section above: V-50 now reproduces end-to-end after pinning the edge to nginx:1.18-alpine.** |
 
 ## Diff reading — planted gadgets unchanged
 

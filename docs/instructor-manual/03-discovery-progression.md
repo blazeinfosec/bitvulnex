@@ -171,13 +171,15 @@ two that map best to their interest area.
 5. Pivot to mock-s3 listing (15 min).
 6. Fetch synthetic KYC documents (15 min).
 
-> **INSTRUCTOR NOTE:** Don't expect every trainee to land the
-> smuggle. The realisation that *both* the nginx half and the Node
-> half are needed is the teaching moment; constructing a clean
-> sender is a tooling problem more than a security insight. Award
-> credit for "trainee identified both halves and articulated the
-> smuggle mechanism" even if their socket script doesn't fire
-> cleanly.
+> **INSTRUCTOR NOTE:** The smuggle *does* reproduce end-to-end on the
+> shipped `nginx:1.18-alpine` edge (dev-mode: warm the outer and
+> smuggled routes once so they're compiled before the raw-TCP send).
+> The realisation that *both* the nginx half and the Node half are
+> needed is the teaching moment; constructing a clean sender is a
+> tooling problem more than a security insight. Award full credit for a
+> landed smuggle, and partial credit for "trainee identified both
+> halves and articulated the mechanism" if their socket script doesn't
+> fire cleanly in the time budget.
 
 ## Stretch goals (optional, post-Day-2)
 
