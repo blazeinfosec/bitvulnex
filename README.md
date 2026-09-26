@@ -76,11 +76,17 @@ To start, sign up for an ordinary customer account at
 `http://localhost/signup`. Instructors can find the seeded staff accounts in
 [`docs/instructor-manual/README.md`](./docs/instructor-manual/README.md#seeded-accounts).
 
+(URLs assume the default `WEB_PORT=80`. If you set another host port in
+`.env` — e.g. `WEB_PORT=8080` when 80 is taken — use `http://localhost:8080/`.)
+
 Stop, re-seed, reset, or update the lab:
 
 ```bash
 docker compose down                           # stop, keep data        (make down)
 docker compose run --rm db-migrate            # re-run migrations+seed (make seed)
+                                              # idempotent — won't rotate an
+                                              # already-seeded password; use reset
+                                              # for a clean slate
 docker compose down -v && docker compose up -d --build   # pristine state (make reset)
 git pull && docker compose up -d --build --renew-anon-volumes  # update (make up)
 ```

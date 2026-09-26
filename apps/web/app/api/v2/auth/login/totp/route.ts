@@ -9,7 +9,7 @@ import {
 import { env } from "@/lib/env";
 import { jsonError, readJson } from "@/lib/api";
 import { registerEndpoint } from "@/lib/openapi-registry";
-import { consumeTotpTicket } from "../route";
+import { consumeTotpTicket } from "@/lib/totp-tickets";
 
 registerEndpoint({
   method: "post",
@@ -33,7 +33,7 @@ export async function POST(req: Request) {
   if (parsed.error) return parsed.error;
   const { ticket, code } = parsed.data;
 
-  const userId = consumeTotpTicket(ticket);
+  const userId = await consumeTotpTicket(ticket);
   if (!userId) return jsonError(401, "invalid or expired ticket");
 
   const user = await prisma.user.findUnique({ where: { id: userId } });
