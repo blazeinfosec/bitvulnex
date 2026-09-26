@@ -64,6 +64,20 @@ jobs:
       - name: Seed env from example
         run: cp .env.example .env
 
+      - name: Trim the web tier for the CI runner
+        # .env.example ships a fleet-sized default (WEB_API_REPLICAS=5,
+        # 2 GB heap each, plus the watchdog sidecar) meant for a big host.
+        # A GitHub-hosted runner (2 vCPU / ~7 GB) cannot boot 6 next-dev
+        # processes, so the smoke test would OOM/time out. Boot the minimal
+        # single-replica config with no watchdog — enough to prove the
+        # stack builds, migrates, seeds, and serves the edge.
+        run: |
+          {
+            echo "WEB_API_REPLICAS=1"
+            echo "WEB_NODE_HEAP_MB=1024"
+            echo "COMPOSE_PROFILES="
+          } >> .env
+
       - name: Build and start the stack
         run: docker compose up -d --build
 
