@@ -9,7 +9,42 @@ inadvertently.
 exploitable in this environment, plus a source audit of every `V-NNN`
 construct and a close reading of the diff for files on planted paths.
 
-## Live-exploited end-to-end — 30 of 40
+## Second pass — 39 of 40 exploited live
+
+A follow-up pass drove every remaining vuln, including the browser-only and
+setup-heavy ones. Live-confirmed beyond the first 30: **V-9** (HMAC
+`changeme`), **V-19** (HS256/RS256 key confusion), **V-20** (kid path
+traversal), **V-21** (refresh reuse), **V-10** (predictable reset token),
+**V-27** (lexicographic tier — a forged string-tier token bypassed the
+leverage gate that a numeric token got 403 on), **V-43** (a cancelled maker
+order's fill still counts toward fee-tier volume — buggy query $7,143 vs
+correct $773), **V-44** (a fresh 5M-USDT supply captured a ~98.5% share of a
+full accrual window it barely participated in), **V-45** (8 parallel claims
+each credited the same reward, 8×), **V-15** (vulnerable `xml2js@0.4.23`
+reached live via the admin sanctions import), **V-49** (a locally-planted
+`@bvbe-internal/observability` executed via the lazy `import()`; publishing
+to public npm is out of lab scope), **V-13** (browser: login redirected to
+`https://example.com` via the raw `next`), **V-22** (browser: the `editOrder`
+Server Action mass-assigned `status`/`feeTier`/`amount`), and **V-50** (see
+below).
+
+**V-50 now reproduces.** The edge was pinned to `nginx:1.18-alpine`, a
+deliberately-lenient older build. A single CL+TE request produced two backend
+requests and a smuggled `POST /api/v2/auth/signup` executed past the edge
+(the smuggled user then logged in). nginx 1.25 rejects CL+TE and blunts it;
+1.18 forwards the ambiguity to the `--insecure-http-parser` upstream. See the
+updated V-50 entry in `VULNS.md`.
+
+**V-32 — the one not won live.** The cancel-vs-match race is the same
+unfenced read-modify-write class proven live via V-28 (withdrawal, 9/10
+parallel → balance −0.0709) and V-45 (staking, 8× credit). The construct is
+intact (separate READ COMMITTED transactions, no `SELECT FOR UPDATE`). Across
+14+ parallel attempts the match consistently won the timing window; the
+documented single-packet HTTP/2 exploit needs tighter timing than the
+dev-mode stack produces. Recorded as construct-verified and race-class-proven,
+not won in this environment.
+
+## First pass — 30 of 40 (retained below)
 
 Each was triggered against the live app; Pattern-A plants also emitted
 their `{BLAZE_BITVULNEX_...}` flag.
