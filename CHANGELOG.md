@@ -6,6 +6,31 @@ planted vulnerabilities — references to "fixed" issues that hint at
 adjacent unfixed ones, TODOs left in the code, etc. They are part of
 the lab.
 
+## 2026-09-26 — Maintenance: reliability, licensing, and docs
+
+- Change: relicensed to **MIT** (© Blaze Information Security & the
+  Bitvulnex contributors), matching the OWASP Juice Shop model. See
+  [`LICENSE`](../LICENSE).
+- Docs: README refreshed for a one-command Docker start, added app
+  screenshots, and reframed the deployment guidance — Bitvulnex is for
+  **isolated test environments only**. Run it on a local machine or an
+  isolated lab/CTF network; keep it off the public internet and away from
+  untrusted users, and never point it at real funds, keys, or personal data.
+- Ops: repository published publicly; CI restored to green (workspace
+  typecheck, unit tests, and a full `docker-compose` build-and-boot smoke
+  test on a trimmed single-replica web tier).
+- Fixed: broad functional bug-fix pass across the app — deposit/withdrawal
+  refunds and settlement, background jobs (market-maker book hygiene,
+  deposit watcher, staking, yield accrual), live order-book / trade-feed
+  updates, session-token refresh, the P2P completion flow, and many UI
+  error states. Security-relevant behavior is unchanged; the planted flaws
+  are features, not bugs.
+- Fixed: flaky unit test made deterministic across CI runners (trade
+  timestamps in a test fake no longer tie).
+- Ops: edge pinned to **nginx 1.18-alpine** for legacy mobile-app client
+  compatibility (continues OPS-2024-117). *(REVIEW: confirm the edge still
+  rejects requests that carry both Content-Length and Transfer-Encoding.)*
+
 ## 2026-07-01 — Phase 9: lab finalization
 
 - Fixed: OTC accept handler hardened against double-fill (Phase 8
