@@ -66,6 +66,8 @@ function makeFake() {
   const balances: BalanceRow[] = [];
   let nextOrderId = 1;
   let nextTradeId = 1;
+  // Fixed base for monotonic trade timestamps (see trade.create below).
+  const startClock = Date.now();
   const pairs = [
     {
       base: "BTC",
@@ -133,12 +135,18 @@ function makeFake() {
             (!where.executedAt?.gte || t.executedAt >= where.executedAt.gte),
         ),
       create: async ({ data }: { data: Omit<TradeRow, "id" | "executedAt"> }) => {
+        const id = nextTradeId++;
         const row: TradeRow = {
-          id: nextTradeId++,
+          id,
           ...data,
           price: data.price as Prisma.Decimal,
           amount: D(data.amount as unknown as string),
-          executedAt: new Date(),
+          // Strictly increasing per insert (base clock + id). Using a bare
+          // `new Date()` let two same-millisecond trades tie, and the
+          // desc `findFirst` tiebreak then returned the earlier one — a
+          // timing-flaky "last price" that passed locally but failed on a
+          // faster CI runner. All timestamps stay within the 24h window.
+          executedAt: new Date(startClock + id),
         };
         trades.push(row);
         return row;
