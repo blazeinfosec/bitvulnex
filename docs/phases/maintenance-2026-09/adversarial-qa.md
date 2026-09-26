@@ -108,3 +108,20 @@ non-transactional withdrawal and limit-free transfer, V-32's two-transaction
 race, V-51's verbatim `parsed.data` forward, V-33's first-vs-last envelope
 parsers, and V-4/V-25's byte-unchanged files (V-25's `match.ts` and V-34's
 `feature-flags.ts` and replay route were not touched by the commit).
+
+## Killer chains — end-to-end re-verification (2026-09-26)
+
+All four chains were exploited **composed end-to-end** against the live stack
+(nginx 1.18 edge, `--insecure-http-parser` upstream). No code was modified.
+
+| Chain | Outcome proven live | Verdict |
+|-------|---------------------|---------|
+| **A** — drain hot wallet | V-48 leaked secret → forged admin JWT → V-6 trace-header bypass (no auth) → emergency-withdraw → V-33 polyglot PSBT: validator saw victim/1 sat, `finalizepsbt` broadcast `RAWTX:[{attacker, 10,000,000,000}]`. | **PASS** |
+| **B** — become admin & persist | V-51 `PATCH /api/v2/me {"role":"admin"}` promoted a fresh user; second admin planted via `POST /api/v2/admin/users`. V-50 smuggle delivery reproduced: one CL+TE request → two backend executions; a smuggled `PATCH /api/v2/me` flipped a victim row `user→admin`. | **PASS** |
+| **C** — mass takeover via oracle | whale1 self-trade (V-25) drove the public oracle to 40000; the liquidation worker (which reads the oracle direct from `web:3000`, bypassing the nginx cache) flagged two victim longs; whale1 registered as keeper and claimed both rebates. | **PASS** |
+| **D** — exfiltrate DB + KYC | Path 1: forged admin + V-6 → `GET /api/v1/internal/users` = 54 records incl. `passwordHash`/`totpSecret` (403 without the trace header). Path 2: V-40 SSRF → IMDS IAM creds → mock-S3 `kyc-bucket` listing + a KYC doc body. | **PASS** |
+
+Environmental notes (not defects; docs corrected): a forged JWT `sub` must be a
+real DB user id; the PSBT envelope body is raw JSON, not base64; V-50 reproduces
+because the shipped edge is nginx 1.18 (the earlier "not reproduced" caveat
+assumed 1.25).

