@@ -19,6 +19,21 @@ signposting — so the app reads like something a normal, slightly careless
 team shipped. The full catalog (root cause, exploitation path, and the fix a
 blue team would apply) lives in [`VULNS.md`](./VULNS.md).
 
+## Screenshots
+
+The exchange looks and behaves like a real trading venue — that realism is the
+point. The vulnerabilities hide in ordinary-looking business code, not behind
+warning signs.
+
+![Spot trading — live order book, candlestick chart, and order entry](docs/screenshots/trade.png)
+*Spot trading: live order book, candlestick chart, and Limit / Market / Stop-Limit / OCO order entry.*
+
+![Markets — real-time spot prices across all listed pairs](docs/screenshots/markets.png)
+*Markets: real-time prices, 24h stats, and volume across every listed pair.*
+
+![Landing page with the DO NOT DEPLOY banner](docs/screenshots/landing.png)
+*Landing page — with the DO NOT DEPLOY banner every entry point carries.*
+
 ## Audience
 
 - Pentester / red-team upskilling
@@ -136,7 +151,7 @@ so the containers pick up the change.
 ├── AGENTS.md                  # pointer for non-Claude AI agents
 ├── VULNS.md                   # planted-vulnerability ledger (40 entries)
 ├── README.md                  # this file
-├── LICENSE                    # Apache 2.0 + security-education notice
+├── LICENSE                    # MIT (Blaze Information Security)
 ├── CONTRIBUTING.md            # how the 4-gate workflow operates
 ├── CHANGELOG.md               # mirrored at /about/changelog in-app
 ├── Makefile                   # thin wrapper around pnpm + docker compose
@@ -267,6 +282,7 @@ that's an unintended bug — please open an issue. If it *is* in
 
 ## License
 
-[Apache 2.0](./LICENSE) with a prepended security-education notice.
-Forks for training use are encouraged; redistribution must preserve
-the notice and the DO NOT DEPLOY banner.
+[MIT](./LICENSE) © Blaze Information Security & the Bitvulnex contributors.
+Forks for training use are encouraged. Bitvulnex is deliberately vulnerable —
+keep the DO NOT DEPLOY warning and never run it on a public network or with
+real funds, keys, or personal data.

@@ -8,7 +8,7 @@ export function Footer() {
         <div className="space-y-2">
           <div>
             <span className="font-semibold text-text">Bitvulnex</span> · Authorized
-            security education lab · Apache 2.0
+            security education lab · MIT
           </div>
           <p className="text-xs text-text-mute max-w-md">
             Bitvulnex — a deliberately vulnerable Bitcoin exchange for

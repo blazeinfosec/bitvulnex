@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "description": "Bitvulnex — a deliberately vulnerable Bitcoin exchange (authorized security education lab)",
-  "license": "Apache-2.0",
+  "license": "MIT",
   "packageManager": "pnpm@9.12.0",
   "engines": {
     "node": ">=22"
