@@ -22,6 +22,7 @@
 #      to instructors.
 
 set -euo pipefail
+cd "$(dirname "$0")/.."
 
 NAME="${1:-}"
 HINTS="off"
@@ -69,8 +70,5 @@ echo
 echo "==> Canonical 44-flag table"
 echo "    (give this file to the instructor; do NOT share with trainees)"
 echo
-if [ -n "${CTF_SALT:-}" ]; then
-  pnpm exec tsx scripts/derive-flags.ts
-else
-  echo "    (set CTF_SALT in your shell to print the table)"
-fi
+# derive-flags.ts reads CTF_SALT from the shell, falling back to .env.
+pnpm exec tsx scripts/derive-flags.ts

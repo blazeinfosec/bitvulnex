@@ -65,6 +65,7 @@ export function CandleChart({
   });
 
   const [loading, setLoading] = useState(true);
+  const fittedFor = useRef<string | null>(null);
 
   // Persist timeframe selection
   useEffect(() => {
@@ -128,7 +129,9 @@ export function CandleChart({
 
   const loadCandles = useCallback(async () => {
     if (!candleSeriesRef.current || !volumeSeriesRef.current) return;
-    setLoading(true);
+    const viewKey = `${pair}|${tf}`;
+    const firstLoad = fittedFor.current !== viewKey;
+    if (firstLoad) setLoading(true);
     try {
       const res = await fetch(
         `/api/v2/public/chart/${encodeURIComponent(pair)}/${tf}`,
@@ -150,7 +153,12 @@ export function CandleChart({
       }));
       candleSeriesRef.current.setData(candles);
       volumeSeriesRef.current.setData(volumes);
-      chartRef.current?.timeScale().fitContent();
+      // Only auto-fit on first load / pair or timeframe change so periodic
+      // refreshes don't reset the user's zoom and scroll position.
+      if (firstLoad) {
+        chartRef.current?.timeScale().fitContent();
+        fittedFor.current = viewKey;
+      }
     } finally {
       setLoading(false);
     }

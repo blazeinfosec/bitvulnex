@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { prisma } from "@bvbe/db";
 import { userFromAuthorization } from "@/lib/auth";
 import { jsonError, readJson } from "@/lib/api";
 import { registerEndpoint } from "@/lib/openapi-registry";
@@ -19,7 +20,41 @@ registerEndpoint({
   },
 });
 
+registerEndpoint({
+  method: "get",
+  path: "/api/v2/me/p2p/offers",
+  summary: "List the caller's own P2P offers",
+  responses: {
+    "200": { description: "OK" },
+    "401": { description: "Auth required" },
+  },
+});
+
 export const dynamic = "force-dynamic";
+
+export async function GET(req: Request) {
+  const claims = await userFromAuthorization(req.headers.get("authorization"));
+  if (!claims) return jsonError(401, "unauthorized");
+
+  const rows = await prisma.p2POffer.findMany({
+    where: { userId: claims.sub },
+    orderBy: { createdAt: "desc" },
+    take: 100,
+  });
+
+  return NextResponse.json({
+    offers: rows.map((o) => ({
+      id: o.id,
+      side: o.side,
+      asset: o.asset,
+      amount: o.amount.toString(),
+      price: o.price.toString(),
+      payMethod: o.payMethod,
+      status: o.status,
+      createdAt: o.createdAt.toISOString(),
+    })),
+  });
+}
 
 const positiveDecimal = z
   .string()

@@ -9,6 +9,8 @@
 // re-rotate per cohort.
 
 import { createHash } from "node:crypto";
+import { existsSync, readFileSync } from "node:fs";
+import { join } from "node:path";
 import { deriveDigest, formatFlag } from "../apps/web/lib/ctf/derive";
 
 const SALT_DERIVED: string[] = [
@@ -76,10 +78,23 @@ function derivableFlag(vulnId: string, secret: string): string {
   return formatFlag(deriveDigest(`${vulnId}:${secret}`));
 }
 
+// Resolve CTF_SALT from the env, falling back to a CTF_SALT= line in
+// ./.env (which `pnpm`/`tsx` do not auto-load). Mirrors compile-hints.ts.
+function resolveSalt(): string | null {
+  if (process.env.CTF_SALT) return process.env.CTF_SALT;
+  const envFile = join(__dirname, "..", ".env");
+  if (!existsSync(envFile)) return null;
+  for (const line of readFileSync(envFile, "utf-8").split(/\r?\n/)) {
+    const m = line.match(/^\s*CTF_SALT\s*=\s*(.+?)\s*$/);
+    if (m && m[1]) return m[1].replace(/^["']|["']$/g, "");
+  }
+  return null;
+}
+
 function main() {
-  const salt = process.env.CTF_SALT;
+  const salt = resolveSalt();
   if (!salt) {
-    console.error("CTF_SALT not set");
+    console.error("CTF_SALT not set (export it or add CTF_SALT=... to .env)");
     process.exit(1);
   }
 

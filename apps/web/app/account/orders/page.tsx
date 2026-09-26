@@ -26,15 +26,27 @@ export default function OrdersPage() {
   const [message, setMessage] = useState<string | null>(null);
 
   async function load() {
-    const res = await authedFetch("/api/v2/me/orders?status=open");
-    if (res.status === 401) {
+    // The API filters on a single status, so fetch the resting states
+    // (open + partially filled) separately and merge.
+    const [openRes, partialRes] = await Promise.all([
+      authedFetch("/api/v2/me/orders?status=open"),
+      authedFetch("/api/v2/me/orders?status=partial"),
+    ]);
+    if (openRes.status === 401 || partialRes.status === 401) {
       router.replace("/login");
       return;
     }
-    if (res.ok) {
-      const b = (await res.json()) as { orders: OrderRow[] };
-      setOrders(b.orders);
+    const rows: OrderRow[] = [];
+    for (const res of [openRes, partialRes]) {
+      if (res.ok) {
+        const b = (await res.json()) as { orders: OrderRow[] };
+        rows.push(...b.orders);
+      }
     }
+    rows.sort(
+      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+    );
+    setOrders(rows);
   }
 
   useEffect(() => {

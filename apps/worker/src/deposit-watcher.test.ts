@@ -212,4 +212,52 @@ describe("pollOnce", () => {
     expect(deposits[0]?.status).toBe("credited");
     expect(Number(balances.get("u1:BTC")?.amount)).toBe(0.5);
   });
+
+  it("does not mark pending deposits dropped when the node watch call fails", async () => {
+    seed.addresses[0]!.user.kycTier = 1; // threshold = 3, deposit stays pending
+    const { db, deposits } = makeFake(seed);
+    const txid = "d".repeat(64);
+
+    await pollOnce(
+      staticRpc({
+        "bcrt1quser_addr": [{ txid, vout: 0, amountBtc: 0.2, confirmations: 1 }],
+      }),
+      db,
+    );
+    expect(deposits[0]?.status).toBe("confirming");
+
+    const failing: RpcClient = {
+      watch: async () => {
+        throw new Error("HTTP 503");
+      },
+    };
+    await pollOnce(failing, db);
+    expect(deposits[0]?.status).toBe("confirming");
+
+    // Once the node is back and still reports the tx, it keeps progressing.
+    await pollOnce(
+      staticRpc({
+        "bcrt1quser_addr": [{ txid, vout: 0, amountBtc: 0.2, confirmations: 3 }],
+      }),
+      db,
+    );
+    expect(deposits[0]?.status).toBe("credited");
+  });
+
+  it("still marks a pending deposit dropped when a successful watch no longer reports it", async () => {
+    seed.addresses[0]!.user.kycTier = 1;
+    const { db, deposits } = makeFake(seed);
+    const txid = "e".repeat(64);
+
+    await pollOnce(
+      staticRpc({
+        "bcrt1quser_addr": [{ txid, vout: 0, amountBtc: 0.2, confirmations: 0 }],
+      }),
+      db,
+    );
+    expect(deposits[0]?.status).toBe("seen");
+
+    await pollOnce(staticRpc({ "bcrt1quser_addr": [] }), db);
+    expect(deposits[0]?.status).toBe("dropped");
+  });
 });

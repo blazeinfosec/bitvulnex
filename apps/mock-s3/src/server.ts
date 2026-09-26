@@ -65,13 +65,25 @@ app.get("/kyc-bucket", (_req, res) => {
   res.type("application/xml").send(listingXml());
 });
 
-app.get("/kyc-bucket/:userKey/:docKey", (req, res) => {
-  const { userKey, docKey } = req.params;
+function sendObject(res: express.Response, key: string): void {
   res.json({
     bucket: "kyc-bucket",
-    key: `kyc/${userKey}/${docKey}`,
+    key,
     record: SYNTHETIC_DOC,
   });
+}
+
+// Short form: /kyc-bucket/<user>/<doc> (the `kyc/` prefix is implied).
+app.get("/kyc-bucket/:userKey/:docKey", (req, res) => {
+  const { userKey, docKey } = req.params;
+  sendObject(res, `kyc/${userKey}/${docKey}`);
+});
+
+// Full-key form, exactly as returned by the listing:
+// /kyc-bucket/kyc/<user>/<doc>
+app.get(/^\/kyc-bucket\/(kyc\/.+)$/, (req, res) => {
+  const key = (req.params as unknown as Record<string, string>)[0] ?? "";
+  sendObject(res, key);
 });
 
 app.get("/", (_req, res) => {

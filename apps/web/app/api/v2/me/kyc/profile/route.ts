@@ -32,9 +32,17 @@ export async function PUT(req: Request) {
   const parsed = await readJson(req, schema);
   if (parsed.error) return parsed.error;
 
+  const dob = new Date(parsed.data.dateOfBirth);
+  if (
+    Number.isNaN(dob.getTime()) ||
+    dob.toISOString().slice(0, 10) !== parsed.data.dateOfBirth
+  ) {
+    return jsonError(400, "dateOfBirth invalid");
+  }
+
   const data = {
     legalName: parsed.data.legalName,
-    dateOfBirth: new Date(parsed.data.dateOfBirth),
+    dateOfBirth: dob,
     country: parsed.data.country,
     addressLine: parsed.data.addressLine,
     city: parsed.data.city,

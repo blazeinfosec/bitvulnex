@@ -7,6 +7,7 @@ import { registerEndpoint } from "@/lib/openapi-registry";
 import { requireTier, TierError } from "@/lib/kyc-tier";
 import type { Tier } from "@/lib/kyc-tier";
 import {
+  AccountFrozenError,
   InsufficientBalanceError,
   WithdrawalValidationError,
   submitWithdrawal,
@@ -94,6 +95,8 @@ export async function POST(req: Request) {
       return jsonError(e.status, e.message);
     if (e instanceof LimitExceededError)
       return jsonError(e.status, e.message);
+    if (e instanceof AccountFrozenError)
+      return jsonError(e.status, e.message || "account frozen");
     if (e instanceof AssetError) return jsonError(e.status, e.message);
     return jsonError(400, e instanceof Error ? e.message : "submit failed");
   }

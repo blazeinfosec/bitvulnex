@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { authedFetch } from "@/lib/token-storage";
+import { authedFetch, loadFailure } from "@/lib/token-storage";
 
 type DocRow = {
   id: string;
@@ -39,6 +39,7 @@ const dangerBtn =
 
 export default function AdminKycReview() {
   const router = useRouter();
+  const [loadError, setLoadError] = useState<string | null>(null);
   const params = useParams<{ userId: string }>();
   const userId = params.userId;
   const [view, setView] = useState<View | null>(null);
@@ -49,10 +50,13 @@ export default function AdminKycReview() {
 
   async function load() {
     const res = await authedFetch(`/api/v2/admin/kyc/${userId}`);
-    if (res.status === 401 || res.status === 403) {
-      router.replace("/login");
+    const fail = await loadFailure(res);
+    if (fail) {
+      if (fail.redirect) router.replace("/login");
+      else setLoadError(fail.message);
       return;
     }
+    setLoadError(null);
     setView((await res.json()) as View);
   }
 
@@ -112,6 +116,7 @@ export default function AdminKycReview() {
     await load();
   }
 
+  if (!view && loadError) return <p className="text-sell text-sm">{loadError}</p>;
   if (!view) return <p className="text-text-dim">Loading…</p>;
 
   return (
@@ -130,7 +135,14 @@ export default function AdminKycReview() {
         <h2 className="text-sm font-semibold text-text mb-4">Profile</h2>
         <dl className="grid sm:grid-cols-2 gap-y-3 gap-x-4 text-sm">
           <Item label="Legal name" value={view.profile?.legalName ?? "—"} />
-          <Item label="Date of birth" value={view.profile?.dateOfBirth ?? "—"} />
+          <Item
+            label="Date of birth"
+            value={
+              view.profile?.dateOfBirth
+                ? view.profile.dateOfBirth.slice(0, 10)
+                : "—"
+            }
+          />
           <Item label="Country" value={view.profile?.country ?? "—"} />
           <Item label="City" value={view.profile?.city ?? "—"} />
           <div className="sm:col-span-2">

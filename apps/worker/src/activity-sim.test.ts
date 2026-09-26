@@ -11,9 +11,12 @@ function makeFakeDb() {
     messages: [] as unknown[],
     cases: [] as unknown[],
   };
+  const users = [{ id: "u1" }, { id: "u2" }, { id: "u3" }];
   const db = {
     user: {
-      findMany: async () => [{ id: "u1" }, { id: "u2" }, { id: "u3" }],
+      count: async () => users.length,
+      findMany: async (args: { skip?: number; take?: number }) =>
+        users.slice(args.skip ?? 0, (args.skip ?? 0) + (args.take ?? users.length)),
     },
     deposit: {
       create: async (args: { data: unknown }) => {
@@ -68,6 +71,17 @@ describe("simulateActivityTick", () => {
     expect(calls.tickets).toHaveLength(1);
     expect(calls.messages).toHaveLength(1);
     expect(calls.cases).toHaveLength(1);
+  });
+
+  it("picks the customer at a random offset across the whole candidate set", async () => {
+    const { db, calls } = makeFakeDb();
+    // First draw fires the deposit branch; second picks the offset
+    // (0.9 * 3 → index 2); the rest keep the other branches quiet.
+    const draws = [0.01, 0.9];
+    const rng = () => draws.shift() ?? 0.99;
+    await simulateActivityTick(db, rng, 1_000);
+    expect(calls.deposits).toHaveLength(1);
+    expect((calls.deposits[0] as { userId: string }).userId).toBe("u3");
   });
 
   it("does nothing when the RNG is always high", async () => {

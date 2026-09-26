@@ -10,7 +10,7 @@ function makeFake(seed: {
     userId: string;
     asset: string;
     principal: Prisma.Decimal;
-    status: "active" | "ended";
+    status: "active" | "unstaking" | "ended";
   }>;
   programs: Array<{ asset: string; rewardAsset: string; apyBps: number }>;
   claims: Array<{
@@ -38,7 +38,9 @@ function makeFake(seed: {
           (p) =>
             p.id === where.id &&
             p.userId === where.userId &&
-            p.status === where.status,
+            (typeof where.status === "object" && where.status !== null
+              ? (where.status as { in: string[] }).in.includes(p.status)
+              : p.status === where.status),
         ) ?? null,
     },
     stakingProgram: {
@@ -135,6 +137,47 @@ describe("claimRewards (happy path)", () => {
     expect(res.rows).toBe(1);
     expect(claims[0]?.claimedAt).not.toBeNull();
     expect(balances[0]?.available.toString()).toBe("0.5");
+  });
+
+  it("still credits rewards accrued before the position ended", async () => {
+    const { db, claims, balances } = makeFake({
+      positions: [
+        {
+          id: "sp1",
+          userId: "u1",
+          asset: "ETH",
+          principal: D(10),
+          status: "ended",
+        },
+      ],
+      programs: [{ asset: "ETH", rewardAsset: "ETH", apyBps: 400 }],
+      claims: [
+        { id: "sc1", positionId: "sp1", amount: D("0.25"), claimedAt: null },
+      ],
+    });
+    const res = await claimRewards({ userId: "u1", positionId: "sp1" }, db);
+    expect(res.credited).toBe("0.25");
+    expect(claims[0]?.claimedAt).not.toBeNull();
+    expect(balances[0]?.amount.toString()).toBe("0.25");
+  });
+
+  it("rejects a position owned by another user", async () => {
+    const { db } = makeFake({
+      positions: [
+        {
+          id: "sp1",
+          userId: "u2",
+          asset: "ETH",
+          principal: D(10),
+          status: "ended",
+        },
+      ],
+      programs: [{ asset: "ETH", rewardAsset: "ETH", apyBps: 400 }],
+      claims: [],
+    });
+    await expect(
+      claimRewards({ userId: "u1", positionId: "sp1" }, db),
+    ).rejects.toThrow(/position not found/);
   });
 
   it("is a no-op when there are no unclaimed rows", async () => {

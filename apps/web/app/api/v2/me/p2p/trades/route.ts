@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { prisma } from "@bvbe/db";
 import { userFromAuthorization } from "@/lib/auth";
 import { jsonError, readJson } from "@/lib/api";
 import { registerEndpoint } from "@/lib/openapi-registry";
@@ -18,7 +19,44 @@ registerEndpoint({
   },
 });
 
+registerEndpoint({
+  method: "get",
+  path: "/api/v2/me/p2p/trades",
+  summary: "List the caller's P2P trades (as buyer or seller)",
+  responses: {
+    "200": { description: "OK" },
+    "401": { description: "Auth required" },
+  },
+});
+
 export const dynamic = "force-dynamic";
+
+export async function GET(req: Request) {
+  const claims = await userFromAuthorization(req.headers.get("authorization"));
+  if (!claims) return jsonError(401, "unauthorized");
+
+  const rows = await prisma.p2PTrade.findMany({
+    where: {
+      OR: [{ buyerUserId: claims.sub }, { sellerUserId: claims.sub }],
+    },
+    orderBy: { createdAt: "desc" },
+    take: 100,
+  });
+
+  return NextResponse.json({
+    trades: rows.map((t) => ({
+      id: t.id,
+      offerId: t.offerId,
+      asset: t.asset,
+      amount: t.amount.toString(),
+      price: t.price.toString(),
+      status: t.status,
+      createdAt: t.createdAt.toISOString(),
+      releasedAt: t.releasedAt ? t.releasedAt.toISOString() : null,
+      role: t.buyerUserId === claims.sub ? "buyer" : "seller",
+    })),
+  });
+}
 
 const positiveDecimal = z
   .string()

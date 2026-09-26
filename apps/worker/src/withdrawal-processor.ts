@@ -2,13 +2,14 @@
 //
 //   1. pending → broadcast: pick up any pending withdrawal, ask the
 //      mock node to `sendmany` to the destination address, record
-//      the txid, advance status.
+//      the txid, advance status. Non-BTC assets have no node in the
+//      lab, so they settle off-node with a synthetic reference.
 //
-//   2. broadcast/confirming → confirming/confirmed: poll
+//   2. broadcast/confirming/bumped → confirming/confirmed: poll
 //      `gettransaction` for each in-flight withdrawal, advance status
 //      based on confirmation count.
 
-import { prisma } from "@bvbe/db";
+import { Prisma, prisma } from "@bvbe/db";
 
 export type BitcoinClient = {
   sendmany(addressToAmount: Record<string, string>, feeSat: number): Promise<string>;
@@ -17,13 +18,16 @@ export type BitcoinClient = {
 
 export type WithdrawalDb = Pick<
   typeof prisma,
-  "withdrawal"
+  "withdrawal" | "balance" | "$transaction"
 >;
 
 // Confirmation threshold for moving a broadcast withdrawal to
 // `confirmed`. The lab keeps this at 1 to keep e2e runs fast; real
 // exchanges typically wait 3-6.
 const CONFIRMED_THRESHOLD = 1;
+
+// Only BTC is backed by the regtest mock node.
+const ON_CHAIN_ASSETS = new Set(["BTC"]);
 
 export async function processWithdrawalOnce(
   client: BitcoinClient,
@@ -39,6 +43,21 @@ export async function processWithdrawalOnce(
     take: 50,
   });
   for (const w of pending) {
+    if (!ON_CHAIN_ASSETS.has(w.asset)) {
+      const now = new Date();
+      await db.withdrawal.update({
+        where: { id: w.id },
+        data: {
+          status: "confirmed",
+          txid: `offchain-${w.id}`,
+          approvedAt: now,
+          broadcastAt: now,
+          confirmedAt: now,
+        },
+      });
+      confirmed += 1;
+      continue;
+    }
     try {
       const txid = await client.sendmany(
         { [w.destAddress]: w.amount.toString() },
@@ -55,19 +74,32 @@ export async function processWithdrawalOnce(
       });
       broadcast += 1;
     } catch (e) {
-      await db.withdrawal.update({
-        where: { id: w.id },
-        data: {
-          status: "failed",
-          failedReason: e instanceof Error ? e.message : "rpc error",
-        },
+      // The debit happened at submit time; give the funds back. Guard on
+      // status so a concurrent user cancel (which also refunds) wins.
+      const refund = (w.amount as Prisma.Decimal).add(w.fee as Prisma.Decimal);
+      await db.$transaction(async (tx) => {
+        const flipped = await tx.withdrawal.updateMany({
+          where: { id: w.id, status: "pending" },
+          data: {
+            status: "failed",
+            failedReason: e instanceof Error ? e.message : "rpc error",
+          },
+        });
+        if (flipped.count === 0) return;
+        await tx.balance.update({
+          where: { userId_asset: { userId: w.userId, asset: w.asset } },
+          data: {
+            available: { increment: refund },
+            amount: { increment: refund },
+          },
+        });
       });
       failed += 1;
     }
   }
 
   const inFlight = await db.withdrawal.findMany({
-    where: { status: { in: ["broadcast", "confirming"] } },
+    where: { status: { in: ["broadcast", "confirming", "bumped"] } },
     take: 100,
   });
   for (const w of inFlight) {

@@ -10,6 +10,7 @@ import {
   authedFetch,
   clearTokens,
   getRefreshToken,
+  responseError,
 } from "@/lib/token-storage";
 
 type Me = {
@@ -26,16 +27,26 @@ export default function AccountPage() {
   const router = useRouter();
   const [me, setMe] = useState<Me | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
     (async () => {
-      const res = await authedFetch("/api/v2/me");
-      if (res.status === 401) {
-        router.replace("/login");
-        return;
+      try {
+        const res = await authedFetch("/api/v2/me");
+        if (res.status === 401) {
+          router.replace("/login");
+          return;
+        }
+        if (!res.ok) {
+          setLoadError(await responseError(res, "Could not load your account."));
+          return;
+        }
+        setMe((await res.json()) as Me);
+      } catch {
+        setLoadError("Could not load your account.");
+      } finally {
+        setLoading(false);
       }
-      setMe((await res.json()) as Me);
-      setLoading(false);
     })();
   }, [router]);
 
@@ -64,6 +75,14 @@ export default function AccountPage() {
     }
     clearTokens();
     router.replace("/");
+  }
+
+  if (loadError) {
+    return (
+      <Container className="py-12">
+        <p className="text-sell text-sm">{loadError}</p>
+      </Container>
+    );
   }
 
   if (loading || !me) {

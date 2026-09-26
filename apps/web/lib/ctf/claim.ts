@@ -67,7 +67,7 @@ const PATTERN_B_VALIDATORS: Record<string, Validator> = {
 
   // V-14 — path traversal in KYC doc fetch.
   // Proof = the traversed path they reached.
-  "V-14": (proof) => /\.\.\/|\.\.\\\\/.test(proof) && proof.length > 0,
+  "V-14": (proof) => /\.\.[\/\\]/.test(decodeRepeatedly(proof)),
 
   // V-17 — command injection via spawn shell.
   // Proof = the marker output from the injected command.
@@ -94,9 +94,10 @@ const PATTERN_B_VALIDATORS: Record<string, Validator> = {
   // trainee got from a cross-origin handshake.
   "V-23": (proof) => proof.trim().length > 0,
 
-  // V-24 — bech32 with zero-width chars accepted.
-  // Proof = the zero-width-laden address the lab accepted.
-  "V-24": (proof) => /[​-‍﻿]/.test(proof),
+  // V-24 — permissive address validation. Proof = the address the
+  // lab accepted: zero-width-laden, cross-network HRP (tb1...), or a
+  // bech32 string whose checksum doesn't verify.
+  "V-24": (proof) => isV24Bypass(proof),
 
   // V-27 — KYC tier lex compare. Proof = the string tier value the
   // trainee submitted that bypassed the gate.
@@ -206,12 +207,85 @@ const PATTERN_B_VALIDATORS: Record<string, Validator> = {
   },
 
   // CHAIN-D: exfiltrate KYC. Proof = a synthetic KYC document key
-  // path the trainee retrieved (must start with kyc-bucket/ and
-  // contain a user-id segment).
+  // the trainee retrieved from the bucket. Accepts the object key as
+  // listed (kyc/user-001/...), the bucket-qualified form
+  // (kyc-bucket/user-001/... or kyc-bucket/kyc/user-001/...), or the
+  // full object URL (http://s3.bvbe.internal/kyc-bucket/user-001/...).
   "CHAIN-D": (proof) => {
-    return /^kyc-bucket\/user-[0-9]+\//.test(proof);
+    let p = proof.trim();
+    const schemeHost = p.match(/^[a-z][a-z0-9+.-]*:\/\/[^/]+(\/.*)?$/i);
+    if (schemeHost) p = schemeHost[1] ?? "";
+    p = p.replace(/^\/+/, "");
+    return /^(?:kyc-bucket\/(?:kyc\/)?|kyc\/)user-[0-9]+\/[^/\s]+/.test(p);
   },
 };
+
+// Undo URL-encoding (including double-encoding like %252e) so an
+// encoded traversal proof reads the same as the literal one.
+function decodeRepeatedly(input: string): string {
+  let cur = input;
+  for (let i = 0; i < 3; i++) {
+    let next: string;
+    try {
+      next = decodeURIComponent(cur);
+    } catch {
+      break;
+    }
+    if (next === cur) break;
+    cur = next;
+  }
+  return cur;
+}
+
+const BECH32_CHARSET = "qpzry9x8gf2tvdw0s3jn54khce6mua7l";
+
+function bech32Polymod(values: number[]): number {
+  const GEN = [0x3b6a57b2, 0x26508e6d, 0x1ea119fa, 0x3d4233dd, 0x2a1462b3];
+  let chk = 1;
+  for (const v of values) {
+    const top = chk >>> 25;
+    chk = ((chk & 0x1ffffff) << 5) ^ v;
+    for (let i = 0; i < 5; i++) {
+      if ((top >>> i) & 1) chk ^= GEN[i] as number;
+    }
+  }
+  return chk >>> 0;
+}
+
+// True when the bech32/bech32m checksum verifies.
+function bech32ChecksumOk(addr: string): boolean {
+  const a = addr.toLowerCase();
+  const sep = a.lastIndexOf("1");
+  if (sep < 1 || sep + 7 > a.length) return false;
+  const hrp = a.slice(0, sep);
+  const data: number[] = [];
+  for (const ch of a.slice(sep + 1)) {
+    const v = BECH32_CHARSET.indexOf(ch);
+    if (v < 0) return false;
+    data.push(v);
+  }
+  const expanded: number[] = [];
+  for (const c of hrp) expanded.push(c.charCodeAt(0) >> 5);
+  expanded.push(0);
+  for (const c of hrp) expanded.push(c.charCodeAt(0) & 31);
+  const pm = bech32Polymod([...expanded, ...data]);
+  return pm === 1 || pm === 0x2bc830a3;
+}
+
+function isV24Bypass(proof: string): boolean {
+  if (/[​-‍﻿]/.test(proof)) return true;
+  const a = proof.trim();
+  const m = a.toLowerCase().match(/^(bc|tb|bcrt)1([a-z0-9]+)$/);
+  if (!m) return false;
+  for (const ch of m[2] as string) {
+    if (!BECH32_CHARSET.includes(ch)) return false;
+  }
+  if (m[2]!.length < 6) return false;
+  // Cross-network HRP accepted where a single network is expected.
+  if (m[1] === "tb") return true;
+  // Right alphabet, wrong checksum.
+  return !bech32ChecksumOk(a);
+}
 
 function isJwtWithAlg(token: string, alg: string): boolean {
   if (typeof token !== "string") return false;

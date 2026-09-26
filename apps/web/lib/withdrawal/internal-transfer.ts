@@ -43,10 +43,19 @@ export async function internalTransfer(
     throw new TransferValidationError("amount must be > 0");
   }
 
-  const recipient = await db.user.findUnique({
-    where: { email: args.toUserEmail.toLowerCase() },
-    select: { id: true },
-  });
+  // Signup stores the email as typed, so match case-insensitively.
+  // An exact match wins if two accounts differ only by case.
+  const email = args.toUserEmail.trim();
+  const recipient =
+    (await db.user.findUnique({
+      where: { email },
+      select: { id: true },
+    })) ??
+    (await db.user.findFirst({
+      where: { email: { equals: email, mode: "insensitive" } },
+      select: { id: true },
+      orderBy: { createdAt: "asc" },
+    }));
   if (!recipient) {
     throw new TransferValidationError("recipient not found");
   }

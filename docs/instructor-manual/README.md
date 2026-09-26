@@ -54,6 +54,37 @@ course of a two-day cohort.
   if a trainee tells you "I tried the PoC and it doesn't work" — the
   caveats live here.
 
+## Killer chains at a glance
+
+Moved here from the root README so trainees don't see the paths up front.
+Full walkthroughs are in `02-killer-chains.md`.
+
+| Chain | Outcome | Path |
+|-------|---------|------|
+| **A** | Drain the hot wallet | git-history JWT leak → forged admin → internal-namespace bypass → polyglot PSBT broadcast |
+| **B** | Become admin & persist | mass-assignment on `PATCH /api/v2/me` → plant a second admin (CL/TE smuggle is the env-dependent delivery variant) |
+| **C** | Mass user takeover | self-trade poisons the public price oracle → liquidation worker fires → attacker keeper claims the rebate |
+| **D** | Exfiltrate user DB + KYC | internal-namespace dump of password hashes, *or* KYC URL-import SSRF → cloud metadata → mock S3 |
+
+## Seeded accounts
+
+Staff and fixture accounts created by `packages/db/prisma/seed.ts`. Don't
+hand these to trainees: several challenges are about reaching staff
+privileges. Trainees should sign up at `/signup` like any customer.
+
+| Email | Role | Password |
+|-------|------|----------|
+| `admin@bvbe.local` | admin | `change-me-after-first-login` |
+| `treasury@bvbe.local`, `treasury2@…`, `treasury3@…` | treasury | `change-me-after-first-login` |
+| `support1@bvbe.local`, `support2@…` | support | `change-me-after-first-login` |
+| `compliance@bvbe.local` | compliance | `change-me-after-first-login` |
+| `mm.alpha@bvbe.local`, `mm.beta@…` | user (pre-funded market makers) | `change-me-after-first-login` |
+| `whale1@example.test` / `whale2@example.test` | user (pre-funded) | `Sup3rLong-Whale-Pass-001` / `-002` |
+
+The ~43 synthetic customers use `lab-password-N`. `scripts/new-cohort.sh`
+logs in as `admin@bvbe.local` by default; override with
+`BVBE_ADMIN_EMAIL` and `BVBE_ADMIN_PASSWORD`.
+
 ## How to use this manual
 
 ### Running a 2-day cohort

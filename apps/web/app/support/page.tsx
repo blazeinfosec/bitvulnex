@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Container } from "@/components/ui/container";
-import { authedFetch } from "@/lib/token-storage";
+import { authedFetch, loadFailure } from "@/lib/token-storage";
 
 type TicketRow = {
   id: string;
@@ -20,7 +20,10 @@ const primaryBtn =
 function statusClass(s: string) {
   switch (s) {
     case "open":
+    case "awaiting_user":
       return "text-warn";
+    case "awaiting_agent":
+      return "text-info";
     case "resolved":
       return "text-buy";
     case "closed":
@@ -33,15 +36,18 @@ function statusClass(s: string) {
 export default function SupportInbox() {
   const router = useRouter();
   const [tickets, setTickets] = useState<TicketRow[] | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
     (async () => {
-      const res = await authedFetch("/api/v2/me/tickets");
-      if (res.status === 401) {
-        router.replace("/login");
+      const res = await authedFetch("/api/v2/me/tickets").catch(() => null);
+      const fail = await loadFailure(res, "Could not load your tickets.");
+      if (fail) {
+        if (fail.redirect) router.replace("/login");
+        else setLoadError(fail.message);
         return;
       }
-      const body = (await res.json()) as { tickets: TicketRow[] };
+      const body = (await res!.json()) as { tickets: TicketRow[] };
       setTickets(body.tickets);
     })();
   }, [router]);
@@ -63,7 +69,11 @@ export default function SupportInbox() {
       </div>
 
       <div className="rounded-lg border border-border bg-bg-elevated overflow-hidden">
-        {!tickets ? (
+        {!tickets && loadError ? (
+          <p className="px-4 py-10 text-center text-sell text-sm">
+            {loadError}
+          </p>
+        ) : !tickets ? (
           <p className="px-4 py-10 text-center text-text-mute text-sm">
             Loading…
           </p>

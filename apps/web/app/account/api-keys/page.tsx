@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Container } from "@/components/ui/container";
-import { authedFetch } from "@/lib/token-storage";
+import { authedFetch, loadFailure, responseError } from "@/lib/token-storage";
 import { DataTable, type Column, EmptyState, Modal } from "@/components/exchange";
 
 type ApiKeyListItem = {
@@ -33,15 +33,18 @@ export default function ApiKeysPage() {
   const [scopes, setScopes] = useState<string[]>(["read"]);
   const [created, setCreated] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   async function load() {
-    const res = await authedFetch("/api/v2/me/api-keys");
-    if (res.status === 401) {
-      router.replace("/login");
+    const res = await authedFetch("/api/v2/me/api-keys").catch(() => null);
+    const fail = await loadFailure(res, "Could not load API keys.");
+    if (fail) {
+      if (fail.redirect) router.replace("/login");
+      else setError(fail.message);
       return;
     }
-    const body = await res.json();
-    setKeys(body.keys);
+    const body = await res!.json();
+    setKeys(body.keys ?? []);
   }
 
   useEffect(() => {
@@ -51,11 +54,16 @@ export default function ApiKeysPage() {
 
   async function create(e: React.FormEvent) {
     e.preventDefault();
+    setError(null);
     const res = await authedFetch("/api/v2/me/api-keys", {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ name, scopes }),
     });
+    if (!res.ok) {
+      setError(await responseError(res, "Could not create API key."));
+      return;
+    }
     const body = await res.json();
     setCreated(body.key);
     setName("");
@@ -63,7 +71,14 @@ export default function ApiKeysPage() {
   }
 
   async function revoke(id: string) {
-    await authedFetch(`/api/v2/me/api-keys/${id}`, { method: "DELETE" });
+    setError(null);
+    const res = await authedFetch(`/api/v2/me/api-keys/${id}`, {
+      method: "DELETE",
+    });
+    if (!res.ok) {
+      setError(await responseError(res, "Could not revoke API key."));
+      return;
+    }
     await load();
   }
 
@@ -177,6 +192,12 @@ export default function ApiKeysPage() {
           API keys
         </a>
       </nav>
+
+      {error && (
+        <div className="rounded-md border border-sell/40 bg-sell/10 text-sell px-3 py-2 text-sm">
+          {error}
+        </div>
+      )}
 
       {created && (
         <div className="rounded-lg border border-warn/40 bg-warn/10 p-4 space-y-2">

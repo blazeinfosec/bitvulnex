@@ -46,6 +46,34 @@ function isLocalHost(host: string): boolean {
   return h === "localhost" || h === "127.0.0.1" || h === "::1";
 }
 
+function isInternalProbeHost(rawHost: string): boolean {
+  let host = rawHost.toLowerCase();
+  if (host.startsWith("[") && host.endsWith("]")) {
+    const v6 = host.slice(1, -1);
+    return (
+      v6 === "::" ||
+      v6 === "::1" ||
+      v6.startsWith("::ffff:") ||
+      v6.startsWith("fe80:") ||
+      /^f[cd][0-9a-f]{0,2}:/.test(v6)
+    );
+  }
+  host = host.replace(/\.$/, "");
+  // Single-label names resolve on the docker network (mock-imds,
+  // mock-s3, redis, ...), never on the public internet.
+  if (!host.includes(".")) return true;
+  return (
+    host === "0.0.0.0" ||
+    host.includes("bvbe.internal") ||
+    host.startsWith("127.") ||
+    host.startsWith("169.254.") ||
+    host.startsWith("metadata.") ||
+    host.startsWith("10.") ||
+    host.startsWith("192.168.") ||
+    /^172\.(1[6-9]|2[0-9]|3[0-1])\./.test(host)
+  );
+}
+
 export async function POST(req: Request) {
   const claims = await userFromAuthorization(req.headers.get("authorization"));
   if (!claims) return jsonError(401, "unauthorized");
@@ -115,14 +143,16 @@ export async function POST(req: Request) {
   // link-local metadata addresses, the bvbe.internal alias, and
   // RFC1918 ranges all qualify. The probe is read-only — the fetch
   // above has already happened.
-  const host = target.hostname.toLowerCase();
+  // Check both the requested host and wherever redirects landed.
+  let finalHost: string | null = null;
+  try {
+    finalHost = res.url ? new URL(res.url).hostname : null;
+  } catch {
+    finalHost = null;
+  }
   const reachedInternal =
-    host.includes("bvbe.internal") ||
-    host.startsWith("169.254.") ||
-    host.startsWith("metadata.") ||
-    host.startsWith("10.") ||
-    host.startsWith("192.168.") ||
-    /^172\.(1[6-9]|2[0-9]|3[0-1])\./.test(host);
+    isInternalProbeHost(target.hostname) ||
+    (finalHost !== null && isInternalProbeHost(finalHost));
   const body = reachedInternal
     ? maybeEmitFlag({ document: doc }, "V-40")
     : { document: doc };

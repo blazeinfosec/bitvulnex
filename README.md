@@ -34,23 +34,34 @@ vulnerabilities** (catalog: [`VULNS.md`](./VULNS.md)) and **4 end-to-end
 "killer chains"** — all verified exploitable against a live stack
 (receipts: [`docs/exploitation/`](./docs/exploitation/)).
 
-| Chain | Outcome | Path |
-|-------|---------|------|
-| **A** | Drain the hot wallet | git-history JWT leak → forged admin → internal-namespace bypass → polyglot PSBT broadcast |
-| **B** | Become admin & persist | mass-assignment on `PATCH /api/v2/me` → plant a second admin (CL/TE smuggle is the env-dependent delivery variant) |
-| **C** | Mass user takeover | self-trade poisons the public price oracle → liquidation worker fires → attacker keeper claims the rebate |
-| **D** | Exfiltrate user DB + KYC | internal-namespace dump of password hashes, *or* KYC URL-import SSRF → cloud metadata → mock S3 |
+The four chains are: drain the hot wallet, become admin and persist, take
+over user accounts en masse, and exfiltrate the user database and KYC
+documents. How to get there is up to you.
+
+> **Spoiler warning.** `VULNS.md`, `docs/instructor-manual/`,
+> `docs/exploitation/`, `docs/hints/`, and the compiled hint and flag
+> files in `docs/` are the answer key. If you're a trainee, don't read
+> them.
 
 ## Quick start
 
-Requirements: Docker + Docker Compose. (Node 22 + pnpm 9 only needed for
-local non-Docker dev.)
+Requirements: Docker with Compose v2 (Docker Desktop on Windows/macOS,
+Docker Engine on Linux), about 4 GB of free RAM, and port 80 free on the
+host. Node 22 + pnpm 9 are only needed for unit tests and the instructor
+scripts (`make install` sets them up).
 
 ```bash
-cp .env.example .env
-make up        # docker compose up -d — builds + starts all services
-               # the db-migrate container applies migrations and seeds ~54 users
-open http://localhost/
+cp .env.example .env           # required — compose refuses to start without CTF_SALT
+docker compose up -d --build   # or `make up`; the first build takes a few minutes
+```
+
+The one-shot `db-migrate` container applies migrations, seeds ~54 synthetic
+users, and exits. Then open <http://localhost/> in a browser. To check the
+stack from a terminal:
+
+```bash
+docker compose ps -a              # db-migrate should show "Exited (0)"
+curl http://localhost/api/health  # {"status":"ok","phase":0}
 ```
 
 Everything comes up self-contained — the seed runs automatically as part of
@@ -59,18 +70,46 @@ Everything comes up self-contained — the seed runs automatically as part of
 - `http://localhost/` — landing page (with DO NOT DEPLOY banner)
 - `http://localhost/about/changelog` — in-app changelog
 - `http://localhost/docs` — public API documentation (Swagger)
-- `http://localhost/api/health` — health check (`{"status":"ok"}`)
+- `http://localhost/api/health` — health check (`{"status":"ok","phase":0}`)
 
-Seeded logins (password `change-me-after-first-login`):
-`admin@bvbe.local`, `treasury@bvbe.local`, `compliance@bvbe.local`,
-`mm.alpha@bvbe.local` / `mm.beta@bvbe.local` (pre-funded market makers).
+To start, sign up for an ordinary customer account at
+`http://localhost/signup`. Instructors can find the seeded staff accounts in
+[`docs/instructor-manual/README.md`](./docs/instructor-manual/README.md#seeded-accounts).
 
-Re-seed or reset the lab:
+Stop, re-seed, reset, or update the lab:
 
 ```bash
-make seed      # re-run prisma seed against the running db
-make reset     # docker compose down -v && up  (pristine state)
+docker compose down                           # stop, keep data        (make down)
+docker compose run --rm db-migrate            # re-run migrations+seed (make seed)
+docker compose down -v && docker compose up -d --build   # pristine state (make reset)
+git pull && docker compose up -d --build --renew-anon-volumes  # update (make up)
 ```
+
+### Configuration
+
+Compose reads a handful of toggles from `.env`; everything else is wired in
+`docker-compose.yml`. After editing `.env`, run `docker compose up -d` again
+so the containers pick up the change.
+
+| Variable | Default | Purpose |
+|----------|---------|---------|
+| `CTF_SALT` | `change-me-per-cohort` | Required. Flags derive from it; rotate per cohort (8+ chars). |
+| `CTF_MODE` / `HINT_MODE` / `SCOREBOARD_ENABLED` | `false` | Turn on the CTF surfaces. |
+| `BVBE_HTTP_PORT` | `80` | Host port for the nginx edge. |
+| `ACTIVITY_SIM_ENABLED` / `ACTIVITY_SIM_EVERY_MS` | `true` / `20000` | Ambient simulated customer activity. |
+
+### Troubleshooting
+
+- **Port 80 already in use** (common on Windows with IIS or `http.sys`):
+  set `BVBE_HTTP_PORT=8080` in `.env`, run `docker compose up -d`, and
+  browse to `http://localhost:8080/`.
+- **`CTF_SALT must be set`**: you skipped `cp .env.example .env`.
+- **`web` never starts**: check `docker compose logs db-migrate` — the
+  web container waits for migrations and seeding to succeed.
+- **Windows**: use Docker Desktop with the WSL2 backend. Run the `.sh`
+  scripts from Git Bash or WSL; `.gitattributes` keeps them LF.
+- **No `make`**: every `make` target is a one-line wrapper — see the
+  `Makefile` for the equivalent command.
 
 ## Tech stack
 
@@ -121,8 +160,9 @@ make reset     # docker compose down -v && up  (pristine state)
 ## Running a CTF cohort
 
 The exchange ships with a 44-target CTF mode (40 planted vulnerabilities
-+ 4 killer-chain bonus flags). Set `CTF_MODE=true` in `.env` and the
-trainee-facing surfaces appear:
++ 4 killer-chain bonus flags). Set `CTF_MODE=true` in `.env`, then run
+`docker compose up -d` to recreate the containers, and the trainee-facing
+surfaces appear:
 
 - **`/ctf`** — trainee page. Lists every target, accepts
   `{BLAZE_BITVULNEX_...}` flag submissions, tracks per-trainee score,
@@ -141,6 +181,9 @@ trainee-facing surfaces appear:
    `scripts/new-cohort.sh <cohort-name> [--hints=on|off]`. The script
    logs in as admin, creates the cohort, and prints the 44-flag table
    (save to an instructor-private file — do NOT share with trainees).
+   It needs `bash`, `curl`, and host Node/pnpm (`make install`); on
+   Windows, run it from Git Bash or WSL. It reads `CTF_SALT` from your
+   shell, falling back to `.env`.
 2. Trainees sign up on the running stack. They auto-attach to the
    `default` cohort on first `/ctf` interaction. Move them to your
    real cohort by editing `User.cohortId` directly, OR (recommended)

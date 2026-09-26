@@ -96,3 +96,34 @@ export function formatDecimal(value: string | number, dp = 8): string {
   const result = n.toFixed(dp);
   return result.replace(/0+$/, "").replace(/\.$/, "") || "0";
 }
+
+/**
+ * Normalises a user-typed decimal before it goes over the wire: trims
+ * whitespace, adds the leading zero to ".5" and drops a trailing ".".
+ */
+export function normalizeAmount(value: string): string {
+  let v = value.trim();
+  if (v.startsWith(".")) v = "0" + v;
+  if (v.endsWith(".")) v = v.slice(0, -1);
+  return v;
+}
+
+/** Extracts a readable message from a failed API response. */
+export async function failureMessage(
+  res: Response,
+  action: string,
+): Promise<string> {
+  const text = await res.text().catch(() => "");
+  let msg: string | null = null;
+  if (text) {
+    try {
+      const j = JSON.parse(text) as { error?: { message?: string } | string; message?: string };
+      if (typeof j.error === "string") msg = j.error;
+      else if (j.error && typeof j.error.message === "string") msg = j.error.message;
+      else if (typeof j.message === "string") msg = j.message;
+    } catch {
+      msg = text.length < 200 ? text : null;
+    }
+  }
+  return `${action} failed: ${msg ?? `HTTP ${res.status}`}`;
+}

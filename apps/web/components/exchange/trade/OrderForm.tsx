@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { SideToggle } from "../SideToggle";
 import { BalancePill } from "../BalancePill";
@@ -80,6 +81,7 @@ export function OrderForm({
   onPriceInputChange,
   className,
 }: OrderFormProps) {
+  const pathname = usePathname();
   const [side, setSide] = useState<"buy" | "sell">("buy");
   const [type, setType] = useState<OrderType>("limit");
   const [amount, setAmount] = useState("");
@@ -360,7 +362,7 @@ export function OrderForm({
             </p>
             <div className="flex gap-2">
               <a
-                href="/login"
+                href={`/login?next=${encodeURIComponent(pathname ?? "/")}`}
                 className="inline-flex items-center justify-center h-8 px-3 text-xs font-medium rounded-md bg-accent text-accent-fg hover:bg-accent-hover transition-colors no-underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
               >
                 Sign in

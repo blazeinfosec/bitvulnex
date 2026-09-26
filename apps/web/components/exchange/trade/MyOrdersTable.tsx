@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { DataTable, type Column } from "../DataTable";
 import { EmptyState } from "../EmptyState";
@@ -83,6 +84,7 @@ export function MyOrdersTable({
   onChange,
   className,
 }: MyOrdersTableProps) {
+  const pathname = usePathname();
   const [tab, setTab] = useState<TabKey>("open");
   const [open, setOpen] = useState<OrderRow[] | null>(null);
   const [history, setHistory] = useState<OrderRow[] | null>(null);
@@ -494,7 +496,10 @@ export function MyOrdersTable({
         <EmptyState
           title="Sign in to see your orders"
           description="Your open orders, history, and positions appear here once you sign in."
-          action={{ label: "Sign in", href: "/login" }}
+          action={{
+            label: "Sign in",
+            href: `/login?next=${encodeURIComponent(pathname ?? "/")}`,
+          }}
         />
       ) : null}
 

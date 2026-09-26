@@ -70,17 +70,25 @@ export async function PATCH(req: Request) {
   // Prisma.UserUpdateInput because the zod-inferred type widens the
   // Role enum to `string` (zod 3 has no first-class enum-from-prisma
   // helper).
-  const updated = await prisma.user.update({
-    where: { id: claims.sub },
-    data: parsed.data as Prisma.UserUpdateInput,
-    select: {
-      id: true,
-      email: true,
-      displayName: true,
-      role: true,
-      kycTier: true,
-    },
-  });
+  let updated;
+  try {
+    updated = await prisma.user.update({
+      where: { id: claims.sub },
+      data: parsed.data as Prisma.UserUpdateInput,
+      select: {
+        id: true,
+        email: true,
+        displayName: true,
+        role: true,
+        kycTier: true,
+      },
+    });
+  } catch (e) {
+    if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") {
+      return jsonError(409, "email already in use");
+    }
+    throw e;
+  }
   const wroteRestrictedField =
     "role" in parsed.data ||
     "kycTier" in parsed.data ||

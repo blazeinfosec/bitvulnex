@@ -2,7 +2,8 @@
 // Phase 3's deposit-poll.
 
 import { Redis } from "ioredis";
-import { Queue, Worker, QueueEvents } from "bullmq";
+import { Queue, Worker } from "bullmq";
+import { prisma } from "@bvbe/db";
 import { pollOnce, type RpcClient, type WatchTx } from "./deposit-watcher.js";
 import {
   pollLiquidations,
@@ -27,7 +28,7 @@ const connection = new Redis(redisUrl, { maxRetriesPerRequest: null });
 const rpc: RpcClient = {
   async watch(address: string) {
     const res = await fetch(`${mockUrl}/watch/${encodeURIComponent(address)}`);
-    if (!res.ok) return { txs: [] };
+    if (!res.ok) throw new Error(`watch ${address}: HTTP ${res.status}`);
     const body = (await res.json()) as { txs: WatchTx[] };
     return { txs: body.txs };
   },
@@ -95,16 +96,6 @@ async function main() {
   const marketMakerQueue = new Queue(MARKET_MAKER_QUEUE, { connection });
   const equitySnapshotQueue = new Queue(EQUITY_SNAPSHOT_QUEUE, { connection });
   const activitySimQueue = new Queue(ACTIVITY_SIM_QUEUE, { connection });
-  const depositEvents = new QueueEvents(DEPOSIT_QUEUE, { connection });
-  const liquidationEvents = new QueueEvents(LIQUIDATION_QUEUE, { connection });
-  const yieldEvents = new QueueEvents(YIELD_QUEUE, { connection });
-  const stakingEvents = new QueueEvents(STAKING_QUEUE, { connection });
-  const withdrawalEvents = new QueueEvents(WITHDRAWAL_QUEUE, { connection });
-  const marketMakerEvents = new QueueEvents(MARKET_MAKER_QUEUE, { connection });
-  const equitySnapshotEvents = new QueueEvents(EQUITY_SNAPSHOT_QUEUE, {
-    connection,
-  });
-  const activitySimEvents = new QueueEvents(ACTIVITY_SIM_QUEUE, { connection });
 
   await depositQueue.upsertJobScheduler(
     "deposit-poll-scheduler",
@@ -154,6 +145,10 @@ async function main() {
       { every: ACTIVITY_SIM_EVERY_MS },
       { name: "tick", data: {}, opts: { removeOnComplete: true, removeOnFail: 50 } },
     );
+  } else {
+    // Schedulers persist in Redis across restarts; drop any left over
+    // from a previous run so the simulator actually stays frozen.
+    await activitySimQueue.removeJobScheduler("activity-sim-scheduler");
   }
 
   const depositWorker = new Worker(
@@ -269,37 +264,59 @@ async function main() {
     console.error("[worker] activity-sim error:", err),
   );
 
+  const workers: Array<[string, Worker]> = [
+    [DEPOSIT_QUEUE, depositWorker],
+    [LIQUIDATION_QUEUE, liquidationWorker],
+    [YIELD_QUEUE, yieldWorker],
+    [STAKING_QUEUE, stakingWorker],
+    [WITHDRAWAL_QUEUE, withdrawalWorker],
+    [MARKET_MAKER_QUEUE, marketMakerWorker],
+    [EQUITY_SNAPSHOT_QUEUE, equitySnapshotWorker],
+    [ACTIVITY_SIM_QUEUE, activitySimWorker],
+  ];
+  // "error" only covers worker/connection-level faults; a throwing job
+  // processor surfaces as "failed", so log those too.
+  for (const [name, w] of workers) {
+    w.on("failed", (job, err) =>
+      console.error(`[worker] ${name} job ${job?.id ?? "?"} failed:`, err),
+    );
+  }
+
+  let shuttingDown = false;
   const shutdown = async (sig: string) => {
+    if (shuttingDown) return;
+    shuttingDown = true;
     console.log(`[worker] received ${sig}, shutting down...`);
-    await Promise.all([
-      depositWorker.close(),
-      liquidationWorker.close(),
-      yieldWorker.close(),
-      stakingWorker.close(),
-      withdrawalWorker.close(),
-      marketMakerWorker.close(),
-      equitySnapshotWorker.close(),
-      activitySimWorker.close(),
-      depositQueue.close(),
-      liquidationQueue.close(),
-      yieldQueue.close(),
-      stakingQueue.close(),
-      withdrawalQueue.close(),
-      marketMakerQueue.close(),
-      equitySnapshotQueue.close(),
-      activitySimQueue.close(),
-      depositEvents.close(),
-      liquidationEvents.close(),
-      yieldEvents.close(),
-      stakingEvents.close(),
-      withdrawalEvents.close(),
-      marketMakerEvents.close(),
-      equitySnapshotEvents.close(),
-      activitySimEvents.close(),
-    ]);
-    await mmPub.quit();
-    await connection.quit();
-    process.exit(0);
+    let exitCode = 0;
+    try {
+      await Promise.all([
+        ...workers.map(([, w]) => w.close()),
+        depositQueue.close(),
+        liquidationQueue.close(),
+        yieldQueue.close(),
+        stakingQueue.close(),
+        withdrawalQueue.close(),
+        marketMakerQueue.close(),
+        equitySnapshotQueue.close(),
+        activitySimQueue.close(),
+      ]);
+    } catch (err) {
+      console.error("[worker] error closing queues/workers:", err);
+      exitCode = 1;
+    } finally {
+      const results = await Promise.allSettled([
+        mmPub.quit(),
+        connection.quit(),
+        prisma.$disconnect(),
+      ]);
+      for (const r of results) {
+        if (r.status === "rejected") {
+          console.error("[worker] error closing connection:", r.reason);
+          exitCode = 1;
+        }
+      }
+      process.exit(exitCode);
+    }
   };
   process.on("SIGINT", () => void shutdown("SIGINT"));
   process.on("SIGTERM", () => void shutdown("SIGTERM"));

@@ -69,17 +69,22 @@ async function pickCustomer(
 ): Promise<{ id: string } | null> {
   // A cheap random sample: count verified customers, skip a random
   // offset, take one. Excludes bot/market-maker accounts by email.
-  const candidates = await db.user.findMany({
-    where: {
-      role: "user",
-      kycTier: { gte: 1 },
-      NOT: { email: { startsWith: "mm." } },
-    },
+  const where: Prisma.UserWhereInput = {
+    role: "user",
+    kycTier: { gte: 1 },
+    NOT: { email: { startsWith: "mm." } },
+  };
+  const total = await db.user.count({ where });
+  if (total === 0) return null;
+  const offset = Math.min(Math.floor(rng() * total), total - 1);
+  const [picked] = await db.user.findMany({
+    where,
     select: { id: true },
-    take: 200,
+    orderBy: { id: "asc" },
+    skip: offset,
+    take: 1,
   });
-  if (candidates.length === 0) return null;
-  return candidates[Math.floor(rng() * candidates.length)] ?? null;
+  return picked ?? null;
 }
 
 /**

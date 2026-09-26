@@ -48,7 +48,16 @@ export async function pollOnce(
   });
 
   for (const ba of addresses) {
-    const { txs } = await rpc.watch(ba.address).catch(() => ({ txs: [] }));
+    let txs: WatchTx[];
+    try {
+      ({ txs } = await rpc.watch(ba.address));
+    } catch (err) {
+      // Node unreachable / non-OK response: we know nothing about this
+      // address this round. Skip it entirely — an empty result here would
+      // make the drop check below mark every pending deposit as dropped.
+      console.error(`[deposit-watcher] watch failed for ${ba.address}:`, err);
+      continue;
+    }
     const minConf = minConfirmationsForTier(ba.user.kycTier);
 
     for (const tx of txs) {

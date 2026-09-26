@@ -21,7 +21,7 @@ export async function GET(req: Request) {
   if (!claims) return jsonError(401, "unauthorized");
 
   const open = await prisma.liquidation.findMany({
-    where: { keeperUserId: null },
+    where: { keeperUserId: null, position: { status: "open" } },
     orderBy: { flaggedAt: "asc" },
     include: {
       position: {

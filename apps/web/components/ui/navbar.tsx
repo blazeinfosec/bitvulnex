@@ -1,11 +1,18 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { usePathname, useRouter } from "next/navigation";
 import { Container } from "./container";
 import { Wordmark } from "@/components/exchange/Wordmark";
 import { MobileNav } from "@/components/exchange/MobileNav";
-import { getAccessToken } from "@/lib/token-storage";
+import {
+  AUTH_EVENT,
+  clearTokens,
+  getAccessToken,
+  getRefreshToken,
+  getTokenClaims,
+} from "@/lib/token-storage";
 
 const linkClass =
   "px-3 py-2 text-sm font-medium text-text-dim hover:text-text transition-colors rounded-md no-underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent";
@@ -14,24 +21,42 @@ type DropItem = { href: string; label: string };
 
 function NavDropdown({
   label,
-  href,
   items,
+  footer,
 }: {
   label: string;
-  href: string;
   items: DropItem[];
+  footer?: (close: () => void) => React.ReactNode;
 }) {
+  const ref = useRef<HTMLDetailsElement | null>(null);
+  const pathname = usePathname();
+  const close = useCallback(() => {
+    if (ref.current) ref.current.open = false;
+  }, []);
+
+  // Close the menu whenever the route changes.
+  useEffect(() => {
+    close();
+  }, [pathname, close]);
+
+  // Close when clicking outside the menu.
+  useEffect(() => {
+    function onDocClick(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) close();
+    }
+    document.addEventListener("click", onDocClick);
+    return () => document.removeEventListener("click", onDocClick);
+  }, [close]);
+
   return (
-    <details className="relative group">
+    <details ref={ref} className="relative group">
       <summary
         className={
           linkClass +
           " inline-flex items-center gap-1 cursor-pointer list-none [&::-webkit-details-marker]:hidden"
         }
       >
-        <Link href={href} className="no-underline text-inherit">
-          {label}
-        </Link>
+        <span>{label}</span>
         <svg
           width="10"
           height="10"
@@ -48,26 +73,53 @@ function NavDropdown({
           <Link
             key={it.href}
             href={it.href}
+            onClick={close}
             className="block px-3 py-2 text-sm text-text-dim hover:text-text hover:bg-bg-hover transition-colors no-underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
           >
             {it.label}
           </Link>
         ))}
+        {footer ? footer(close) : null}
       </div>
     </details>
   );
 }
 
+const STAFF_ROLES = new Set(["admin", "support", "compliance", "treasury"]);
+
 export function NavBar() {
+  const router = useRouter();
   const [isAuthed, setIsAuthed] = useState(false);
+  const [isStaff, setIsStaff] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
 
   useEffect(() => {
-    setIsAuthed(Boolean(getAccessToken()));
-    const onStorage = () => setIsAuthed(Boolean(getAccessToken()));
-    window.addEventListener("storage", onStorage);
-    return () => window.removeEventListener("storage", onStorage);
+    const sync = () => {
+      setIsAuthed(Boolean(getAccessToken()));
+      const role = getTokenClaims()?.role;
+      setIsStaff(Boolean(role && STAFF_ROLES.has(role)));
+    };
+    sync();
+    window.addEventListener("storage", sync);
+    window.addEventListener(AUTH_EVENT, sync);
+    return () => {
+      window.removeEventListener("storage", sync);
+      window.removeEventListener(AUTH_EVENT, sync);
+    };
   }, []);
+
+  const signOut = useCallback(async () => {
+    const refresh = getRefreshToken();
+    if (refresh) {
+      await fetch("/api/v2/auth/logout", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ refresh }),
+      }).catch(() => undefined);
+    }
+    clearTokens();
+    router.replace("/");
+  }, [router]);
 
   return (
     <header className="border-b border-border bg-bg-elevated relative z-20">
@@ -103,7 +155,6 @@ export function NavBar() {
           {isAuthed ? (
             <NavDropdown
               label="Wallet"
-              href="/wallet/deposit"
               items={[
                 { href: "/wallet/deposit", label: "Deposit" },
                 { href: "/wallet/withdraw", label: "Withdraw" },
@@ -113,25 +164,43 @@ export function NavBar() {
           ) : null}
           <NavDropdown
             label="More"
-            href="/otc"
             items={[
               { href: "/otc", label: "OTC desk" },
               { href: "/p2p", label: "P2P" },
               { href: "/account/api-keys", label: "API keys" },
               { href: "/referrals", label: "Referrals" },
               { href: "/subaccounts", label: "Sub-accounts" },
+              { href: "/support", label: "Support" },
             ]}
           />
+          {isAuthed && isStaff ? (
+            <Link href="/admin" className={linkClass}>
+              Admin
+            </Link>
+          ) : null}
           {isAuthed ? (
             <NavDropdown
               label="Account"
-              href="/account/profile"
               items={[
+                { href: "/account", label: "Overview" },
                 { href: "/account/profile", label: "Profile" },
                 { href: "/account/security", label: "Security" },
                 { href: "/account/kyc", label: "KYC" },
                 { href: "/account/api-keys", label: "API keys" },
+                { href: "/account/orders", label: "Orders" },
               ]}
+              footer={(close) => (
+                <button
+                  type="button"
+                  onClick={() => {
+                    close();
+                    void signOut();
+                  }}
+                  className="block w-full text-left px-3 py-2 text-sm text-text-dim hover:text-text hover:bg-bg-hover transition-colors border-t border-border-subtle mt-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+                >
+                  Sign out
+                </button>
+              )}
             />
           ) : null}
           {!isAuthed ? (
@@ -183,6 +252,8 @@ export function NavBar() {
           open={mobileOpen}
           onClose={() => setMobileOpen(false)}
           isAuthed={isAuthed}
+          isStaff={isStaff}
+          onSignOut={signOut}
         />
       </div>
     </header>

@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { Container } from "@/components/ui/container";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { authedFetch } from "@/lib/token-storage";
+import { authedFetch, errorMessage, responseError } from "@/lib/token-storage";
 
 type LiqRow = {
   id: number;
@@ -27,6 +27,33 @@ export default function KeeperPage() {
   const router = useRouter();
   const [queue, setQueue] = useState<LiqRow[]>([]);
   const [message, setMessage] = useState<string | null>(null);
+  const [registeredAt, setRegisteredAt] = useState<string | null>(null);
+  const [registering, setRegistering] = useState(false);
+  const [registerError, setRegisterError] = useState<string | null>(null);
+
+  async function register() {
+    setRegistering(true);
+    setRegisterError(null);
+    try {
+      const res = await authedFetch("/api/v2/me/keeper/register", {
+        method: "POST",
+      });
+      if (res.status === 401) {
+        router.replace("/login");
+        return;
+      }
+      if (!res.ok) {
+        setRegisterError(await responseError(res, "Registration failed."));
+        return;
+      }
+      const b = (await res.json().catch(() => ({}))) as { registeredAt?: string };
+      setRegisteredAt(b.registeredAt ?? new Date().toISOString());
+    } catch {
+      setRegisterError("Registration failed.");
+    } finally {
+      setRegistering(false);
+    }
+  }
 
   async function load() {
     const res = await authedFetch("/api/v2/keeper/liquidations");
@@ -60,7 +87,7 @@ export default function KeeperPage() {
     setMessage(
       b.ok
         ? `claimed; rebate ${b.rebate}`
-        : `claim failed: ${b.error?.message ?? "?"}`,
+        : `claim failed: ${errorMessage(b, `HTTP ${res.status}`)}`,
     );
     load();
   }
@@ -74,6 +101,31 @@ export default function KeeperPage() {
         Anyone can claim a flagged liquidation. Rebate is paid from
         the closed position&apos;s collateral.
       </p>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Keeper registration</CardTitle>
+        </CardHeader>
+        <CardContent className="text-sm space-y-2">
+          {registeredAt ? (
+            <p className="text-buy">
+              Registered as a keeper since{" "}
+              {new Date(registeredAt).toLocaleString()}.
+            </p>
+          ) : (
+            <>
+              <p className="text-text-dim">
+                You must be registered as a keeper (KYC tier 1+) before
+                claiming liquidations.
+              </p>
+              <Button size="sm" onClick={register} disabled={registering}>
+                {registering ? "Registering…" : "Register as keeper"}
+              </Button>
+            </>
+          )}
+          {registerError && <p className="text-sell">{registerError}</p>}
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader>

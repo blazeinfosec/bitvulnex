@@ -4,7 +4,11 @@ import { useEffect, useState } from "react";
 import { Modal } from "../Modal";
 import { Button } from "@/components/ui/button";
 import { authedFetch } from "@/lib/token-storage";
-import { InlineMessage, formatDecimal } from "./modal-shared";
+import {
+  InlineMessage,
+  formatDecimal,
+  failureMessage,
+} from "./modal-shared";
 
 export interface WithdrawModalProps {
   open: boolean;
@@ -50,8 +54,7 @@ export function WithdrawModal({
         onSuccess();
         onClose();
       } else {
-        const body = await res.text();
-        setError(`Withdraw failed (${res.status}): ${body || "unknown error"}`);
+        setError(await failureMessage(res, "Withdraw"));
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Network error");

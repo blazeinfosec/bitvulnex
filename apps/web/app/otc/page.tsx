@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Container } from "@/components/ui/container";
-import { authedFetch } from "@/lib/token-storage";
+import { authedFetch, responseError } from "@/lib/token-storage";
 import { Modal } from "@/components/exchange";
 
 type Ticket = {
@@ -57,9 +57,11 @@ export default function OtcPage() {
     if (res.ok) {
       setTicket((await res.json()) as Ticket);
     } else if (res.status === 403) {
-      setMessage("OTC desk requires KYC tier 2 or higher.");
+      setMessage(
+        await responseError(res, "OTC desk requires KYC tier 2 or higher."),
+      );
     } else {
-      setMessage(`Quote error: ${res.status}`);
+      setMessage(await responseError(res, `Quote error: ${res.status}`));
     }
   }
 
@@ -74,7 +76,7 @@ export default function OtcPage() {
       setMessage("Ticket filled.");
       setTicket(null);
     } else {
-      setMessage(`Accept error: ${res.status}`);
+      setMessage(await responseError(res, `Accept error: ${res.status}`));
     }
     setConfirmOpen(false);
   }

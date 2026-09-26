@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Container } from "@/components/ui/container";
-import { authedFetch } from "@/lib/token-storage";
+import { authedFetch, errorMessage } from "@/lib/token-storage";
 import { BalancePill } from "@/components/exchange";
 
 type BalanceRow = { asset: string; amount: string };
@@ -26,19 +26,21 @@ export default function WalletTransferPage() {
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
 
-  useEffect(() => {
-    (async () => {
-      const res = await authedFetch("/api/v2/me/balance");
-      if (res.status === 401) {
-        router.replace("/login");
-        return;
-      }
-      if (res.ok) {
-        const b = (await res.json()) as { balances: BalanceRow[] };
-        setBalances(b.balances);
-      }
-    })();
+  const loadBalances = useCallback(async () => {
+    const res = await authedFetch("/api/v2/me/balance");
+    if (res.status === 401) {
+      router.replace("/login");
+      return;
+    }
+    if (res.ok) {
+      const b = (await res.json()) as { balances: BalanceRow[] };
+      setBalances(b.balances);
+    }
   }, [router]);
+
+  useEffect(() => {
+    void loadBalances();
+  }, [loadBalances]);
 
   async function submit() {
     setError(null);
@@ -50,18 +52,15 @@ export default function WalletTransferPage() {
       headers: { "content-type": "application/json" },
       body: JSON.stringify(body),
     });
-    const respBody = (await res.json()) as
-      | { transferId: string }
-      | { error: { message: string } };
+    const respBody = (await res.json().catch(() => null)) as unknown;
     if (!res.ok) {
-      setError(
-        "error" in respBody ? respBody.error.message : "Transfer failed",
-      );
+      setError(errorMessage(respBody, "Transfer failed"));
     } else {
       setMessage("Transfer complete.");
       setAmount("");
       setRecipientEmail("");
       setMemo("");
+      await loadBalances();
     }
   }
 

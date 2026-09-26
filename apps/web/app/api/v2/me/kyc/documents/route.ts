@@ -32,7 +32,12 @@ export async function POST(req: Request) {
   const claims = await userFromAuthorization(req.headers.get("authorization"));
   if (!claims) return jsonError(401, "unauthorized");
 
-  const form = await req.formData();
+  let form: FormData;
+  try {
+    form = await req.formData();
+  } catch {
+    return jsonError(400, "multipart/form-data body required");
+  }
   const file = form.get("file");
   const docType = String(form.get("type") ?? "");
 

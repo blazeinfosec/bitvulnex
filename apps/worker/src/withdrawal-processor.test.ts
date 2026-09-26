@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
+import { Prisma } from "@bvbe/db";
 import {
   type BitcoinClient,
   type WithdrawalDb,
@@ -9,8 +10,8 @@ type WRow = {
   id: string;
   userId: string;
   asset: string;
-  amount: string;
-  fee: string;
+  amount: Prisma.Decimal;
+  fee: Prisma.Decimal;
   destAddress: string;
   status:
     | "pending"
@@ -32,6 +33,7 @@ type WRow = {
 
 function makeFakeDb(seed: WRow[]) {
   const rows = [...seed];
+  const balances = new Map<string, Prisma.Decimal>();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const api: any = {
     withdrawal: {
@@ -59,9 +61,40 @@ function makeFakeDb(seed: WRow[]) {
         rows[idx] = { ...rows[idx]!, ...data };
         return rows[idx];
       },
+      updateMany: async ({
+        where,
+        data,
+      }: {
+        where: { id: string; status: WRow["status"] };
+        data: Partial<WRow>;
+      }) => {
+        const idx = rows.findIndex(
+          (r) => r.id === where.id && r.status === where.status,
+        );
+        if (idx < 0) return { count: 0 };
+        rows[idx] = { ...rows[idx]!, ...data };
+        return { count: 1 };
+      },
     },
+    balance: {
+      update: async ({
+        where,
+        data,
+      }: {
+        where: { userId_asset: { userId: string; asset: string } };
+        data: { available: { increment: Prisma.Decimal } };
+      }) => {
+        const key = `${where.userId_asset.userId}:${where.userId_asset.asset}`;
+        const next = (balances.get(key) ?? new Prisma.Decimal(0)).add(
+          data.available.increment,
+        );
+        balances.set(key, next);
+        return { available: next };
+      },
+    },
+    $transaction: async (fn: (tx: unknown) => Promise<unknown>) => fn(api),
   };
-  return { db: api as WithdrawalDb, rows };
+  return { db: api as WithdrawalDb, rows, balances };
 }
 
 function makeClient(opts: {
@@ -83,8 +116,8 @@ function seedRow(overrides: Partial<WRow> = {}): WRow {
     id: "w1",
     userId: "u1",
     asset: "BTC",
-    amount: "0.1",
-    fee: "0.0001",
+    amount: new Prisma.Decimal("0.1"),
+    fee: new Prisma.Decimal("0.0001"),
     destAddress: "bcrt1qrecipient",
     status: "pending",
     txid: null,
@@ -151,5 +184,44 @@ describe("processWithdrawalOnce", () => {
     expect(summary.failed).toBe(1);
     expect(fake.rows[0]?.status).toBe("failed");
     expect(fake.rows[0]?.failedReason).toContain("rpc unavailable");
+    // amount + fee is credited back to the user.
+    expect(fake.balances.get("u1:BTC")?.toString()).toBe("0.1001");
+  });
+
+  it("does not refund a failed send that was cancelled concurrently", async () => {
+    const client = makeClient({
+      sendmanyImpl: async () => {
+        // User cancel lands while the RPC is in flight.
+        fake.rows[0] = { ...fake.rows[0]!, status: "rejected" };
+        throw new Error("rpc unavailable");
+      },
+    });
+    await processWithdrawalOnce(client, fake.db);
+    expect(fake.rows[0]?.status).toBe("rejected");
+    expect(fake.balances.get("u1:BTC")).toBeUndefined();
+  });
+
+  it("settles non-BTC withdrawals without calling the BTC node", async () => {
+    fake.rows[0] = seedRow({ asset: "USDT", amount: new Prisma.Decimal("500") });
+    let callCount = 0;
+    const client = makeClient({
+      sendmanyImpl: async () => {
+        callCount += 1;
+        return "x".repeat(64);
+      },
+    });
+    const summary = await processWithdrawalOnce(client, fake.db);
+    expect(callCount).toBe(0);
+    expect(summary.confirmed).toBe(1);
+    expect(fake.rows[0]?.status).toBe("confirmed");
+  });
+
+  it("confirms a bumped withdrawal once its replacement confirms", async () => {
+    const txid = "b".repeat(64);
+    fake.rows[0] = seedRow({ status: "bumped", txid });
+    const client = makeClient({ txConfirmations: { [txid]: 1 } });
+    const summary = await processWithdrawalOnce(client, fake.db);
+    expect(summary.confirmed).toBe(1);
+    expect(fake.rows[0]?.status).toBe("confirmed");
   });
 });

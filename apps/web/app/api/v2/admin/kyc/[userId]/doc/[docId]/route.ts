@@ -24,11 +24,17 @@ export async function GET(
     return jsonError(404, "file missing");
   }
 
+  // Header values must be ByteStrings, so a filename with non-ASCII
+  // characters or quotes gets an ASCII fallback plus the RFC 5987
+  // encoded form.
+  const asciiName =
+    doc.filename.replace(/[^\x20-\x7e]/g, "_").replace(/["\\]/g, "_") ||
+    "document";
   return new Response(new Uint8Array(bytes), {
     status: 200,
     headers: {
       "content-type": doc.mimeType,
-      "content-disposition": `inline; filename="${doc.filename}"`,
+      "content-disposition": `inline; filename="${asciiName}"; filename*=UTF-8''${encodeURIComponent(doc.filename)}`,
     },
   });
 }

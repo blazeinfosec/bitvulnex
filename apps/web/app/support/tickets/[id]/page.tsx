@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { Container } from "@/components/ui/container";
-import { authedFetch } from "@/lib/token-storage";
+import { authedFetch, loadFailure, responseError } from "@/lib/token-storage";
 
 type Message = {
   id: string;
@@ -43,14 +43,22 @@ export default function UserTicketDetail() {
   const params = useParams<{ id: string }>();
   const [data, setData] = useState<Detail | null>(null);
   const [reply, setReply] = useState("");
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [sendError, setSendError] = useState<string | null>(null);
+  const [sending, setSending] = useState(false);
 
   async function load() {
-    const res = await authedFetch(`/api/v2/me/tickets/${params.id}`);
-    if (res.status === 401) {
-      router.replace("/login");
+    const res = await authedFetch(`/api/v2/me/tickets/${params.id}`).catch(
+      () => null,
+    );
+    const fail = await loadFailure(res, "Could not load this ticket.");
+    if (fail) {
+      if (fail.redirect) router.replace("/login");
+      else setLoadError(fail.message);
       return;
     }
-    setData((await res.json()) as Detail);
+    setLoadError(null);
+    setData((await res!.json()) as Detail);
   }
 
   useEffect(() => {
@@ -59,13 +67,31 @@ export default function UserTicketDetail() {
   }, [params.id]);
 
   async function send() {
-    await authedFetch(`/api/v2/me/tickets/${params.id}/reply`, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ body: reply }),
-    });
-    setReply("");
-    await load();
+    setSendError(null);
+    setSending(true);
+    try {
+      const res = await authedFetch(`/api/v2/me/tickets/${params.id}/reply`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ body: reply }),
+      });
+      if (!res.ok) {
+        setSendError(await responseError(res, "Reply failed."));
+        return;
+      }
+      setReply("");
+      await load();
+    } finally {
+      setSending(false);
+    }
+  }
+
+  if (!data && loadError) {
+    return (
+      <Container className="py-10">
+        <p className="text-sell text-sm">{loadError}</p>
+      </Container>
+    );
   }
 
   if (!data) {
@@ -134,6 +160,7 @@ export default function UserTicketDetail() {
 
       <section className="rounded-lg border border-border bg-bg-elevated p-5 space-y-3">
         <h2 className="text-sm font-semibold text-text">Reply</h2>
+        {sendError && <p className="text-sell text-sm">{sendError}</p>}
         <textarea
           value={reply}
           onChange={(e) => setReply(e.target.value)}
@@ -145,9 +172,9 @@ export default function UserTicketDetail() {
           type="button"
           className={primaryBtn}
           onClick={send}
-          disabled={!reply}
+          disabled={!reply || sending}
         >
-          Send reply
+          {sending ? "Sending…" : "Send reply"}
         </button>
       </section>
     </Container>

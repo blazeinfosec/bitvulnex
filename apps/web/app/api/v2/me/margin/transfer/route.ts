@@ -63,6 +63,7 @@ export async function POST(req: Request) {
           },
           data: {
             available: { decrement: amount },
+            amount: { decrement: amount },
             marginAvailable: { increment: amount },
           },
         });
@@ -77,6 +78,7 @@ export async function POST(req: Request) {
           data: {
             marginAvailable: { decrement: amount },
             available: { increment: amount },
+            amount: { increment: amount },
           },
         });
       }

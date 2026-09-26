@@ -45,7 +45,7 @@ function bech32Random(n: number): string {
   return out;
 }
 
-class ChainState {
+export class ChainState {
   blockHeight = 0;
   bestBlockHash = "0".repeat(64);
   // utxos keyed by `${txid}:${vout}`
@@ -108,22 +108,38 @@ class ChainState {
    * the txid.
    */
   labSend(address: string, amountSat: bigint, replaceable = true): string {
+    const feeSat = 1_000n;
+    const target = amountSat + feeSat;
+
+    // Coin selection is a dry run first: pick keys without touching the
+    // wallet so an insufficient-funds error leaves every UTXO spendable.
     let collected = 0n;
-    const inputs: Array<{ txid: string; vout: number }> = [];
-    while (collected < amountSat + 1_000n && this.labWalletUtxos.length > 0) {
-      const key = this.labWalletUtxos.shift();
-      if (!key) break;
+    const selected: string[] = [];
+    for (const key of this.labWalletUtxos) {
+      if (collected >= target) break;
       const u = this.utxos.get(key);
       if (!u || u.spent) continue;
-      u.spent = true;
+      selected.push(key);
       collected += u.amountSat;
+    }
+    if (collected < target) throw new Error("lab wallet exhausted");
+
+    const inputs: Array<{ txid: string; vout: number }> = [];
+    const selectedSet = new Set(selected);
+    for (const key of selected) {
+      const u = this.utxos.get(key) as Utxo;
+      u.spent = true;
       inputs.push({ txid: u.txid, vout: u.vout });
     }
-    if (collected < amountSat) throw new Error("lab wallet exhausted");
+    // Drop the spent keys (and any stale ones that no longer resolve).
+    this.labWalletUtxos = this.labWalletUtxos.filter((k) => {
+      if (selectedSet.has(k)) return false;
+      const u = this.utxos.get(k);
+      return !!u && !u.spent;
+    });
 
     const txid = randomHex(32);
-    const feeSat = 1_000n;
-    const changeSat = collected - amountSat - feeSat;
+    const changeSat = collected - target;
     const outputs: Array<{ address: string; amountSat: bigint }> = [
       { address, amountSat },
     ];
@@ -156,30 +172,38 @@ class ChainState {
 
   /**
    * RBF-replace a mempool tx with a new one that redirects the
-   * original amount to `newAddress`. Returns the new txid.
+   * recipient output (vout 0) to `newAddress`. Any other outputs
+   * (e.g. change back to the lab wallet) are carried over unchanged.
+   * The fee bump is taken from the recipient output only. Returns the
+   * new txid.
    */
   rbfReplace(oldTxid: string, newAddress: string): string {
     const old = this.mempool.get(oldTxid);
     if (!old) throw new Error("tx not in mempool");
     if (!old.replaceable) throw new Error("tx not replaceable");
 
-    // Drop the old outputs from utxos
-    old.outputs.forEach((_, i) => {
-      this.utxos.delete(`${oldTxid}:${i}`);
-    });
+    const [recipient, ...rest] = old.outputs;
+    if (!recipient) throw new Error("tx has no outputs");
+    // Same inputs, fee raised by `bumpSat`; the recipient output absorbs
+    // the bump so input_sum - outputs_sum still equals the recorded fee.
+    const bumpSat = 500n;
+    if (recipient.amountSat <= bumpSat) {
+      throw new Error("recipient output too small to bump fee");
+    }
+    const feeSat = old.feeSat + bumpSat;
+    const newOutputs: Array<{ address: string; amountSat: bigint }> = [
+      { address: newAddress, amountSat: recipient.amountSat - bumpSat },
+      ...rest.map((o) => ({ address: o.address, amountSat: o.amountSat })),
+    ];
+
+    // Drop the old outputs from utxos (and from the lab wallet's list).
+    const oldKeys = new Set(old.outputs.map((_, i) => `${oldTxid}:${i}`));
+    oldKeys.forEach((k) => this.utxos.delete(k));
+    this.labWalletUtxos = this.labWalletUtxos.filter((k) => !oldKeys.has(k));
     this.mempool.delete(oldTxid);
     this.dropped.add(oldTxid);
 
     const replacementTxid = randomHex(32);
-    // total = sum of the old outputs = (input_sum - old.feeSat).
-    // We keep the same inputs and increase the fee by `bumpSat`,
-    // so the new outputs lose exactly that amount.
-    // Recorded feeSat = old.feeSat + bumpSat; real fee equals
-    // input_sum - newOutputs.sum, which simplifies to the same value.
-    const total = old.outputs.reduce((a, o) => a + o.amountSat, 0n);
-    const bumpSat = 500n;
-    const feeSat = old.feeSat + bumpSat;
-    const newOutputs = [{ address: newAddress, amountSat: total - bumpSat }];
     this.mempool.set(replacementTxid, {
       txid: replacementTxid,
       inputs: old.inputs,
@@ -188,13 +212,16 @@ class ChainState {
       replaceable: true,
     });
     newOutputs.forEach((o, i) => {
-      this.utxos.set(`${replacementTxid}:${i}`, {
+      const key = `${replacementTxid}:${i}`;
+      this.utxos.set(key, {
         txid: replacementTxid,
         vout: i,
         address: o.address,
         amountSat: o.amountSat,
         spent: false,
       });
+      // Re-register lab-wallet outputs (change) so the wallet keeps its funds.
+      if (o.address === this.labWalletAddress) this.labWalletUtxos.push(key);
     });
     return replacementTxid;
   }

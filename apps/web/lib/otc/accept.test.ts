@@ -146,6 +146,15 @@ describe("acceptOtc — double-fill defence", () => {
     expect(rejected).toHaveLength(1);
   });
 
+  it("an expired quote is persisted as expired", async () => {
+    const { db, ticket } = makeFake();
+    ticket.quoteExpiresAt = new Date(Date.now() - 1_000);
+    await expect(
+      acceptOtc({ userId: "u1", ticketId: "t1", feeBps: 25 }, db),
+    ).rejects.toThrow(/quote expired/);
+    expect(ticket.status).toBe("expired");
+  });
+
   it("happy path produces the expected base/quote deltas", async () => {
     const { db } = makeFake();
     const r = await acceptOtc(
