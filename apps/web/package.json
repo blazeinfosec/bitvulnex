@@ -22,7 +22,7 @@
     "jose": "^5.9.3",
     "lightweight-charts": "^5.0.0",
     "lucide-react": "^0.451.0",
-    "next": "^15.0.0",
+    "next": "^15.5.24",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "swagger-ui-dist": "^5.17.14",
